@@ -21,12 +21,43 @@ navegador (celular / notebook na LAN)
 Um link só para todas as sessões. O hub é um daemon desanexado: sobrevive à morte de
 qualquer sessão e se autoencerra 60s depois que a última sai.
 
-## Pré-requisito: habilitar o canal
+## Instalação
 
-O protocolo de canal do Claude Code vem **desligado de fábrica** e é protegido por três
-camadas independentes. Sem todas elas, este plugin instala, conecta, serve a página e registra
-a atividade normalmente — **mas os prompts nunca chegam ao modelo**, e o descarte é silencioso
-do lado do Claude.
+Clone, leia o script e execute — um comando resolve tudo, inclusive numa máquina recém-formatada:
+
+```bash
+git clone https://github.com/uesleinasch/claude-local-session
+./claude-local-session/install.sh
+```
+
+Se preferir a via curta (executa código remoto sem revisão prévia, avalie):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/uesleinasch/claude-local-session/main/install.sh | bash
+```
+
+O instalador verifica o `claude`, instala o `bun` se faltar, adiciona o marketplace, instala o
+plugin e configura as três camadas descritas abaixo. É idempotente: rodar de novo não duplica
+nada e não pede senha se já estiver tudo certo. Ele pede `sudo` uma única vez, para escrever em
+`/etc/claude-code/managed-settings.json`.
+
+Depois abra um terminal novo e rode `claude` — o canal já vem ativo, porque o instalador
+escreve no seu rc:
+
+```bash
+alias claude='claude --channels plugin:local-session@unac'
+```
+
+Numa máquina que já tem o plugin, `/local-session:setup` faz a mesma configuração de dentro do
+Claude Code (o pedido de senha vira um diálogo gráfico, via `pkexec`).
+
+## O que o instalador configura
+
+O protocolo de canal do Claude Code vem **desligado de fábrica** e é protegido por três camadas
+independentes. Sem todas elas, o plugin instala, conecta, serve a página e registra a atividade
+normalmente — **mas os prompts nunca chegam ao modelo**, e o descarte é silencioso do lado do
+Claude. Esta seção existe para você entender o que foi mexido na sua máquina, e para conseguir
+fazer à mão se preferir.
 
 ### 1. Ligar o recurso e permitir o plugin
 
@@ -38,8 +69,7 @@ sudo tee /etc/claude-code/managed-settings.json >/dev/null <<'EOF'
 {
   "channelsEnabled": true,
   "allowedChannelPlugins": [
-    { "plugin": "local-session", "marketplace": "unac" },
-    { "plugin": "telegram", "marketplace": "claude-plugins-official" }
+    { "plugin": "local-session", "marketplace": "unac" }
   ]
 }
 EOF
@@ -49,8 +79,9 @@ EOF
 mensagens para dentro das sessões.
 
 **Atenção:** declarar `allowedChannelPlugins` *substitui* a allowlist padrão da Anthropic, em
-vez de somar a ela. Liste todos os plugins de canal que você usa — por isso o Telegram oficial
-está no exemplo acima.
+vez de somar a ela. Se você usa outro plugin de canal — o Telegram oficial, por exemplo —
+acrescente a entrada dele aqui, senão ele para de receber. É por isso que o instalador faz
+merge em vez de sobrescrever: uma entrada que já esteja no arquivo nunca é removida.
 
 ### 2. Ativar o canal na sessão
 
@@ -60,12 +91,9 @@ A allowlist diz o que *pode* ser canal; cada sessão ainda escolhe o que *é*:
 claude --channels plugin:local-session@unac
 ```
 
-O formato é `plugin:<nome>@<marketplace>` — não o identificador que aparece nos logs. Para não
-digitar sempre, guarde um alias no seu `.zshrc`:
-
-```bash
-alias claudew='claude --channels plugin:local-session@unac'
-```
+O formato é `plugin:<nome>@<marketplace>` — não o identificador que aparece nos logs. É por isso
+que o instalador escreve o alias sobrepondo o próprio `claude`: a flag é por sessão e não tem
+equivalente em `settings.json`, então sem o alias você precisaria lembrar dela toda vez.
 
 ### 3. Opcional: não aprovar cada resposta
 
@@ -84,19 +112,11 @@ continuam pedindo), em `~/.claude/settings.json`:
 Se a sua organização distribui `managed-settings.json` por política, a alteração do passo 1
 pode ser sobrescrita — fale com quem administra antes.
 
-## Instalação
+## Como pegar o link
 
-Como plugin local do Claude Code:
-
-```
-/plugin marketplace add uesleinasch/claude-local-session
-/plugin install local-session@unac
-```
-
-Reinicie a sessão. Na primeira execução, o MCP server gera o token em
-`~/.claude/local-session/config.json` (modo `0600`) e sobe o hub sozinho.
-
-Para descobrir o endereço, pergunte ao Claude — ele tem a tool `link`:
+Na primeira execução o MCP server gera o token em `~/.claude/local-session/config.json`
+(modo `0600`) e sobe o hub sozinho. Para descobrir o endereço, pergunte ao Claude — ele tem a
+tool `link`:
 
 ```
 > qual o link da sessão?
@@ -200,5 +220,8 @@ Estrutura:
 | `src/hook-event.ts` | Payload de hook → evento de atividade             |
 | `hooks/report.ts`   | Hook: lê stdin, faz POST, falha em silêncio       |
 | `web/`              | UI estática, sem framework nem build              |
+| `src/setup-core.ts` | Merges de configuração, sem I/O (testável)        |
+| `scripts/setup.ts`  | Aplica a configuração; eleva com `sudo` ou `pkexec` |
+| `install.sh`        | Instalador de máquina nova — casca fina sobre o setup |
 
 O design completo está em `docs/superpowers/specs/2026-08-07-claude-local-session-design.md`.
