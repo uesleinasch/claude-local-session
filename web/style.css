@@ -1,0 +1,456 @@
+:root {
+  --bg: #0b0c0e;
+  --bg-raise: #131519;
+  --ink: #eceae7;
+  --ink-dim: #85817b;
+  --rule: #262a2f;
+  --amber: #ffb02e;
+  --green: #63d38b;
+  --red: #ff6b60;
+
+  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --step-0: 0.9375rem;
+  --step--1: 0.8125rem;
+  --step--2: 0.6875rem;
+
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: var(--step-0);
+  line-height: 1.5;
+  -webkit-text-size-adjust: 100%;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 2px;
+}
+
+#app {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas: "bar" "body" "composer";
+  height: 100dvh;
+  max-width: 68ch;
+  margin: 0 auto;
+}
+
+/* ---------- barra ---------- */
+
+#bar {
+  grid-area: bar;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px calc(12px);
+  padding-top: max(12px, env(safe-area-inset-top));
+  border-bottom: 1px solid var(--rule);
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+#title {
+  margin: 0;
+  font-size: var(--step-0);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+#back {
+  display: none;
+  min-width: 44px;
+  min-height: 44px;
+  margin: -10px 0 -10px -12px;
+  border: 0;
+  background: none;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+
+#app[data-view="feed"] #back {
+  display: block;
+}
+
+#state::before {
+  content: "○ encerrada";
+  color: var(--ink-dim);
+  font-size: var(--step--2);
+  letter-spacing: 0.02em;
+}
+
+#state[data-alive="true"]::before {
+  content: "● ativa";
+  color: var(--green);
+}
+
+#app[data-view="sessions"] #state {
+  display: none;
+}
+
+/* ---------- alternância de telas ---------- */
+
+#sessions,
+#feed {
+  grid-area: body;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+#app[data-view="sessions"] #feed,
+#app[data-view="sessions"] #composer,
+#app[data-view="feed"] #sessions {
+  display: none;
+}
+
+/* ---------- lista de sessões ---------- */
+
+#session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.session {
+  display: block;
+  width: 100%;
+  min-height: 64px;
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.session:hover {
+  background: var(--bg-raise);
+}
+
+.session-name {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.session-name::before {
+  content: "●";
+  color: var(--green);
+  font-size: var(--step--2);
+}
+
+.session[data-alive="false"] {
+  color: var(--ink-dim);
+}
+
+.session[data-alive="false"] .session-name::before {
+  content: "○";
+  color: var(--ink-dim);
+}
+
+.session-path {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-dim);
+  font-size: var(--step--1);
+  word-break: break-all;
+}
+
+#sessions-empty,
+#feed-empty {
+  padding: 32px 16px;
+  color: var(--ink-dim);
+  font-size: var(--step--1);
+  text-align: center;
+}
+
+/* ---------- feed ---------- */
+
+#feed {
+  padding: 16px 16px 24px;
+}
+
+.turn {
+  margin: 0 0 24px;
+}
+
+.who {
+  margin: 0 0 4px;
+  color: var(--ink-dim);
+  font-size: var(--step--2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.turn[data-kind="prompt"] .who {
+  color: var(--amber);
+}
+
+.text {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* atividade — a régua vertical liga os passos de um mesmo bloco */
+.acts {
+  margin: 0 0 24px;
+  padding: 2px 0 2px 14px;
+  border-left: 2px solid var(--rule);
+  list-style: none;
+  color: var(--ink-dim);
+  font-size: var(--step--1);
+}
+
+.act {
+  display: flex;
+  gap: 10px;
+  padding: 2px 0;
+}
+
+.act-tool {
+  flex: none;
+  width: 7ch;
+  color: var(--ink);
+}
+
+.act-detail {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.act[data-status="start"] .act-detail::after {
+  content: " …";
+  color: var(--amber);
+}
+
+.act[data-status="idle"] {
+  color: var(--ink-dim);
+  font-style: italic;
+}
+
+/* ---------- permissão: único bloco invertido da página ---------- */
+
+.perm {
+  margin: 0 0 24px;
+  padding: 16px;
+  background: var(--amber);
+  color: #0b0c0e;
+}
+
+.perm-tool {
+  margin: 0;
+  font-size: var(--step--2);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.perm-desc {
+  margin: 6px 0 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.perm-preview {
+  margin: 8px 0 0;
+  max-height: 8lh;
+  overflow: auto;
+  font-size: var(--step--1);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  opacity: 0.75;
+}
+
+.perm-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.perm-actions button {
+  flex: 1;
+  min-height: 56px;
+  border: 0;
+  background: #0b0c0e;
+  font: inherit;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.perm-allow {
+  color: var(--green);
+}
+
+.perm-deny {
+  color: var(--red);
+}
+
+.perm-actions button:active {
+  transform: translateY(1px);
+}
+
+.perm[data-resolved] {
+  background: none;
+  border: 1px solid var(--rule);
+  color: var(--ink-dim);
+}
+
+.perm[data-resolved] .perm-actions {
+  display: none;
+}
+
+.perm-verdict {
+  margin: 12px 0 0;
+  font-size: var(--step--1);
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.perm[data-resolved="allow"] .perm-verdict {
+  color: var(--green);
+}
+
+.perm[data-resolved="deny"] .perm-verdict {
+  color: var(--red);
+}
+
+/* ---------- composer ---------- */
+
+#composer {
+  grid-area: composer;
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding: 12px 16px;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--rule);
+  background: var(--bg);
+}
+
+#input {
+  flex: 1;
+  max-height: 7lh;
+  padding: 12px;
+  border: 1px solid var(--rule);
+  background: var(--bg-raise);
+  color: var(--ink);
+  font: inherit;
+  resize: none;
+}
+
+#input::placeholder {
+  color: var(--ink-dim);
+}
+
+#input:disabled {
+  opacity: 0.5;
+}
+
+#send {
+  min-height: 48px;
+  padding: 0 20px;
+  border: 0;
+  background: var(--amber);
+  color: #0b0c0e;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#send:disabled {
+  background: var(--rule);
+  color: var(--ink-dim);
+  cursor: not-allowed;
+}
+
+#offline {
+  position: fixed;
+  left: 50%;
+  bottom: calc(88px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 8px 14px;
+  background: var(--red);
+  color: #0b0c0e;
+  font-size: var(--step--1);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* Em tela larga as duas telas convivem — o alternador vira sidebar. */
+@media (min-width: 900px) {
+  #app {
+    grid-template-columns: 26ch 1fr;
+    grid-template-areas: "bar bar" "sessions body" "sessions composer";
+    max-width: 100ch;
+  }
+
+  #bar {
+    grid-area: bar;
+  }
+
+  #sessions {
+    grid-area: sessions;
+    display: block !important;
+    border-right: 1px solid var(--rule);
+  }
+
+  #app[data-view="sessions"] #feed,
+  #app[data-view="sessions"] #composer {
+    display: none;
+  }
+
+  #app[data-view="feed"] #back {
+    display: none;
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "name": "unac-local",
+  "owner": { "name": "Ueslei Nascimento" },
+  "plugins": [
+    {
+      "name": "local-session",
+      "source": "./",
+      "description": "Expõe cada sessão do Claude Code numa página web da rede local — chat, linha de atividade e aprovação de permissão pelo navegador."
+    }
+  ]
+}

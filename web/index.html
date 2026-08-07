@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#0b0c0e" />
+    <title>local-session</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="app" data-view="sessions">
+      <header id="bar">
+        <button id="back" type="button" aria-label="Voltar para a lista de sessões">
+          <span aria-hidden="true">←</span>
+        </button>
+        <h1 id="title">sessões</h1>
+        <span id="state" data-alive="false"></span>
+      </header>
+
+      <section id="sessions" aria-label="Sessões ativas">
+        <ul id="session-list"></ul>
+        <p id="sessions-empty" hidden>
+          nenhuma sessão registrada.<br />
+          abra o Claude Code num projeto e ela aparece aqui.
+        </p>
+      </section>
+
+      <main id="feed" aria-label="Conversa e atividade" aria-live="polite" aria-relevant="additions">
+        <p id="feed-empty">sem histórico ainda. mande um prompt.</p>
+      </main>
+
+      <footer id="composer">
+        <label class="sr-only" for="input">Prompt para a sessão</label>
+        <textarea
+          id="input"
+          rows="1"
+          placeholder="prompt para esta sessão…"
+          autocomplete="off"
+          autocapitalize="sentences"
+          enterkeyhint="send"
+        ></textarea>
+        <button id="send" type="button">enviar</button>
+      </footer>
+
+      <p id="offline" role="status" hidden>sem conexão com o hub — tentando de novo…</p>
+    </div>
+
+    <script src="/app.js" type="module"></script>
+  </body>
+</html>
