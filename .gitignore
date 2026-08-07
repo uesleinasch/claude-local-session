@@ -1,3 +1,6 @@
 node_modules/
 *.log
 .DS_Store
+
+# O ~/.gitignore_global do autor ignora /docs/; aqui as specs são versionadas.
+!/docs/
