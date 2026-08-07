@@ -27,7 +27,7 @@ Como plugin local do Claude Code:
 
 ```
 /plugin marketplace add uesleinasch/claude-local-session
-/plugin install local-session@unac-local
+/plugin install local-session@unac
 ```
 
 Reinicie a sessão. Na primeira execução, o MCP server gera o token em

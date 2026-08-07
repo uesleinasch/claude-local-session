@@ -1,6 +1,6 @@
 {
-  "name": "unac-local",
-  "owner": { "name": "Ueslei Nascimento" },
+  "name": "unac",
+  "owner": { "name": "Ueslei Nascimento", "url": "https://github.com/uesleinasch" },
   "plugins": [
     {
       "name": "local-session",
