@@ -1,6 +1,6 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { createSocket } from 'node:dgram'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { DEFAULT_PORT } from './protocol'
@@ -53,7 +53,11 @@ export function loadConfig(dir = configDir()): Config {
   const rival = readConfig(dir)
   if (rival) return rival
 
-  writeFileSync(file, data, { mode: 0o600 })
+  // Arquivo existente porém inválido: sobrescrever direto ignoraria o mode 0600
+  // e deixaria um config pela metade visível a outra sessão — tmp + rename é atômico.
+  const tmp = join(dir, `config.json.${process.pid}.tmp`)
+  writeFileSync(tmp, data, { mode: 0o600 })
+  renameSync(tmp, file)
   return withPortOverride(fresh)
 }
 

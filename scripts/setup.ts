@@ -33,6 +33,18 @@ function readJson<T>(path: string): T | null {
   }
 }
 
+// Arquivo ausente é ponto de partida legítimo; arquivo presente que não parseia é
+// conteúdo de terceiros que um merge "do zero" apagaria — nunca sobrescrever.
+function corruptJson(path: string): boolean {
+  if (!existsSync(path)) return false
+  try {
+    JSON.parse(readFileSync(path, 'utf8'))
+    return false
+  } catch {
+    return true
+  }
+}
+
 function identity(): PluginIdentity {
   const fromPath = detectPluginIdentity(ROOT)
   if (fromPath) return fromPath
@@ -74,7 +86,9 @@ const managed = readJson<ManagedSettings>(MANAGED_SETTINGS_PATH)
 const merged = mergeManagedSettings(managed, id)
 const managedJson = `${JSON.stringify(merged.next, null, 2)}\n`
 
-if (!merged.changed) {
+if (corruptJson(MANAGED_SETTINGS_PATH)) {
+  miss(`${MANAGED_SETTINGS_PATH} existe mas não é JSON válido — corrija-o antes de rodar de novo`)
+} else if (!merged.changed) {
   ok('canal habilitado e plugin na allowlist')
 } else if (!APPLY) {
   miss(`${MANAGED_SETTINGS_PATH} precisa de channelsEnabled + allowedChannelPlugins`)
@@ -94,7 +108,9 @@ const settingsPath = join(HOME, '.claude/settings.json')
 const tool = replyToolName(id)
 const perms = mergeUserPermissions(readJson<Record<string, unknown>>(settingsPath), tool)
 
-if (!perms.changed) {
+if (corruptJson(settingsPath)) {
+  miss(`${settingsPath} existe mas não é JSON válido — corrija-o antes de rodar de novo`)
+} else if (!perms.changed) {
   ok('tool reply já dispensada de confirmação')
 } else if (!APPLY) {
   miss(`falta ${tool} em permissions.allow`)

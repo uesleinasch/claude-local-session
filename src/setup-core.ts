@@ -52,7 +52,13 @@ export function mergeManagedSettings(
 ): Merge<ManagedSettings> {
   const base = current ?? {}
   const list = Array.isArray(base.allowedChannelPlugins) ? base.allowedChannelPlugins : []
-  const listed = list.some(e => e.plugin === entry.plugin && e.marketplace === entry.marketplace)
+  const listed = list.some(
+    e =>
+      typeof e === 'object' &&
+      e !== null &&
+      e.plugin === entry.plugin &&
+      e.marketplace === entry.marketplace,
+  )
 
   return {
     next: {

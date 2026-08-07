@@ -94,6 +94,13 @@ describe('mergeManagedSettings', () => {
     const dois = mergeManagedSettings(um, ID).next
     expect(dois.allowedChannelPlugins).toHaveLength(1)
   })
+
+  test('tolera lixo na allowlist sem lançar nem descartar', () => {
+    const atual = { allowedChannelPlugins: [null, 'texto', ID] as never }
+    const { next, changed } = mergeManagedSettings(atual, ID)
+    expect(changed).toBe(true)
+    expect(next.allowedChannelPlugins).toEqual([null, 'texto', ID] as never)
+  })
 })
 
 describe('mergeUserPermissions', () => {

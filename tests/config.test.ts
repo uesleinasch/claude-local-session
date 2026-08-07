@@ -37,6 +37,13 @@ describe('loadConfig', () => {
     expect(loadConfig(dir).token).toHaveLength(64)
   })
 
+  test('regeneração de arquivo corrompido restaura o modo 0600', () => {
+    writeFileSync(join(dir, 'config.json'), 'não é json', { mode: 0o644 })
+    loadConfig(dir)
+    const mode = statSync(join(dir, 'config.json')).mode & 0o777
+    expect(mode).toBe(0o600)
+  })
+
   test('LOCAL_SESSION_PORT sobrepõe a porta sem tocar no token', () => {
     const original = loadConfig(dir)
     process.env.LOCAL_SESSION_PORT = '9123'

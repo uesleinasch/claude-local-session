@@ -10,6 +10,15 @@ const offline = document.getElementById('offline')
 
 const token = new URLSearchParams(location.search).get('t')
 const LAST_KEY = 'local-session.last'
+const MAX_EVENTS = 200
+
+// O cookie definido pelo hub já autentica as próximas visitas — o token não
+// precisa ficar exposto na barra de endereço nem no histórico do navegador.
+if (token) {
+  const url = new URL(location.href)
+  url.searchParams.delete('t')
+  history.replaceState(null, '', url)
+}
 
 let ws = null
 let backoff = 1000
@@ -48,12 +57,22 @@ function connect() {
 }
 
 function send(msg) {
-  if (ws?.readyState === WebSocket.OPEN) ws.send(JSON.stringify(msg))
+  if (ws?.readyState !== WebSocket.OPEN) return false
+  ws.send(JSON.stringify(msg))
+  return true
 }
 
 function handle(msg) {
   if (msg.type === 'sessions') {
     sessions = Array.isArray(msg.sessions) ? msg.sessions : []
+    // Sessão lembrada que o hub não conhece mais: volta para a lista em vez de
+    // deixar o usuário preso num feed vazio e morto.
+    if (currentId && !sessions.some(s => s.id === currentId)) {
+      currentId = null
+      localStorage.removeItem(LAST_KEY)
+      events = []
+      app.dataset.view = 'sessions'
+    }
     // Uma sessão viva e nenhuma escolhida: entra direto, sem passo intermediário.
     if (!currentId && sessions.filter(s => s.alive).length === 1) {
       open(sessions.find(s => s.alive).id)
@@ -69,7 +88,20 @@ function handle(msg) {
     return
   }
   if (msg.type === 'event' && msg.sessionId === currentId) {
-    events.push(msg.event)
+    const e = msg.event
+    // O hub reemite o card de permissão resolvido com o mesmo requestId —
+    // substituir espelha o feed do servidor; empilhar duplicaria o card e
+    // ressuscitaria os botões do antigo no próximo render.
+    if (e.kind === 'permission') {
+      const at = events.findIndex(x => x.kind === 'permission' && x.requestId === e.requestId)
+      if (at !== -1) {
+        events[at] = e
+        renderFeed()
+        return
+      }
+    }
+    events.push(e)
+    if (events.length > MAX_EVENTS) events.splice(0, events.length - MAX_EVENTS)
     renderFeed()
   }
 }
@@ -251,8 +283,13 @@ function permNode(e) {
     btn.className = cls
     btn.textContent = text
     btn.addEventListener('click', () => {
-      actions.querySelectorAll('button').forEach(b => (b.disabled = true))
-      send({ type: 'permission_decision', sessionId: currentId, requestId: e.requestId, behavior })
+      const sent = send({
+        type: 'permission_decision',
+        sessionId: currentId,
+        requestId: e.requestId,
+        behavior,
+      })
+      if (sent) actions.querySelectorAll('button').forEach(b => (b.disabled = true))
     })
     actions.append(btn)
   }
@@ -290,7 +327,8 @@ function renderFeed() {
 function submit() {
   const text = input.value.trim()
   if (text === '' || !currentId) return
-  send({ type: 'prompt', sessionId: currentId, text })
+  // Só limpa depois de entregar: com a conexão caída, apagar seria perder o texto.
+  if (!send({ type: 'prompt', sessionId: currentId, text })) return
   input.value = ''
   resize()
 }
