@@ -189,6 +189,11 @@ qualquer sessão dentro de tmux (não só as spawnadas pela página); para sess�
 tmux o hub avisa que não há como interromper. O protocolo de canal do Claude Code não tem
 interrupção nativa (ver `ROADMAP.md`).
 
+**Encerrar a sessão.** O `✕` de cada item da lista finaliza a sessão e a remove da lista
+(apagando o histórico dela): dentro de tmux, via `tmux kill-session`; fora, via `SIGTERM`
+no processo do `claude` — o mesmo que fechá-lo no terminal. Em sessões já encerradas o
+`✕` apenas limpa o item da lista.
+
 ## Segurança
 
 O token é a única barreira, e essa página aprova `Bash`. Quem tiver o link executa código

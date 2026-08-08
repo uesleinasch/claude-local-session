@@ -163,13 +163,37 @@ async function interruptSession(pid: number): Promise<string | null> {
   return sent.ok ? null : 'falha ao enviar Escape para o tmux'
 }
 
+function claudeAncestorOf(pid: number): number | null {
+  let cur = pid
+  for (let i = 0; i < 25 && cur > 1; i++) {
+    try {
+      if (readFileSync(`/proc/${cur}/comm`, 'utf8').trim() === 'claude') return cur
+      const stat = readFileSync(`/proc/${cur}/stat`, 'utf8')
+      cur = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[1])
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
 async function killSession(pid: number): Promise<string | null> {
   const pane = await findPane(pid)
-  if (pane === 'no-tmux') return 'tmux indisponível'
-  if (pane === 'not-found') return 'esta sessão não roda dentro de tmux — encerre pelo terminal'
-  // '=' força match exato do nome: kill-session -t é prefix-match por padrão.
-  const res = await run('tmux', ['kill-session', '-t', `=${pane.sessionName}`])
-  return res.ok ? null : 'falha ao encerrar a sessão do tmux'
+  if (typeof pane === 'object') {
+    // '=' força match exato do nome: kill-session -t é prefix-match por padrão.
+    const res = await run('tmux', ['kill-session', '-t', `=${pane.sessionName}`])
+    return res.ok ? null : 'falha ao encerrar a sessão do tmux'
+  }
+  // Fora do tmux (inclusive sem servidor tmux nenhum): finaliza o claude
+  // diretamente. O confirm do navegador é o guarda; o token já dá esse poder.
+  const claudePid = claudeAncestorOf(pid)
+  if (claudePid === null) return 'processo do claude não encontrado — encerre pelo terminal'
+  try {
+    process.kill(claudePid, 'SIGTERM')
+    return null
+  } catch {
+    return 'falha ao finalizar o processo do claude'
+  }
 }
 
 // 404 em vez de 401: uma resposta de "não autorizado" confirmaria que o serviço existe.
