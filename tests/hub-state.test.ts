@@ -323,6 +323,44 @@ describe('auto mode', () => {
   })
 })
 
+describe('contexto da sessão', () => {
+  test('noteContext guarda na sessão e broadcasted na lista', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    const browser = spy()
+    reg.addBrowser(browser)
+
+    reg.noteContext({ sessionId: 's1', pct: 25.3, usedTokens: 253_000, maxTokens: 1_000_000 })
+    const last = browser.sent.at(-1)
+    expect(last.type).toBe('sessions')
+    expect(last.sessions[0].context).toEqual({ pct: 25.3, usedTokens: 253_000, maxTokens: 1_000_000 })
+  })
+
+  test('variação menor que 1 ponto não gera novo broadcast', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    const browser = spy()
+    reg.addBrowser(browser)
+
+    reg.noteContext({ sessionId: 's1', pct: 25.0 })
+    const count = browser.sent.length
+    reg.noteContext({ sessionId: 's1', pct: 25.4 })
+    expect(browser.sent.length).toBe(count)
+
+    reg.noteContext({ sessionId: 's1', pct: 26.2 })
+    expect(browser.sent.length).toBe(count + 1)
+  })
+
+  test('sessão desconhecida é ignorada', () => {
+    const reg = new Registry()
+    const browser = spy()
+    reg.addBrowser(browser)
+    const before = browser.sent.length
+    reg.noteContext({ sessionId: 'fantasma', pct: 50 })
+    expect(browser.sent.length).toBe(before)
+  })
+})
+
 describe('pergunta (AskUserQuestion)', () => {
   const question: FeedEvent = {
     kind: 'question',

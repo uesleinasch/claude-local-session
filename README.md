@@ -156,6 +156,13 @@ entrar numa delas você vê:
   aparecem na página e a resposta volta pela mesma via do botão de interromper (teclas no
   tmux). Suporta multiseleção e resposta livre.
 
+**Janela de contexto.** Uma barra fina abaixo do header mostra o uso da janela de
+contexto da sessão (verde <50%, âmbar 50-79%, vermelha ≥80%), com percentual e tokens;
+na lista, cada sessão exibe o percentual. A fonte é o statusline do Claude Code — o
+único lugar com o percentual exato calculado para o modelo em uso: o script de
+statusline repassa o JSON que já recebe para `hooks/context-report.ts`, que faz um POST
+autenticado ao hub. Sem statusline configurado, a barra simplesmente não aparece.
+
 **Auto mode.** O botão `auto` no topo do feed liga a aprovação automática de permissões
 daquela sessão: cada pedido que chegar é aprovado pelo hub na hora e o card entra no feed
 já resolvido como `✓ permitido (auto)` — rastro completo, zero toque. Ligar o auto também

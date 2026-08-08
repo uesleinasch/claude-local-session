@@ -11,6 +11,7 @@ import {
   isPermissionBehavior,
   MAX_QUESTIONS,
   parseActivityPost,
+  parseContextPost,
   type BrowserToHub,
   type HubToBrowser,
   type QuestionAnswer,
@@ -317,6 +318,20 @@ async function handleActivity(req: Request): Promise<Response> {
   return new Response('ok')
 }
 
+async function handleContext(req: Request): Promise<Response> {
+  if (req.method !== 'POST') return notFound()
+  let body: unknown
+  try {
+    body = await req.json()
+  } catch {
+    return new Response('bad request', { status: 400 })
+  }
+  const post = parseContextPost(body)
+  if (!post) return new Response('bad request', { status: 400 })
+  registry.noteContext(post)
+  return new Response('ok')
+}
+
 function onSessionMessage(ws: Ws, msg: SessionToHub): void {
   switch (msg.type) {
     case 'register': {
@@ -551,6 +566,7 @@ try {
         return srv.upgrade(req, { data: { role } }) ? undefined : notFound()
       }
       if (url.pathname === '/_activity') return handleActivity(req)
+      if (url.pathname === '/_context') return handleContext(req)
 
       const asset = STATIC[url.pathname]
       if (!asset) return notFound()

@@ -55,11 +55,72 @@ body {
 
 #app {
   display: grid;
-  grid-template-rows: auto 1fr auto;
-  grid-template-areas: "bar" "body" "composer";
+  grid-template-rows: auto auto 1fr auto;
+  grid-template-areas: "bar" "context" "body" "composer";
   height: 100dvh;
   max-width: 68ch;
   margin: 0 auto;
+}
+
+/* ---------- janela de contexto ---------- */
+
+#context {
+  grid-area: context;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--bg);
+}
+
+#context[hidden] {
+  display: none;
+}
+
+#context-track {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-raise);
+  overflow: hidden;
+}
+
+#context-fill {
+  height: 100%;
+  width: 0;
+  background: var(--green);
+  transition: width 0.4s ease;
+}
+
+#context[data-level="warn"] #context-fill {
+  background: var(--amber);
+}
+
+#context[data-level="high"] #context-fill {
+  background: var(--red);
+}
+
+#context-pct {
+  font-size: var(--step--2);
+  color: var(--ink-dim);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-ctx {
+  margin-left: 8px;
+  font-size: var(--step--2);
+  font-weight: 700;
+  color: var(--green);
+  font-variant-numeric: tabular-nums;
+}
+
+.session-ctx[data-level="warn"] {
+  color: var(--amber);
+}
+
+.session-ctx[data-level="high"] {
+  color: var(--red);
 }
 
 /* ---------- barra ---------- */

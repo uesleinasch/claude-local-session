@@ -10,6 +10,9 @@ const input = document.getElementById('input')
 const sendBtn = document.getElementById('send')
 const stopBtn = document.getElementById('stop')
 const autoBtn = document.getElementById('automode')
+const ctxBox = document.getElementById('context')
+const ctxFill = document.getElementById('context-fill')
+const ctxPct = document.getElementById('context-pct')
 const offline = document.getElementById('offline')
 const toastEl = document.getElementById('toast')
 const spawnBox = document.getElementById('spawn')
@@ -219,8 +222,31 @@ function current() {
   return sessions.find(s => s.id === currentId) ?? null
 }
 
+function ctxLevel(pct) {
+  return pct < 50 ? 'ok' : pct < 80 ? 'warn' : 'high'
+}
+
+function fmtTokens(n) {
+  return n >= 1000 ? `${Math.round(n / 1000)}k` : String(n)
+}
+
+function renderContext(s) {
+  const ctx = s?.context
+  ctxBox.hidden = app.dataset.view !== 'feed' || !ctx
+  if (ctxBox.hidden) return
+  const pct = Math.round(ctx.pct)
+  ctxFill.style.width = `${Math.min(100, Math.max(0, ctx.pct))}%`
+  ctxBox.dataset.level = ctxLevel(pct)
+  ctxPct.textContent =
+    ctx.usedTokens !== undefined && ctx.maxTokens !== undefined
+      ? `${pct}% · ${fmtTokens(ctx.usedTokens)}/${fmtTokens(ctx.maxTokens)}`
+      : `${pct}%`
+  ctxBox.title = `janela de contexto: ${ctxPct.textContent}`
+}
+
 function renderBar() {
   const s = current()
+  renderContext(s)
   if (app.dataset.view === 'sessions' || !s) {
     bar.title.textContent = 'sessões'
     bar.state.dataset.alive = 'false'
@@ -361,6 +387,13 @@ function renderSessions() {
       badge.className = 'session-auto'
       badge.textContent = 'auto'
       name.append(badge)
+    }
+    if (s.context) {
+      const ctx = document.createElement('span')
+      ctx.className = 'session-ctx'
+      ctx.dataset.level = ctxLevel(Math.round(s.context.pct))
+      ctx.textContent = `${Math.round(s.context.pct)}%`
+      name.append(ctx)
     }
 
     const path = document.createElement('span')

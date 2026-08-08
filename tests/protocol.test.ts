@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { parseActivityPost } from '../src/protocol'
+import { parseActivityPost, parseContextPost } from '../src/protocol'
 
 const spec = {
   question: 'Qual fruta você prefere?',
@@ -124,6 +124,21 @@ describe('parseActivityPost com pergunta', () => {
       question: { questionId: 't', answers: { boa: 'sim', ruim: 42, pior: null } },
     })
     expect(post?.question?.answers).toEqual({ boa: 'sim' })
+  })
+
+  test('parseContextPost valida e confina o percentual', () => {
+    expect(parseContextPost({ sessionId: 's1', pct: 25.3, usedTokens: 253_000, maxTokens: 1_000_000 }))
+      .toEqual({ sessionId: 's1', pct: 25.3, usedTokens: 253_000, maxTokens: 1_000_000 })
+    expect(parseContextPost({ sessionId: 's1', pct: 12 })).toEqual({ sessionId: 's1', pct: 12 })
+    expect(parseContextPost({ sessionId: 's1', pct: 250 })?.pct).toBe(100)
+    expect(parseContextPost({ sessionId: 's1', pct: Number.NaN })).toBeNull()
+    expect(parseContextPost({ sessionId: '', pct: 10 })).toBeNull()
+    expect(parseContextPost({ pct: 10 })).toBeNull()
+    expect(parseContextPost({ sessionId: 's1', pct: 10, usedTokens: 'x' })).toEqual({
+      sessionId: 's1',
+      pct: 10,
+    })
+    expect(parseContextPost(null)).toBeNull()
   })
 
   test('post sem question continua funcionando como antes', () => {

@@ -42,7 +42,24 @@ export type SessionSummary = {
   busy?: boolean
   /** Auto mode: o hub aprova sozinho os pedidos de permissão desta sessão. */
   auto?: boolean
+  /** Uso da janela de contexto, reportado pelo statusline. */
+  context?: SessionContext
   endedAt?: number
+}
+
+export type SessionContext = { pct: number; usedTokens?: number; maxTokens?: number }
+
+export type ContextPost = SessionContext & { sessionId: string }
+
+export function parseContextPost(raw: unknown): ContextPost | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const o = raw as Record<string, unknown>
+  if (typeof o.sessionId !== 'string' || o.sessionId === '') return null
+  if (typeof o.pct !== 'number' || Number.isNaN(o.pct)) return null
+  const post: ContextPost = { sessionId: o.sessionId, pct: Math.min(100, Math.max(0, o.pct)) }
+  if (typeof o.usedTokens === 'number' && o.usedTokens >= 0) post.usedTokens = o.usedTokens
+  if (typeof o.maxTokens === 'number' && o.maxTokens > 0) post.maxTokens = o.maxTokens
+  return post
 }
 
 export type SessionToHub =

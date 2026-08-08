@@ -1,6 +1,7 @@
 import {
   DEAD_SESSION_TTL_MS,
   MAX_EVENTS,
+  type ContextPost,
   type FeedEvent,
   type HubToBrowser,
   type HubToSession,
@@ -235,6 +236,19 @@ export class Registry {
     const found = entry.events.find(e => e.kind === 'permission' && e.requestId === requestId)
     if (!found || found.kind !== 'permission') return
     this.push(sessionId, { ...found, resolved: behavior, ...(auto ? { auto: true } : {}) })
+  }
+
+  /** Broadcast só quando o ponto inteiro muda: o statusline reporta a cada refresh. */
+  noteContext(post: ContextPost): void {
+    const entry = this.sessions.get(post.sessionId)
+    if (!entry) return
+    const prev = entry.summary.context
+    entry.summary.context = { pct: post.pct }
+    if (post.usedTokens !== undefined) entry.summary.context.usedTokens = post.usedTokens
+    if (post.maxTokens !== undefined) entry.summary.context.maxTokens = post.maxTokens
+    if (prev === undefined || Math.round(prev.pct) !== Math.round(post.pct)) {
+      this.broadcastSessions()
+    }
   }
 
   setAuto(sessionId: string, on: boolean): boolean {
