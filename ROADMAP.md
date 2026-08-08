@@ -44,6 +44,9 @@ pedido de permissão e decisão allow/deny
 
 ## 4. Refinamentos do que já existe
 
+- **systemd user unit para o hub** — com spawn configurado o hub já é serviço
+  permanente, mas após um reboot da máquina nada o inicia até a primeira sessão de
+  terminal. Um `systemctl --user enable` fecharia o ciclo: celular funciona desde o boot.
 - **`/local-session:update`** — a atualização hoje exige bump de versão (sem ele o
   `plugin install` mantém o snapshot), reinstalar, e trocar o hub vencendo a corrida
   contra os respawners das sessões antigas (`hub-client` respawna do próprio root no
