@@ -28,6 +28,8 @@ export type SessionSummary = {
   cwd: string
   pid: number
   alive: boolean
+  /** Turno em andamento: prompt/tool start liga, Stop hook ou interrupção desliga. */
+  busy?: boolean
   endedAt?: number
 }
 

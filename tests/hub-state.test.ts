@@ -107,11 +107,12 @@ describe('roteamento', () => {
     reg.subscribe(dentro, 's1')
     reg.subscribe(fora, 's2')
 
-    const before = fora.sent.length
+    const before = fora.sent.filter(m => m.type === 'event').length
     reg.push('s1', activity('npm test'))
 
     expect(dentro.sent.at(-1)).toMatchObject({ type: 'event', sessionId: 's1' })
-    expect(fora.sent).toHaveLength(before)
+    // A virada de busy manda 'sessions' para todos — mas 'event' só ao inscrito.
+    expect(fora.sent.filter(m => m.type === 'event')).toHaveLength(before)
   })
 
   test('browser removido para de receber', () => {
@@ -256,6 +257,48 @@ describe('permissão', () => {
     reg.addBrowser(browser)
     reg.subscribe(browser, 's1')
     expect(browser.sent.at(-1).events[0].preview).toBeUndefined()
+  })
+})
+
+describe('estado ocupado', () => {
+  test('prompt liga busy; idle desliga', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    expect(reg.summaries()[0]!.busy).not.toBe(true)
+
+    reg.push('s1', { kind: 'prompt', ts: 1, text: 'oi' })
+    expect(reg.summaries()[0]!.busy).toBe(true)
+
+    reg.push('s1', { kind: 'activity', ts: 2, tool: '', detail: '', status: 'idle' })
+    expect(reg.summaries()[0]!.busy).toBe(false)
+  })
+
+  test('tool start também liga busy', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', activity('npm test'))
+    expect(reg.summaries()[0]!.busy).toBe(true)
+  })
+
+  test('virada de busy manda a lista atualizada a todos os browsers', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    const browser = spy()
+    reg.addBrowser(browser)
+
+    reg.push('s1', activity('npm test'))
+    const lists = browser.sent.filter(m => m.type === 'sessions')
+    expect(lists.at(-1).sessions[0].busy).toBe(true)
+  })
+
+  test('queda da sessão zera busy junto com alive', () => {
+    const reg = new Registry()
+    const sink = spy()
+    reg.registerSession(sink, INFO)
+    reg.push('s1', activity('npm test'))
+    reg.removeSession(sink)
+
+    expect(reg.summaries()[0]).toMatchObject({ alive: false, busy: false })
   })
 })
 

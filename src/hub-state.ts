@@ -94,6 +94,7 @@ export class Registry {
     if (!entry || entry.sink !== sink) return
     entry.sink = null
     entry.summary.alive = false
+    entry.summary.busy = false
     entry.summary.endedAt = now
     this.broadcastSessions()
   }
@@ -105,6 +106,14 @@ export class Registry {
   push(sessionId: string, event: FeedEvent): void {
     const entry = this.sessions.get(sessionId)
     if (!entry) return
+
+    const wasBusy = entry.summary.busy === true
+    if (event.kind === 'prompt' || (event.kind === 'activity' && event.status === 'start')) {
+      entry.summary.busy = true
+    } else if (event.kind === 'activity' && event.status === 'idle') {
+      entry.summary.busy = false
+    }
+    if ((entry.summary.busy === true) !== wasBusy) this.broadcastSessions()
 
     if (event.kind === 'permission') {
       const requestId = event.requestId

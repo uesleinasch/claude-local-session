@@ -204,7 +204,8 @@ function renderBar() {
   }
   bar.title.textContent = s.label
   bar.state.dataset.alive = String(s.alive)
-  stopBtn.hidden = !(s.alive && hubConfig.canInterrupt)
+  bar.state.dataset.busy = String(s.busy === true)
+  stopBtn.hidden = !(s.alive && s.busy === true && hubConfig.canInterrupt)
 }
 
 function renderSpawn() {
@@ -248,6 +249,7 @@ function renderSessions() {
     btn.type = 'button'
     btn.className = 'session'
     btn.dataset.alive = String(s.alive)
+    btn.dataset.busy = String(s.busy === true)
 
     const name = document.createElement('span')
     name.className = 'session-name'
