@@ -83,3 +83,29 @@ pedido de permissão e decisão allow/deny
   um `aria-live`; leitores de tela reanunciam o feed inteiro.
 - **Limite de tamanho de mensagem no hub** — um portador do token pode mandar payloads
   grandes; hoje coberto pelo modelo de ameaça (token = confiança total), mas vale um teto.
+
+## 5. Produtividade e experiência (avaliação de 2026-08-08)
+
+Quatro fraquezas que a avaliação expôs: a página vê a **conversa, não o trabalho** (o que o
+Claude escreve no terminal não chega, então "o que ele mexeu no meu repo?" não tem resposta
+na tela); o `auto` é **tudo-ou-nada** (aprovar cada `Read` na mão ou liberar `rm -rf` sem
+olhar); **escrever no celular é caro**; e o feed é **plano**, sem colapso nem busca.
+
+- **Permissão por ferramenta** — no card, "sempre permitir `Read` nesta sessão". Libera o
+  ruído (leitura, busca) e mantém `Bash`/`Edit` sob os olhos. Mais seguro que o `auto` de
+  hoje e mais confortável; provavelmente o que mais muda o uso diário.
+- **Aprovar pela notificação** — o ntfy dispara ações HTTP: o push de permissão chega com
+  *permitir* / *negar* e a decisão sai da tela de bloqueio. A ação **não pode carregar o
+  token do hub** (quem tem o tópico teria a chave da máquina) — nonce por pedido, preso ao
+  `requestId` e com validade curta.
+- **"O que mudou"** — `git -C <cwd> diff --stat` (e o diff sob demanda) mostrado com a UI de
+  diff que o card de permissão já tem. Leitura pura, o hub já sabe o `cwd`.
+- **Prompts de um toque** — chips acima do composer (`continuar`, `rodar os testes`,
+  `commitar`, `resuma o diff`) e reenvio de um prompt anterior. Corta a digitação no celular.
+- **Mandar foto** — fotografar um erro na tela e mandar. O canal só aceita texto, então o
+  hub grava o arquivo e o prompt referencia o caminho; o Claude abre com `Read`.
+- **Colapsar rajadas no feed** — "12 leituras de arquivo" numa linha expansível, com busca
+  dentro da sessão. Junto com o render incremental do item 4.
+- **Menores** — renomear e fixar sessões (o rótulo é só o nome da pasta), feed unificado de
+  todas as sessões, tempo do turno em andamento, e ditado por voz (a API do navegador exige
+  contexto seguro, então depende do HTTPS do item 1).
