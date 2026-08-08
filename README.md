@@ -212,6 +212,24 @@ um tmux seu, sobrevive ao hub e ao navegador, e você pode anexá-la depois no t
 `tmux attach`. A allowlist é comparada por igualdade exata: o navegador nunca envia um
 caminho arbitrário. Sem `projects`, o recurso fica desligado.
 
+**Receber aviso no celular.** Com a chave `notifyUrl` apontando para um tópico ntfy, o hub
+faz um POST a cada pedido de permissão, pergunta do Claude, `reply` e fim de turno:
+
+```json
+{
+  "token": "…",
+  "port": 7777,
+  "notifyUrl": "https://ntfy.sh/um-topico-que-so-voce-sabe"
+}
+```
+
+Quem publica é o hub, não o navegador — o aviso chega com a página fechada, o celular
+bloqueado e nenhum WebSocket de pé. Instale o app do [ntfy](https://ntfy.sh) e inscreva-se
+no mesmo tópico. Vale para qualquer servidor ntfy, inclusive self-hosted
+(`http://192.168.1.9/ntfy/avisos`); o tópico é a última parte do caminho. Sem a chave, o
+hub não notifica nada. **O tópico é o segredo**: quem souber o nome lê seus avisos, então
+use um nome longo e aleatório ou um servidor com autenticação.
+
 **Interromper o turno.** O botão `■ parar` no topo do feed envia `Escape` para o pane do
 tmux onde a sessão roda — o mesmo gesto que interromperia no terminal. Funciona para
 qualquer sessão dentro de tmux (não só as spawnadas pela página); para sessões fora de
@@ -292,7 +310,8 @@ responder `200` da própria máquina.
 | `LOCAL_SESSION_PORT`  | Porta do hub, sobrepondo a do arquivo (padrão 7777) |
 
 No `config.json`, além de `token` e `port`, a chave opcional `projects` (lista de caminhos
-absolutos) habilita a criação de sessões pela página — ver "Trabalhar de longe".
+absolutos) habilita a criação de sessões pela página e `notifyUrl` liga os avisos por push
+— ver "Trabalhar de longe".
 
 ## Desenvolvimento
 
@@ -312,6 +331,7 @@ Estrutura:
 | `src/hub-state.ts`  | Registro de sessões e feed (sem I/O, testável)    |
 | `src/hub-client.ts` | Cliente WebSocket com backoff e spawn do daemon   |
 | `src/config.ts`     | Token, porta, IP da rota default                  |
+| `src/notify.ts`     | Evento → aviso ntfy, com dedupe (sem I/O no core) |
 | `src/history.ts`    | Histórico em JSONL — persistência e hidratação    |
 | `src/hook-event.ts` | Payload de hook → evento de atividade + preview   |
 | `hooks/report.ts`   | Hook: lê stdin, faz POST, falha em silêncio       |

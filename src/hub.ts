@@ -6,6 +6,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { configDir, loadConfig, readCookie, saveProjects, tokenMatches } from './config'
 import { HistoryStore } from './history'
 import { Registry, type Sink } from './hub-state'
+import { Notifier, postToNtfy } from './notify'
 import {
   IDLE_SHUTDOWN_MS,
   isPermissionBehavior,
@@ -26,7 +27,15 @@ const ROOT = join(import.meta.dir, '..')
 const WEB_DIR = join(ROOT, 'web')
 
 const store = new HistoryStore(join(configDir(), 'history'))
-const registry = new Registry((sessionId, event) => store.appendEvent(sessionId, event))
+const notifier = new Notifier(cfg.notifyUrl === undefined ? null : postToNtfy(cfg.notifyUrl))
+const registry = new Registry((sessionId, event) => {
+  store.appendEvent(sessionId, event)
+  void notifier.notify(labelOf(sessionId), event)
+})
+
+function labelOf(sessionId: string): string {
+  return registry.summaries().find(s => s.id === sessionId)?.label ?? sessionId
+}
 for (const { info, events, endedAt } of store.loadRecent()) {
   registry.hydrateSession(info, events, endedAt)
 }
@@ -88,6 +97,7 @@ const STATIC: Record<string, { file: string; type: string }> = {
   '/': { file: 'index.html', type: 'text/html; charset=utf-8' },
   '/app.js': { file: 'app.js', type: 'text/javascript; charset=utf-8' },
   '/markdown.js': { file: 'markdown.js', type: 'text/javascript; charset=utf-8' },
+  '/connection.js': { file: 'connection.js', type: 'text/javascript; charset=utf-8' },
   '/style.css': { file: 'style.css', type: 'text/css; charset=utf-8' },
 }
 
@@ -393,6 +403,12 @@ function onSessionMessage(ws: Ws, msg: SessionToHub): void {
 
 function onBrowserMessage(ws: Ws, msg: BrowserToHub): void {
   switch (msg.type) {
+    case 'ping': {
+      try {
+        ws.send(JSON.stringify({ type: 'pong' } satisfies HubToBrowser))
+      } catch {}
+      return
+    }
     case 'subscribe': {
       if (typeof msg.sessionId !== 'string') return
       registry.subscribe(ws as Sink, msg.sessionId)

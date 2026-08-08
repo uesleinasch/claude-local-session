@@ -65,6 +65,23 @@ describe('readConfig', () => {
     expect(readConfig(dir)).toBeNull()
     expect(() => statSync(join(dir, 'config.json'))).toThrow()
   })
+
+  test('lê o destino das notificações', () => {
+    const cfg = loadConfig(dir)
+    writeFileSync(
+      join(dir, 'config.json'),
+      JSON.stringify({ ...cfg, notifyUrl: 'https://ntfy.sh/meu-topico' }),
+    )
+    expect(readConfig(dir)?.notifyUrl).toBe('https://ntfy.sh/meu-topico')
+  })
+
+  test('notifyUrl de outro tipo é ignorado em vez de derrubar o config inteiro', () => {
+    const cfg = loadConfig(dir)
+    writeFileSync(join(dir, 'config.json'), JSON.stringify({ ...cfg, notifyUrl: 42 }))
+    const read = readConfig(dir)
+    expect(read?.token).toBe(cfg.token)
+    expect(read?.notifyUrl).toBeUndefined()
+  })
 })
 
 describe('tokenMatches', () => {

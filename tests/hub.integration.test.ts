@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import type { Subprocess } from 'bun'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { loadConfig } from '../src/config'
@@ -9,6 +9,20 @@ let dir: string
 let port: number
 let token: string
 let hub: Subprocess
+
+/** ntfy de mentira: recebe os pushes do hub para que o teste os inspecione. */
+type Push = { topic: string; title: string; message: string }
+let notifyServer: ReturnType<typeof Bun.serve>
+const pushes: Push[] = []
+
+async function waitFor(pred: () => boolean, ms = 4000): Promise<void> {
+  const deadline = Date.now() + ms
+  while (Date.now() < deadline) {
+    if (pred()) return
+    await Bun.sleep(25)
+  }
+  throw new Error('timeout esperando a condição')
+}
 
 function base(): string {
   return `http://127.0.0.1:${port}`
@@ -84,7 +98,21 @@ async function connect(role: 'session' | 'browser'): Promise<Collector> {
 
 beforeAll(async () => {
   dir = mkdtempSync(join(tmpdir(), 'ls-hub-'))
-  token = loadConfig(dir).token
+  const cfg = loadConfig(dir)
+  token = cfg.token
+
+  notifyServer = Bun.serve({
+    port: 0,
+    async fetch(req) {
+      pushes.push((await req.json()) as Push)
+      return new Response('ok')
+    },
+  })
+  writeFileSync(
+    join(dir, 'config.json'),
+    JSON.stringify({ ...cfg, notifyUrl: `http://127.0.0.1:${notifyServer.port}/avisos` }),
+  )
+
   port = await freePort()
   hub = Bun.spawn(['bun', join(import.meta.dir, '..', 'src', 'hub.ts')], {
     env: { ...process.env, LOCAL_SESSION_DIR: dir, LOCAL_SESSION_PORT: String(port) },
@@ -96,6 +124,7 @@ beforeAll(async () => {
 
 afterAll(() => {
   hub?.kill()
+  notifyServer?.stop(true)
   rmSync(dir, { recursive: true, force: true })
 })
 
@@ -110,6 +139,13 @@ describe('gate de token', () => {
   test('aceita o cookie no lugar da query', async () => {
     const res = await fetch(`${base()}/app.js`, { headers: { cookie: `ls_token=${token}` } })
     expect(res.status).toBe(200)
+  })
+
+  test('serve todo módulo importado pelo app, senão a página não carrega', async () => {
+    for (const path of ['/app.js', '/markdown.js', '/connection.js', '/style.css']) {
+      const res = await fetch(`${base()}${path}?t=${token}`)
+      expect(res.status).toBe(200)
+    }
   })
 
   test('responde 404 sem token, sem revelar o serviço', async () => {
@@ -127,6 +163,68 @@ describe('gate de token', () => {
   test('rota desconhecida com token válido continua 404', async () => {
     const res = await fetch(`${base()}/../etc/passwd?t=${token}`)
     expect(res.status).toBe(404)
+  })
+})
+
+describe('keepalive', () => {
+  test('ping do navegador volta como pong, provando que a conexão vive', async () => {
+    const browser = await connect('browser')
+    browser.socket.send(JSON.stringify({ type: 'ping' }))
+    const pong = await browser.wait(m => m.type === 'pong')
+    expect(pong.type).toBe('pong')
+    browser.socket.close()
+  })
+})
+
+describe('notificações', () => {
+  test('pedido de permissão vira push com o projeto no título', async () => {
+    const session = await connect('session')
+    session.socket.send(
+      JSON.stringify({
+        type: 'register',
+        sessionId: 'notif-1',
+        cwd: '/home/u/proj',
+        label: 'proj-notif',
+        pid: 0,
+      }),
+    )
+    session.socket.send(
+      JSON.stringify({
+        type: 'permission_request',
+        requestId: 'perm-notif',
+        toolName: 'Bash',
+        description: 'listar arquivos',
+        inputPreview: 'ls',
+      }),
+    )
+
+    await waitFor(() => pushes.some(p => p.message.includes('Bash')))
+    const push = pushes.find(p => p.message.includes('Bash'))!
+    expect(push.title).toBe('proj-notif')
+    expect(push.topic).toBe('avisos')
+
+    session.socket.close()
+  })
+
+  test('turno encerrado avisa que a sessão ficou ociosa', async () => {
+    const session = await connect('session')
+    session.socket.send(
+      JSON.stringify({
+        type: 'register',
+        sessionId: 'notif-2',
+        cwd: '/home/u/proj',
+        label: 'proj-idle',
+        pid: 0,
+      }),
+    )
+    await Bun.sleep(50)
+    await fetch(`${base()}/_activity?t=${token}`, {
+      method: 'POST',
+      body: JSON.stringify({ sessionId: 'notif-2', tool: '', detail: '', status: 'idle' }),
+    })
+
+    await waitFor(() => pushes.some(p => p.title === 'proj-idle'))
+    session.socket.close()
   })
 })
 

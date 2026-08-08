@@ -1,3 +1,10 @@
+import {
+  INITIAL_BACKOFF_MS,
+  nextBackoff,
+  PING_MS,
+  PONG_TIMEOUT_MS,
+  wakeAction,
+} from './connection.js'
 import { renderMarkdown } from './markdown.js'
 
 const app = document.getElementById('app')
@@ -46,7 +53,10 @@ if (token) {
 }
 
 let ws = null
-let backoff = 1000
+let backoff = INITIAL_BACKOFF_MS
+let retryTimer = null
+let pingTimer = null
+let pongTimer = null
 let sessions = []
 let currentId = localStorage.getItem(LAST_KEY)
 let events = []
@@ -92,13 +102,18 @@ function showToast(text) {
 /* ---------- transporte ---------- */
 
 function connect() {
+  if (retryTimer !== null) {
+    clearTimeout(retryTimer)
+    retryTimer = null
+  }
   const proto = location.protocol === 'https:' ? 'wss' : 'ws'
   const query = token ? `?t=${encodeURIComponent(token)}` : ''
   ws = new WebSocket(`${proto}://${location.host}/_ws${query}`)
 
   ws.onopen = () => {
-    backoff = 1000
+    backoff = INITIAL_BACKOFF_MS
     offline.hidden = true
+    startPing()
     if (currentId) {
       send({ type: 'subscribe', sessionId: currentId })
       flushOutbox()
@@ -116,11 +131,71 @@ function connect() {
   ws.onclose = () => {
     ws = null
     offline.hidden = false
-    setTimeout(connect, backoff)
-    backoff = Math.min(backoff * 2, 15000)
+    stopPing()
+    retryTimer = setTimeout(connect, backoff)
+    backoff = nextBackoff(backoff)
   }
   ws.onerror = () => {}
 }
+
+// O hub derruba a conexão após 120s sem tráfego (idleTimeout); o ping é o que
+// mantém a página em segundo plano viva enquanto o sistema ainda deixa.
+function startPing() {
+  stopPing()
+  pingTimer = setInterval(ping, PING_MS)
+}
+
+function stopPing() {
+  if (pingTimer !== null) {
+    clearInterval(pingTimer)
+    pingTimer = null
+  }
+  if (pongTimer !== null) {
+    clearTimeout(pongTimer)
+    pongTimer = null
+  }
+}
+
+// Um socket suspenso pelo sistema volta como OPEN e nunca mais entrega nada:
+// só a ausência do pong denuncia. Sem isto, a página parecia conectada e
+// exigia refresh manual.
+function ping() {
+  if (!send({ type: 'ping' })) return
+  if (pongTimer !== null) return
+  pongTimer = setTimeout(() => {
+    pongTimer = null
+    reconnectNow()
+  }, PONG_TIMEOUT_MS)
+}
+
+function reconnectNow() {
+  stopPing()
+  try {
+    ws?.close()
+  } catch {}
+  ws = null
+  offline.hidden = false
+  backoff = INITIAL_BACKOFF_MS
+  connect()
+}
+
+/**
+ * Voltar ao foreground é o gatilho que faltava: o celular congela os timers da
+ * aba em segundo plano, então o retry agendado pelo onclose pode nunca disparar
+ * — e sem isto só um refresh manual reconectava.
+ */
+function wake() {
+  const action = wakeAction(ws === null ? null : ws.readyState)
+  if (action === 'wait') return
+  if (action === 'ping') ping()
+  else reconnectNow()
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') wake()
+})
+window.addEventListener('pageshow', wake)
+window.addEventListener('online', wake)
 
 function send(msg) {
   if (ws?.readyState !== WebSocket.OPEN) return false
@@ -129,6 +204,13 @@ function send(msg) {
 }
 
 function handle(msg) {
+  if (msg.type === 'pong') {
+    if (pongTimer !== null) {
+      clearTimeout(pongTimer)
+      pongTimer = null
+    }
+    return
+  }
   if (msg.type === 'sessions') {
     sessions = Array.isArray(msg.sessions) ? msg.sessions : []
     // Sessão lembrada que o hub não conhece mais: volta para a lista em vez de

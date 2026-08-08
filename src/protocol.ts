@@ -112,6 +112,7 @@ export type HubToSession =
   | { type: 'permission_decision'; requestId: string; behavior: PermissionBehavior }
 
 export type BrowserToHub =
+  | { type: 'ping' }
   | { type: 'subscribe'; sessionId: string }
   | { type: 'prompt'; sessionId: string; text: string }
   | {
@@ -130,6 +131,7 @@ export type BrowserToHub =
   | { type: 'favorite'; path: string; on: boolean }
 
 export type HubToBrowser =
+  | { type: 'pong' }
   | { type: 'sessions'; sessions: SessionSummary[] }
   | { type: 'history'; sessionId: string; events: FeedEvent[] }
   | { type: 'event'; sessionId: string; event: FeedEvent }

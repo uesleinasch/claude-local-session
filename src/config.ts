@@ -11,6 +11,8 @@ export type Config = {
   projects?: string[]
   /** Diretórios-pai: todo subdiretório vira projeto elegível para nova sessão. */
   projectsRoot?: string[]
+  /** Tópico ntfy que recebe os avisos, ex.: https://ntfy.sh/meu-topico. */
+  notifyUrl?: string
 }
 
 export function configDir(): string {
@@ -30,11 +32,17 @@ function withPortOverride(cfg: Config): Config {
   return Number.isInteger(port) && port > 0 ? { ...cfg, port } : cfg
 }
 
+function withCleanNotifyUrl(cfg: Config): Config {
+  if (typeof cfg.notifyUrl === 'string' && cfg.notifyUrl !== '') return cfg
+  const { notifyUrl: _drop, ...rest } = cfg
+  return rest
+}
+
 /** Lê sem criar — usado pelos hooks, que não devem materializar config nenhum. */
 export function readConfig(dir = configDir()): Config | null {
   try {
     const parsed: unknown = JSON.parse(readFileSync(join(dir, 'config.json'), 'utf8'))
-    return isConfig(parsed) ? withPortOverride(parsed) : null
+    return isConfig(parsed) ? withCleanNotifyUrl(withPortOverride(parsed)) : null
   } catch {
     return null
   }

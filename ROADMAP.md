@@ -16,9 +16,13 @@ interrupção via tmux). Este documento lista o que vem depois, em ordem de impa
 
 ## 2. Ser avisado em vez de vigiar
 
-- **Push via ntfy.sh / Gotify** — melhor relação custo/impacto: o hub faz um POST quando
-  surge pedido de permissão, quando a sessão fica ociosa (tarefa terminou) e quando chega
-  `reply`. Config: `notifyUrl` no `config.json`. Sem dependências novas no hub.
+- ~~**Push via ntfy.sh**~~ — feito: com `notifyUrl` no `config.json`, o hub publica no
+  tópico ntfy a cada pedido de permissão, pergunta, `reply` e fim de turno. Quem posta é o
+  hub, então o aviso independe de página aberta ou WebSocket vivo. Publicação por JSON no
+  servidor (título com acento não caberia em header latin-1) e dedupe por evento, já que
+  um mesmo pedido de permissão é reemitido quando o preview chega depois.
+- **Gotify** — mesmo lugar do `notifyUrl`, formato de payload diferente (`/message` com
+  token). Só vale se o ntfy não servir.
 - **Web Push nativo** — sem app de terceiros, mas exige HTTPS + service worker + VAPID.
   Depois do item 1.
 - **PWA** — manifest + service worker: ícone na home do celular, tela cheia. Pré-requisito
@@ -48,6 +52,12 @@ pedido de permissão e decisão allow/deny
   prática e é o que o spawn remoto usa.
 
 ## 4. Refinamentos do que já existe
+
+- ~~**Reconectar ao voltar para a página**~~ — feito: o hub derruba o socket após 120s sem
+  tráfego e o celular congela os timers da aba em segundo plano, então o retry agendado
+  pelo `onclose` podia nunca disparar — só o refresh manual reconectava. Agora um ping a
+  cada 45s segura a conexão, `visibilitychange`/`pageshow`/`online` reconectam na hora, e a
+  ausência de `pong` denuncia o socket que voltou do sono como aberto mas morto.
 
 - **systemd user unit para o hub** — com spawn configurado o hub já é serviço
   permanente, mas após um reboot da máquina nada o inicia até a primeira sessão de
