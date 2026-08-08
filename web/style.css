@@ -810,6 +810,10 @@ body {
   display: none;
 }
 
+#quick[hidden] {
+  display: none;
+}
+
 .quick-chip {
   flex: none;
   min-height: 32px;
@@ -858,6 +862,11 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--bg);
+}
+
+/* Sem isto o display de id vence o atributo hidden e o painel cobre a tela. */
+#sheet[hidden] {
+  display: none;
 }
 
 #sheet-bar {
