@@ -28,8 +28,19 @@ export function detectPluginIdentity(pluginRoot: string): PluginIdentity | null 
   return { plugin, marketplace }
 }
 
+/**
+ * Função, não alias: um alias simples injetaria --channels também nos
+ * subcomandos (claude plugin …), e a flag engoliria os argumentos seguintes.
+ */
 export function aliasCommand(id: PluginIdentity): string {
-  return `alias claude='claude --channels plugin:${id.plugin}@${id.marketplace}'`
+  return [
+    'claude() {',
+    '  case "$1" in',
+    '    plugin|mcp|config|update|doctor|install|migrate-installer|setup-token) command claude "$@" ;;',
+    `    *) command claude --channels plugin:${id.plugin}@${id.marketplace} "$@" ;;`,
+    '  esac',
+    '}',
+  ].join('\n')
 }
 
 export function replyToolName(id: PluginIdentity): string {

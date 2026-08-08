@@ -5,7 +5,13 @@ import { homedir, networkInterfaces } from 'node:os'
 import { join } from 'node:path'
 import { DEFAULT_PORT } from './protocol'
 
-export type Config = { token: string; port: number; projects?: string[] }
+export type Config = {
+  token: string
+  port: number
+  projects?: string[]
+  /** Diretórios-pai: todo subdiretório vira projeto elegível para nova sessão. */
+  projectsRoot?: string[]
+}
 
 export function configDir(): string {
   return process.env.LOCAL_SESSION_DIR ?? join(homedir(), '.claude', 'local-session')

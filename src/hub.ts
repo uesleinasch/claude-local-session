@@ -1,6 +1,6 @@
 import type { Server, ServerWebSocket } from 'bun'
 import { execFile } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { configDir, loadConfig, readCookie, tokenMatches } from './config'
 import { HistoryStore } from './history'
@@ -39,10 +39,32 @@ function pluginIdentity(root: string): PluginIdentity | null {
 }
 
 const PROJECTS = (cfg.projects ?? []).filter(p => typeof p === 'string' && p.startsWith('/'))
+const ROOTS = (cfg.projectsRoot ?? []).filter(p => typeof p === 'string' && p.startsWith('/'))
 const IDENTITY = pluginIdentity(ROOT)
 const HAS_TMUX = Bun.which('tmux') !== null
-const CAN_SPAWN = HAS_TMUX && Bun.which('claude') !== null && IDENTITY !== null && PROJECTS.length > 0
+const CAN_SPAWN =
+  HAS_TMUX &&
+  Bun.which('claude') !== null &&
+  IDENTITY !== null &&
+  (PROJECTS.length > 0 || ROOTS.length > 0)
 const CAN_INTERRUPT = HAS_TMUX
+
+/**
+ * Recalculado a cada uso: um repositório clonado depois do boot do hub já
+ * aparece como opção. O navegador só escolhe dentro desta lista — nunca envia
+ * caminho arbitrário.
+ */
+function projectDirs(): string[] {
+  const out = new Set<string>(PROJECTS)
+  for (const root of ROOTS) {
+    try {
+      for (const entry of readdirSync(root, { withFileTypes: true })) {
+        if (entry.isDirectory() && !entry.name.startsWith('.')) out.add(join(root, entry.name))
+      }
+    } catch {}
+  }
+  return [...out].sort()
+}
 
 type WsData = { role: 'session' | 'browser' }
 type Ws = ServerWebSocket<WsData>
@@ -223,7 +245,7 @@ function onBrowserMessage(ws: Ws, msg: BrowserToHub): void {
       if (typeof msg.dir !== 'string') return
       // Allowlist por igualdade exata: o browser escolhe entre os projetos
       // declarados em config.json, nunca envia um caminho arbitrário.
-      if (!CAN_SPAWN || !PROJECTS.includes(msg.dir)) {
+      if (!CAN_SPAWN || !projectDirs().includes(msg.dir)) {
         toast(ws, 'diretório não autorizado para nova sessão')
         return
       }
@@ -285,7 +307,7 @@ try {
             ws.send(
               JSON.stringify({
                 type: 'config',
-                projects: PROJECTS,
+                projects: CAN_SPAWN ? projectDirs() : [],
                 canSpawn: CAN_SPAWN,
                 canInterrupt: CAN_INTERRUPT,
               } satisfies HubToBrowser),

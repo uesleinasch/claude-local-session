@@ -42,11 +42,19 @@ nada e não pede senha se já estiver tudo certo. Ele pede `sudo` uma única vez
 `/etc/claude-code/managed-settings.json`.
 
 Depois abra um terminal novo e rode `claude` — o canal já vem ativo, porque o instalador
-escreve no seu rc:
+escreve no seu rc uma função que sobrepõe o comando:
 
 ```bash
-alias claude='claude --channels plugin:local-session@unac'
+claude() {
+  case "$1" in
+    plugin|mcp|config|update|doctor|install|migrate-installer|setup-token) command claude "$@" ;;
+    *) command claude --channels plugin:local-session@unac "$@" ;;
+  esac
+}
 ```
+
+É função em vez de alias de propósito: um alias injetaria `--channels` também nos
+subcomandos (`claude plugin install …`), e a flag engoliria os argumentos seguintes.
 
 Numa máquina que já tem o plugin, `/local-session:setup` faz a mesma configuração de dentro do
 Claude Code (o pedido de senha vira um diálogo gráfico, via `pkexec`).
@@ -156,13 +164,15 @@ das últimas 48h reaparecem na lista após um reboot.
 Dois recursos dependem do `tmux` estar instalado:
 
 **Nova sessão pelo celular.** Declare os projetos permitidos em
-`~/.claude/local-session/config.json`:
+`~/.claude/local-session/config.json` — um a um (`projects`) ou pelo diretório-pai
+(`projectsRoot`, todo subdiretório vira opção, inclusive repositórios clonados depois):
 
 ```json
 {
   "token": "…",
   "port": 7777,
-  "projects": ["/home/voce/repos/meu-projeto"]
+  "projects": ["/home/voce/repos/meu-projeto"],
+  "projectsRoot": ["/home/voce/repos"]
 }
 ```
 

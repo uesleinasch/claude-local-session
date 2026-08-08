@@ -30,8 +30,17 @@ describe('detectPluginIdentity', () => {
 })
 
 describe('identificadores derivados', () => {
-  test('o alias sobrepõe o próprio claude', () => {
-    expect(aliasCommand(ID)).toBe("alias claude='claude --channels plugin:local-session@unac'")
+  test('a função sobrepõe o claude injetando a flag de canal', () => {
+    const fn = aliasCommand(ID)
+    expect(fn).toStartWith('claude() {')
+    expect(fn).toContain('command claude --channels plugin:local-session@unac "$@"')
+  })
+
+  test('a função deixa subcomandos passarem sem a flag', () => {
+    const fn = aliasCommand(ID)
+    // Um alias simples faria --channels engolir "plugin marketplace update"
+    // como se fossem canais — o case repassa subcomandos ao binário puro.
+    expect(fn).toContain('plugin|mcp|config|update|doctor|install|migrate-installer|setup-token) command claude "$@"')
   })
 
   test('o nome da tool segue o padrão do Claude Code', () => {
