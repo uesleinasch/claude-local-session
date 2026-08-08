@@ -430,7 +430,11 @@ try {
 let lastAlive = Date.now()
 setInterval(() => {
   registry.sweep()
-  if (registry.hasAlive()) {
+  // Com spawn configurado, o hub é serviço permanente: matar a última sessão
+  // pelo navegador não pode derrubar justamente quem permite criar a próxima.
+  // Navegador conectado também segura — fechar tudo com alguém olhando o
+  // histórico derrubaria a página no meio da leitura.
+  if (registry.hasAlive() || registry.hasBrowsers() || CAN_SPAWN) {
     lastAlive = Date.now()
     return
   }

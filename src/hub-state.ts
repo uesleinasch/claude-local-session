@@ -206,6 +206,10 @@ export class Registry {
     return false
   }
 
+  hasBrowsers(): boolean {
+    return this.browsers.size > 0
+  }
+
   sweep(now = Date.now()): void {
     let removed = false
     for (const [id, entry] of this.sessions) {

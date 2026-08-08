@@ -402,6 +402,16 @@ describe('limpeza', () => {
     expect(reg.summaries()).toHaveLength(1)
   })
 
+  test('hasBrowsers acompanha conexões de navegador', () => {
+    const reg = new Registry()
+    expect(reg.hasBrowsers()).toBe(false)
+    const browser = spy()
+    reg.addBrowser(browser)
+    expect(reg.hasBrowsers()).toBe(true)
+    reg.removeBrowser(browser)
+    expect(reg.hasBrowsers()).toBe(false)
+  })
+
   test('hasAlive acompanha a última sessão a cair', () => {
     const reg = new Registry()
     const session = spy()

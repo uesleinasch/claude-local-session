@@ -19,7 +19,9 @@ navegador (celular / notebook na LAN)
 ```
 
 Um link só para todas as sessões. O hub é um daemon desanexado: sobrevive à morte de
-qualquer sessão e se autoencerra 60s depois que a última sai.
+qualquer sessão e se autoencerra 60s depois que a última sai — a menos que haja navegador
+conectado ou spawn configurado (`projects`/`projectsRoot`), caso em que permanece de pé
+como serviço, para a página continuar podendo criar sessões novas.
 
 ## Instalação
 
