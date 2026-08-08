@@ -212,23 +212,50 @@ um tmux seu, sobrevive ao hub e ao navegador, e você pode anexá-la depois no t
 `tmux attach`. A allowlist é comparada por igualdade exata: o navegador nunca envia um
 caminho arbitrário. Sem `projects`, o recurso fica desligado.
 
-**Receber aviso no celular.** Com a chave `notifyUrl` apontando para um tópico ntfy, o hub
-faz um POST a cada pedido de permissão, pergunta do Claude, `reply` e fim de turno:
+**Receber aviso no celular.** Quem publica é o hub, não o navegador — o aviso chega com a
+página fechada, o celular bloqueado e nenhum WebSocket de pé. É o caminho para largar a
+página e ser chamado quando ela precisa de você.
 
-```json
-{
-  "token": "…",
-  "port": 7777,
-  "notifyUrl": "https://ntfy.sh/um-topico-que-so-voce-sabe"
-}
-```
+1. Escolha um nome de tópico longo e aleatório. Ele é a única credencial:
 
-Quem publica é o hub, não o navegador — o aviso chega com a página fechada, o celular
-bloqueado e nenhum WebSocket de pé. Instale o app do [ntfy](https://ntfy.sh) e inscreva-se
-no mesmo tópico. Vale para qualquer servidor ntfy, inclusive self-hosted
-(`http://192.168.1.9/ntfy/avisos`); o tópico é a última parte do caminho. Sem a chave, o
-hub não notifica nada. **O tópico é o segredo**: quem souber o nome lê seus avisos, então
-use um nome longo e aleatório ou um servidor com autenticação.
+   ```
+   openssl rand -hex 12   # ex.: local-session-9f2c1a7b4e8d0c35
+   ```
+
+2. Coloque em `~/.claude/local-session/config.json`:
+
+   ```json
+   {
+     "token": "…",
+     "port": 7777,
+     "notifyUrl": "https://ntfy.sh/local-session-9f2c1a7b4e8d0c35"
+   }
+   ```
+
+3. Reinicie o hub — ele lê a chave no boot (`pkill -f src/hub.ts`, ou mate o PID que
+   escuta a porta: `ss -tlnp | grep 7777`).
+
+4. Instale o app [ntfy](https://ntfy.sh) (Android/iOS) ou abra
+   `https://ntfy.sh/local-session-9f2c1a7b4e8d0c35` no navegador, e inscreva-se no mesmo
+   tópico. Para testar sem esperar um evento:
+
+   ```
+   curl -d "teste" https://ntfy.sh/local-session-9f2c1a7b4e8d0c35
+   ```
+
+O hub avisa em quatro momentos: pedido de permissão, pergunta do Claude
+(`AskUserQuestion`), `reply` da sessão e fim de turno. Não avisa nos prompts que você mesmo
+mandou nem a cada tool executada — seria um push por linha do feed. Um mesmo pedido de
+permissão gera um único aviso, mesmo quando o card é reemitido com o preview.
+
+Vale para qualquer servidor ntfy, inclusive self-hosted
+(`"notifyUrl": "http://192.168.1.9/ntfy/avisos"`); o tópico é sempre a última parte do
+caminho. Sem a chave, o hub não notifica nada.
+
+> **O tópico é o segredo.** No ntfy.sh público, quem souber o nome lê seus avisos — e eles
+> incluem o texto do `reply` e a descrição da tool. Nome curto ou adivinhável vaza o
+> conteúdo do seu trabalho. Para algo mais forte, use um servidor ntfy próprio com
+> autenticação.
 
 **Interromper o turno.** O botão `■ parar` no topo do feed envia `Escape` para o pane do
 tmux onde a sessão roda — o mesmo gesto que interromperia no terminal. Funciona para
