@@ -472,8 +472,8 @@ sendBtn.addEventListener('click', submit)
 stopBtn.addEventListener('click', () => {
   if (!currentId) return
   if (!confirm('Interromper o turno atual desta sessão?')) return
-  if (send({ type: 'interrupt', sessionId: currentId })) showToast('interrupção enviada')
-  else showToast('sem conexão com o hub')
+  // O hub confirma com toast próprio ("turno interrompido") ou reporta o erro.
+  if (!send({ type: 'interrupt', sessionId: currentId })) showToast('sem conexão com o hub')
 })
 
 if (currentId) app.dataset.view = 'feed'

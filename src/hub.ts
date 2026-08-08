@@ -275,7 +275,20 @@ function onBrowserMessage(ws: Ws, msg: BrowserToHub): void {
         return
       }
       void interruptSession(s.pid).then(err => {
-        if (err) toast(ws, err)
+        if (err) {
+          toast(ws, err)
+          return
+        }
+        // O turno morre no terminal sem produzir reply nem Stop hook — sem
+        // isto a página não dá nenhum sinal de que a interrupção funcionou.
+        toast(ws, 'turno interrompido')
+        registry.push(msg.sessionId, {
+          kind: 'activity',
+          ts: Date.now(),
+          tool: '',
+          detail: '',
+          status: 'idle',
+        })
       })
       return
     }
