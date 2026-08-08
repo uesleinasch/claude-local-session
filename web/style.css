@@ -281,28 +281,21 @@ body {
   font-weight: 700;
 }
 
-/* ● âmbar = trabalhando · ○ verde = ociosa (viva) · ○ cinza = encerrada */
+/* ● vermelho = espera você · ● âmbar = trabalhando · ○ verde = ociosa · ○ cinza = encerrada */
 .session-name::before {
   content: "○";
   color: var(--green);
   font-size: var(--step--2);
 }
 
-.session[data-alive="true"] .session-name::after {
-  content: "ociosa";
-  color: var(--ink-dim);
-  font-weight: 400;
-  font-size: var(--step--2);
-}
-
-.session[data-alive="true"][data-busy="true"] .session-name::before {
+.session[data-tone="busy"] .session-name::before {
   content: "●";
   color: var(--amber);
 }
 
-.session[data-alive="true"][data-busy="true"] .session-name::after {
-  content: "trabalhando…";
-  color: var(--amber);
+.session[data-tone="waiting"] .session-name::before {
+  content: "●";
+  color: var(--red);
 }
 
 .session[data-alive="false"] {
@@ -312,6 +305,22 @@ body {
 .session[data-alive="false"] .session-name::before {
   content: "○";
   color: var(--ink-dim);
+}
+
+.session-state {
+  display: block;
+  margin-top: 3px;
+  color: var(--ink-dim);
+  font-size: var(--step--2);
+}
+
+.session-state[data-tone="busy"] {
+  color: var(--amber);
+}
+
+.session-state[data-tone="waiting"] {
+  color: var(--red);
+  font-weight: 700;
 }
 
 .session-path {

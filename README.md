@@ -143,8 +143,17 @@ LAN bloqueia tráfego entre clientes (firewall de endpoint corporativo, isolamen
 
 ## Uso
 
-A página abre na lista de sessões vivas, cada uma rotulada pelo diretório do projeto. Ao
-entrar numa delas você vê:
+A página abre na lista de sessões vivas, cada uma rotulada pelo diretório do projeto. Cada
+linha diz em que pé a sessão está, para você saber onde tocar antes de entrar:
+
+| Marca             | Estado                                                        |
+| ----------------- | ------------------------------------------------------------- |
+| ● `aguardando você` | há permissão ou pergunta esperando resposta                  |
+| ● `trabalhando`   | turno em andamento                                            |
+| ○ `ociosa há N min` | parada desde o último evento — o tempo conta sozinho        |
+| ○ `encerrada`     | sessão terminada, histórico ainda navegável                   |
+
+Ao entrar numa sessão você vê:
 
 - **você / claude** — o que foi mandado e o que o Claude respondeu pela tool `reply`,
   renderizada como markdown (código, listas, links).
@@ -257,6 +266,25 @@ caminho. Sem a chave, o hub não notifica nada.
 > conteúdo do seu trabalho. Para algo mais forte, use um servidor ntfy próprio com
 > autenticação.
 
+**Hub de pé desde o boot.** Por padrão o hub sobe junto com a primeira sessão do Claude
+Code — depois de um reboot, a página não responde até alguém abrir um terminal na máquina.
+O comando `/local-session:service` instala uma unit de usuário do systemd que resolve isso:
+
+```
+/local-session:service            # instala, habilita e inicia
+/local-session:service --check    # só diagnostica
+/local-session:service --disable  # para e desabilita
+```
+
+Ele grava `~/.config/systemd/user/local-session-hub.service` apontando para o diretório
+atual do plugin e liga o *linger* do seu usuário — sem linger, o serviço de usuário só
+existe enquanto há sessão de login aberta, que é justamente o que falta depois de um
+reboot sem ninguém logar. Se faltar privilégio para o linger, o script mostra o comando
+com `sudo` para você rodar. Logs em `journalctl --user -u local-session-hub.service -f`.
+
+A unit aponta para um diretório de versão específico — depois de atualizar o plugin, rode
+`/local-session:update` (que avisa se a unit ficou órfã) ou o comando de serviço de novo.
+
 **Interromper o turno.** O botão `■ parar` no topo do feed envia `Escape` para o pane do
 tmux onde a sessão roda — o mesmo gesto que interromperia no terminal. Funciona para
 qualquer sessão dentro de tmux (não só as spawnadas pela página); para sessões fora de
@@ -349,6 +377,14 @@ bunx tsc --noEmit # checagem de tipos
 bun run hub       # sobe o hub no primeiro plano, para depurar
 ```
 
+Para ver o código local rodando de verdade — o `plugin install/update` puxa do marketplace
+remoto e ignora o que está só na sua máquina — use `/local-session:update` (ou
+`bun scripts/update.ts`) a partir da raiz do repo. Ele espelha `src/`, `web/`, `hooks/` e
+`commands/` em **todos** os diretórios de versão do cache do plugin e troca o hub em
+execução, matando pelo PID que escuta a porta. Espelhar em todos importa: uma sessão antiga
+respawna o hub do próprio root, e um diretório esquecido devolve código velho no primeiro
+respawn. A página cai por alguns segundos e reconecta sozinha.
+
 Estrutura:
 
 | Arquivo             | Responsabilidade                                  |
@@ -359,6 +395,9 @@ Estrutura:
 | `src/hub-client.ts` | Cliente WebSocket com backoff e spawn do daemon   |
 | `src/config.ts`     | Token, porta, IP da rota default                  |
 | `src/notify.ts`     | Evento → aviso ntfy, com dedupe (sem I/O no core) |
+| `src/update-core.ts`| PID na porta e versões no cache — parsing testável |
+| `scripts/service.ts`| Instala a unit de usuário do systemd              |
+| `scripts/update.ts` | Espelha o repo no cache e troca o hub             |
 | `src/history.ts`    | Histórico em JSONL — persistência e hidratação    |
 | `src/hook-event.ts` | Payload de hook → evento de atividade + preview   |
 | `hooks/report.ts`   | Hook: lê stdin, faz POST, falha em silêncio       |

@@ -43,6 +43,30 @@ export function aliasCommand(id: PluginIdentity): string {
   ].join('\n')
 }
 
+export const UNIT_NAME = 'local-session-hub.service'
+
+/**
+ * O hub sai com 0 quando outra instância já tem a porta — `on-failure` evita o
+ * ciclo de reinício que `always` provocaria nessa disputa normal.
+ */
+export function systemdUnit(bunPath: string, pluginRoot: string): string {
+  return [
+    '[Unit]',
+    'Description=local-session hub',
+    'After=network.target',
+    '',
+    '[Service]',
+    'Type=simple',
+    `ExecStart=${bunPath} ${join(pluginRoot, 'src', 'hub.ts')}`,
+    'Restart=on-failure',
+    'RestartSec=5',
+    '',
+    '[Install]',
+    'WantedBy=default.target',
+    '',
+  ].join('\n')
+}
+
 export function replyToolName(id: PluginIdentity): string {
   return `mcp__plugin_${id.plugin}_${SERVER_NAME}__reply`
 }

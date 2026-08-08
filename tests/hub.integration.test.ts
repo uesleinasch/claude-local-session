@@ -142,7 +142,13 @@ describe('gate de token', () => {
   })
 
   test('serve todo módulo importado pelo app, senão a página não carrega', async () => {
-    for (const path of ['/app.js', '/markdown.js', '/connection.js', '/style.css']) {
+    for (const path of [
+      '/app.js',
+      '/markdown.js',
+      '/connection.js',
+      '/session-status.js',
+      '/style.css',
+    ]) {
       const res = await fetch(`${base()}${path}?t=${token}`)
       expect(res.status).toBe(200)
     }

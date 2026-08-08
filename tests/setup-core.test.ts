@@ -7,6 +7,7 @@ import {
   mergeUserPermissions,
   rcPathFor,
   replyToolName,
+  systemdUnit,
 } from '../src/setup-core'
 
 const ID = { plugin: 'local-session', marketplace: 'unac' }
@@ -26,6 +27,28 @@ describe('detectPluginIdentity', () => {
 
   test('devolve null quando o caminho para no marketplace', () => {
     expect(detectPluginIdentity('/home/u/.claude/plugins/cache/unac')).toBeNull()
+  })
+})
+
+describe('systemdUnit', () => {
+  const unit = systemdUnit('/home/u/.bun/bin/bun', '/home/u/.claude/plugins/cache/unac/local-session/0.5.0')
+
+  test('executa o hub do root informado, com caminhos absolutos', () => {
+    expect(unit).toContain(
+      'ExecStart=/home/u/.bun/bin/bun /home/u/.claude/plugins/cache/unac/local-session/0.5.0/src/hub.ts',
+    )
+  })
+
+  test('sobe junto com a sessão do usuário, para valer desde o boot', () => {
+    expect(unit).toContain('WantedBy=default.target')
+  })
+
+  test('reinicia só em falha — sair de porta ocupada é normal, não é erro', () => {
+    expect(unit).toContain('Restart=on-failure')
+  })
+
+  test('não vaza o token pela linha de comando', () => {
+    expect(unit).not.toContain('token')
   })
 })
 

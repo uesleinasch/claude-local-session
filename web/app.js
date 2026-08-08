@@ -6,6 +6,7 @@ import {
   wakeAction,
 } from './connection.js'
 import { renderMarkdown } from './markdown.js'
+import { sessionStatus } from './session-status.js'
 
 const app = document.getElementById('app')
 const bar = { title: document.getElementById('title'), state: document.getElementById('state') }
@@ -190,6 +191,11 @@ function wake() {
   if (action === 'ping') ping()
   else reconnectNow()
 }
+
+// "ociosa há N min" envelhece sozinha: sem evento novo, nada redesenharia a lista.
+setInterval(() => {
+  if (app.dataset.view === 'sessions') renderSessions()
+}, 60_000)
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') wake()
@@ -535,7 +541,14 @@ function renderSessions() {
     path.className = 'session-path'
     path.textContent = s.cwd
 
-    btn.append(name, path)
+    const status = sessionStatus(s, Date.now())
+    const state = document.createElement('span')
+    state.className = 'session-state'
+    state.dataset.tone = status.tone
+    state.textContent = status.label
+
+    btn.dataset.tone = status.tone
+    btn.append(name, state, path)
     btn.addEventListener('click', () => open(s.id))
 
     const kill = document.createElement('button')

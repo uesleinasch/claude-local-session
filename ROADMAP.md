@@ -27,8 +27,10 @@ interrupção via tmux). Este documento lista o que vem depois, em ordem de impa
   Depois do item 1.
 - **PWA** — manifest + service worker: ícone na home do celular, tela cheia. Pré-requisito
   do Web Push.
-- **Badges na lista de sessões** — "aguardando permissão", "ociosa há N min", última
-  atividade. O hub já tem os dados; falta expor no `SessionSummary` e renderizar.
+- ~~**Badges na lista de sessões**~~ — feito: `waiting` e `lastEventAt` no `SessionSummary`
+  viram "aguardando você", "trabalhando", "ociosa há N min" e "encerrada". O texto é uma
+  função pura (`web/session-status.js`), e a lista se redesenha de minuto em minuto para o
+  tempo não congelar sem evento novo.
 
 ## 3. Limitações do protocolo de canal (verificado em 2026-08-07)
 
@@ -59,14 +61,17 @@ pedido de permissão e decisão allow/deny
   cada 45s segura a conexão, `visibilitychange`/`pageshow`/`online` reconectam na hora, e a
   ausência de `pong` denuncia o socket que voltou do sono como aberto mas morto.
 
-- **systemd user unit para o hub** — com spawn configurado o hub já é serviço
-  permanente, mas após um reboot da máquina nada o inicia até a primeira sessão de
-  terminal. Um `systemctl --user enable` fecharia o ciclo: celular funciona desde o boot.
-- **`/local-session:update`** — a atualização hoje exige bump de versão (sem ele o
-  `plugin install` mantém o snapshot), reinstalar, e trocar o hub vencendo a corrida
-  contra os respawners das sessões antigas (`hub-client` respawna do próprio root no
-  instante em que a porta vaga). Um comando que faça a dança inteira — e um hub que
-  se auto-encerre ao detectar versão mais nova no cache — eliminam o atrito.
+- ~~**systemd user unit para o hub**~~ — feito: `/local-session:service` grava a unit de
+  usuário, habilita, inicia e liga o *linger* (sem ele o serviço de usuário morre com o
+  logout, que é exatamente o caso do reboot sem login). `Restart=on-failure` porque sair de
+  porta ocupada é saída normal, não erro. A unit aponta para um diretório de versão, então
+  `/local-session:update` avisa quando ela fica órfã.
+- ~~**`/local-session:update`**~~ — feito: espelha `src/web/hooks/commands` + `plugin.json`
+  em todos os diretórios do cache, mata o hub pelo PID vindo do `ss` (nunca por padrão de
+  texto — `pkill -f` com o caminho no padrão mata o próprio shell) e espera o novo subir.
+- **Hub que se auto-encerra ao ver versão nova no cache** — eliminaria o passo de matar:
+  o hub compararia a própria versão com a maior do cache e sairia sozinho. Só vale a pena
+  se o `update` se mostrar frágil na prática.
 
 - **Diff real no card de permissão** — hoje o preview de `Edit` mostra os blocos antigo/novo
   prefixados com `-`/`+`; um diff de linhas (LCS) marcaria só o que mudou.

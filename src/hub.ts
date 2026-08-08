@@ -98,6 +98,7 @@ const STATIC: Record<string, { file: string; type: string }> = {
   '/app.js': { file: 'app.js', type: 'text/javascript; charset=utf-8' },
   '/markdown.js': { file: 'markdown.js', type: 'text/javascript; charset=utf-8' },
   '/connection.js': { file: 'connection.js', type: 'text/javascript; charset=utf-8' },
+  '/session-status.js': { file: 'session-status.js', type: 'text/javascript; charset=utf-8' },
   '/style.css': { file: 'style.css', type: 'text/css; charset=utf-8' },
 }
 

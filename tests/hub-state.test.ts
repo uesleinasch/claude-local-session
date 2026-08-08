@@ -551,6 +551,85 @@ describe('estado ocupado', () => {
   })
 })
 
+describe('badges da lista', () => {
+  const permission = (over: Partial<Extract<FeedEvent, { kind: 'permission' }>> = {}): FeedEvent => ({
+    kind: 'permission',
+    ts: 10,
+    requestId: 'r1',
+    toolName: 'Bash',
+    description: '',
+    inputPreview: 'ls',
+    ...over,
+  })
+
+  test('pedido de permissão em aberto marca a sessão como esperando por mim', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    expect(reg.summaries()[0]!.waiting).not.toBe(true)
+
+    reg.push('s1', permission())
+    expect(reg.summaries()[0]!.waiting).toBe(true)
+  })
+
+  test('permissão decidida tira a marca', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', permission())
+    reg.resolvePermission('s1', 'r1', 'allow')
+    expect(reg.summaries()[0]!.waiting).toBe(false)
+  })
+
+  test('com dois pedidos, decidir um só não desmarca', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', permission())
+    reg.push('s1', permission({ requestId: 'r2' }))
+    reg.resolvePermission('s1', 'r1', 'allow')
+    expect(reg.summaries()[0]!.waiting).toBe(true)
+  })
+
+  test('pergunta em aberto também espera por mim', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', { kind: 'question', ts: 3, questionId: 'q1', questions: [] })
+    expect(reg.summaries()[0]!.waiting).toBe(true)
+
+    reg.resolveQuestion('s1', 'q1', {})
+    expect(reg.summaries()[0]!.waiting).toBe(false)
+  })
+
+  test('a marca entra na lista mandada aos browsers', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    const browser = spy()
+    reg.addBrowser(browser)
+
+    reg.push('s1', permission())
+    const lists = browser.sent.filter(m => m.type === 'sessions')
+    expect(lists.at(-1).sessions[0].waiting).toBe(true)
+  })
+
+  test('cada evento carimba o instante da última atividade', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', { kind: 'prompt', ts: 111, text: 'oi' })
+    expect(reg.summaries()[0]!.lastEventAt).toBe(111)
+
+    reg.push('s1', { kind: 'activity', ts: 222, tool: '', detail: '', status: 'idle' })
+    expect(reg.summaries()[0]!.lastEventAt).toBe(222)
+  })
+
+  test('sessão que caiu não fica marcada esperando resposta', () => {
+    const reg = new Registry()
+    const sink = spy()
+    reg.registerSession(sink, INFO)
+    reg.push('s1', permission())
+    reg.removeSession(sink)
+
+    expect(reg.summaries()[0]!.waiting).toBe(false)
+  })
+})
+
 describe('persistência', () => {
   test('onEvent recebe cada evento aceito', () => {
     const got: Array<[string, FeedEvent]> = []

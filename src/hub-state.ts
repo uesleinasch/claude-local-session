@@ -97,6 +97,7 @@ export class Registry {
     entry.sink = null
     entry.summary.alive = false
     entry.summary.busy = false
+    entry.summary.waiting = false
     entry.summary.endedAt = now
     this.broadcastSessions()
   }
@@ -121,7 +122,9 @@ export class Registry {
     const entry = this.sessions.get(sessionId)
     if (!entry) return
 
+    entry.summary.lastEventAt = event.ts
     const wasBusy = entry.summary.busy === true
+    const wasWaiting = entry.summary.waiting === true
     if (
       event.kind === 'prompt' ||
       (event.kind === 'question' && event.resolved === undefined) ||
@@ -131,7 +134,8 @@ export class Registry {
     } else if (event.kind === 'activity' && event.status === 'idle') {
       entry.summary.busy = false
     }
-    if ((entry.summary.busy === true) !== wasBusy) this.broadcastSessions()
+
+    let replaced = false
 
     if (event.kind === 'permission') {
       const requestId = event.requestId
@@ -147,29 +151,37 @@ export class Registry {
       )
       if (at !== -1) {
         entry.events[at] = event
-        this.onEvent?.(sessionId, event)
-        this.broadcastEvent(sessionId, event)
-        return
+        replaced = true
       }
     }
 
-    if (event.kind === 'question') {
+    if (!replaced && event.kind === 'question') {
       const questionId = event.questionId
       const at = entry.events.findIndex(
         e => e.kind === 'question' && e.questionId === questionId,
       )
       if (at !== -1) {
         entry.events[at] = event
-        this.onEvent?.(sessionId, event)
-        this.broadcastEvent(sessionId, event)
-        return
+        replaced = true
       }
     }
 
-    entry.events.push(event)
-    if (entry.events.length > MAX_EVENTS) entry.events.splice(0, entry.events.length - MAX_EVENTS)
+    if (!replaced) {
+      entry.events.push(event)
+      if (entry.events.length > MAX_EVENTS) entry.events.splice(0, entry.events.length - MAX_EVENTS)
+    }
+
+    entry.summary.waiting = entry.events.some(
+      e =>
+        (e.kind === 'permission' || e.kind === 'question') && e.resolved === undefined,
+    )
+    if ((entry.summary.busy === true) !== wasBusy || entry.summary.waiting !== wasWaiting) {
+      this.broadcastSessions()
+    }
+
     this.onEvent?.(sessionId, event)
     this.broadcastEvent(sessionId, event)
+    if (replaced) return
 
     // Turno encerrado (Stop/interrupção) com diálogo ainda na tela: o card sem
     // resposta ficaria "aguardando" para sempre — cancela para refletir a TUI.

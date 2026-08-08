@@ -42,6 +42,10 @@ export type SessionSummary = {
   busy?: boolean
   /** Auto mode: o hub aprova sozinho os pedidos de permissão desta sessão. */
   auto?: boolean
+  /** Há permissão ou pergunta esperando resposta humana. */
+  waiting?: boolean
+  /** Instante do último evento do feed — insumo do "ociosa há N min". */
+  lastEventAt?: number
   /** Uso da janela de contexto, reportado pelo statusline. */
   context?: SessionContext
   /** Modelo ativo, reportado pelo statusline. */
