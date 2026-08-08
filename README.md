@@ -197,6 +197,20 @@ arquivos tocados (`git status --short`, incluindo os não rastreados), o resumo 
 diretório que a sessão já declarou. Diff acima de 40 mil caracteres é cortado com aviso.
 Sessão fora de um repositório git diz isso em vez de falhar.
 
+**Terminal remoto.** Ao lado dele, o botão `▮ terminal` abre um terminal de verdade no
+diretório da sessão — um shell dentro de uma sessão `tmux` própria, com o output cru
+chegando ao navegador pelo `pipe-pane` e desenhado pelo xterm.js. Não é foto de tela: cores,
+barra de progresso e `\r` funcionam como no terminal. Você escreve no campo de baixo e a
+fileira de teclas manda `Ctrl-C`, `Esc`, `Tab`, setas e companhia; teclado físico digita
+direto na tela.
+
+O terminal pertence ao **diretório**, não à sessão do Claude: ele sobrevive ao fechar da
+página, ao restart do hub e ao fim da sessão. Você inicia um build, sai, volta depois e
+encontra tudo rolando — e do terminal da máquina dá para anexar no mesmo shell com
+`tmux attach -t lst-…`. Só o `✕ encerrar` mata a sessão de verdade. A fronteira é a mesma da
+nova sessão (sua home mais os `projectsRoot`), e as teclas de controle são uma allowlist:
+o navegador não escolhe o que vai para a linha de comando do `tmux`.
+
 **Mandar foto.** O botão 📎 no composer abre a câmera ou a galeria. A imagem sobe para
 `~/.claude/local-session/uploads/` e o prompt sai com o caminho — o canal só transporta
 texto, então o Claude abre o arquivo com `Read` como faria com qualquer arquivo do projeto.
@@ -425,6 +439,9 @@ Estrutura:
 | `src/notify.ts`     | Evento → aviso ntfy, com dedupe (sem I/O no core) |
 | `src/update-core.ts`| PID na porta e versões no cache — parsing testável |
 | `src/git-changes.ts`| Saídas do git → o texto do painel "mudanças"       |
+| `src/terminal.ts`   | Terminais tmux por diretório: fluxo, teclas e tamanho |
+| `web/terminal-panel.js` | Visor do terminal (xterm.js) e teclas de controle |
+| `web/vendor/`       | xterm.js e addon-fit, MIT, servidos com cache longo |
 | `src/upload.ts`     | Imagem reconhecida pelos bytes e nome de arquivo derivado |
 | `scripts/service.ts`| Instala a unit de usuário do systemd              |
 | `scripts/update.ts` | Espelha o repo no cache e troca o hub             |

@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import type { Subprocess } from 'bun'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { loadConfig } from '../src/config'
@@ -109,9 +109,15 @@ beforeAll(async () => {
       return new Response('ok')
     },
   })
+  // Sem projectsRoot a fronteira do hub é a home de verdade, e os diretórios
+  // temporários deste teste ficariam de fora do que ele aceita abrir.
   writeFileSync(
     join(dir, 'config.json'),
-    JSON.stringify({ ...cfg, notifyUrl: `http://127.0.0.1:${notifyServer.port}/avisos` }),
+    JSON.stringify({
+      ...cfg,
+      notifyUrl: `http://127.0.0.1:${notifyServer.port}/avisos`,
+      projectsRoot: [tmpdir()],
+    }),
   )
 
   port = await freePort()
@@ -142,17 +148,34 @@ describe('gate de token', () => {
     expect(res.status).toBe(200)
   })
 
-  test('serve todo módulo importado pelo app, senão a página não carrega', async () => {
-    for (const path of [
-      '/app.js',
-      '/markdown.js',
-      '/connection.js',
-      '/session-status.js',
-      '/style.css',
-    ]) {
-      const res = await fetch(`${base()}${path}?t=${token}`)
-      expect(res.status).toBe(200)
+  /**
+   * A allowlist de estáticos do hub é escrita à mão: um arquivo novo no `web/`
+   * carrega na página do dev (que já tem tudo em cache) e dá 404 no celular.
+   * Por isso a lista sai do próprio HTML, não de um rol repetido aqui.
+   */
+  test('serve tudo que a página pede, senão ela carrega pela metade', async () => {
+    const webDir = join(import.meta.dir, '..', 'web')
+    const html = readFileSync(join(webDir, 'index.html'), 'utf8')
+    const wanted = new Set(
+      [...html.matchAll(/(?:src|href)="(\/[^"]+)"/g)].map(m => m[1]!).filter(p => p !== '/'),
+    )
+    for (const file of ['app.js', 'terminal-panel.js']) {
+      const mod = readFileSync(join(webDir, file), 'utf8')
+      for (const imp of mod.matchAll(/from '\.\/([\w.-]+)'/g)) wanted.add(`/${imp[1]!}`)
     }
+    expect(wanted.size).toBeGreaterThan(4)
+
+    for (const path of wanted) {
+      const res = await fetch(`${base()}${path}?t=${token}`)
+      expect(res.status, `${path} deveria ser servido pelo hub`).toBe(200)
+    }
+  })
+
+  test('a biblioteca do terminal pode ficar em cache; o resto, nunca', async () => {
+    const lib = await fetch(`${base()}/vendor/xterm.js?t=${token}`)
+    expect(lib.headers.get('cache-control')).toContain('immutable')
+    const app = await fetch(`${base()}/app.js?t=${token}`)
+    expect(app.headers.get('cache-control')).toBe('no-store')
   })
 
   test('responde 404 sem token, sem revelar o serviço', async () => {
@@ -282,6 +305,82 @@ describe('o que mudou', () => {
     session.socket.close()
     browser.socket.close()
     rmSync(plain, { recursive: true, force: true })
+  })
+})
+
+describe.if(Bun.which('tmux') !== null && Bun.which('mkfifo') !== null)('terminal remoto', () => {
+  const work = () => mkdtempSync(join(tmpdir(), 'ls-wsterm-'))
+
+  test('abre, roda um comando e o que sai volta pelo socket', async () => {
+    const cwd = work()
+    const browser = await connect('browser')
+    browser.socket.send(JSON.stringify({ type: 'term_open', dir: cwd, cols: 80, rows: 24 }))
+
+    const ready = await browser.wait(m => m.type === 'term_ready', 10_000)
+    expect(ready.dir).toBe(cwd)
+    expect(ready.cols).toBe(80)
+
+    browser.socket.send(JSON.stringify({ type: 'term_input', text: 'echo pelo-socket', enter: true }))
+    const saida = await browser.wait(
+      m => m.type === 'term_data' && String(m.data).includes('pelo-socket'),
+      10_000,
+    )
+    expect(saida.data).toContain('pelo-socket')
+
+    browser.socket.send(JSON.stringify({ type: 'term_kill' }))
+    await browser.wait(m => m.type === 'term_exit', 10_000)
+    browser.socket.close()
+    rmSync(cwd, { recursive: true, force: true })
+  })
+
+  test('diretório fora da fronteira é recusado', async () => {
+    const browser = await connect('browser')
+    browser.socket.send(JSON.stringify({ type: 'term_open', dir: '/etc', cols: 80, rows: 24 }))
+    const aviso = await browser.wait(m => m.type === 'toast')
+    expect(aviso.text).toContain('não autorizado')
+    expect(browser.seen().some(m => m.type === 'term_ready')).toBe(false)
+    browser.socket.close()
+  })
+
+  test('teclas fora da allowlist não viram comando no tmux', async () => {
+    const cwd = work()
+    const browser = await connect('browser')
+    browser.socket.send(JSON.stringify({ type: 'term_open', dir: cwd, cols: 80, rows: 24 }))
+    await browser.wait(m => m.type === 'term_ready', 10_000)
+
+    browser.socket.send(JSON.stringify({ type: 'term_key', key: 'C-x' }))
+    browser.socket.send(JSON.stringify({ type: 'term_input', text: 'echo depois-da-tecla', enter: true }))
+    const saida = await browser.wait(
+      m => m.type === 'term_data' && String(m.data).includes('depois-da-tecla'),
+      10_000,
+    )
+    expect(saida).toBeDefined()
+
+    browser.socket.send(JSON.stringify({ type: 'term_kill' }))
+    await browser.wait(m => m.type === 'term_exit', 10_000)
+    browser.socket.close()
+    rmSync(cwd, { recursive: true, force: true })
+  })
+
+  test('fechar o navegador não mata o que está rodando', async () => {
+    const cwd = work()
+    const um = await connect('browser')
+    um.socket.send(JSON.stringify({ type: 'term_open', dir: cwd, cols: 80, rows: 24 }))
+    await um.wait(m => m.type === 'term_ready', 10_000)
+    um.socket.send(JSON.stringify({ type: 'term_input', text: 'echo marca-persistente', enter: true }))
+    await um.wait(m => m.type === 'term_data' && String(m.data).includes('marca-persistente'), 10_000)
+    um.socket.close()
+
+    await Bun.sleep(300)
+    const dois = await connect('browser')
+    dois.socket.send(JSON.stringify({ type: 'term_open', dir: cwd, cols: 80, rows: 24 }))
+    const ready = await dois.wait(m => m.type === 'term_ready', 10_000)
+    expect(ready.seed).toContain('marca-persistente')
+
+    dois.socket.send(JSON.stringify({ type: 'term_kill' }))
+    await dois.wait(m => m.type === 'term_exit', 10_000)
+    dois.socket.close()
+    rmSync(cwd, { recursive: true, force: true })
   })
 })
 

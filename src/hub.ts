@@ -23,6 +23,14 @@ import {
   type SessionToHub,
 } from './protocol'
 import { keySequenceFor, type KeyStep } from './question-keys'
+import {
+  clampCols,
+  clampRows,
+  isTermKey,
+  MAX_TERM_INPUT,
+  Terminals,
+  type TermListener,
+} from './terminal'
 import { MAX_UPLOAD_BYTES, sniffImage, uploadName } from './upload'
 import { detectPluginIdentity, type PluginIdentity } from './setup-core'
 
@@ -63,6 +71,7 @@ const IDENTITY = pluginIdentity(ROOT)
 const HAS_TMUX = Bun.which('tmux') !== null
 const CAN_SPAWN = HAS_TMUX && Bun.which('claude') !== null && IDENTITY !== null
 const CAN_INTERRUPT = HAS_TMUX
+const CAN_TERMINAL = HAS_TMUX && Bun.which('mkfifo') !== null
 const MAX_DIRS = 400
 const QUICK_PROMPTS = parseQuickPrompts(cfg.quickPrompts) ?? DEFAULT_QUICK_PROMPTS
 
@@ -98,13 +107,27 @@ function listDirs(path: string): { name: string; path: string }[] | null {
 type WsData = { role: 'session' | 'browser' }
 type Ws = ServerWebSocket<WsData>
 
-const STATIC: Record<string, { file: string; type: string }> = {
+// `immutable` só para o que é biblioteca de terceiros com versão no endereço:
+// são centenas de KB que não podem viajar de novo a cada refresh pelo celular.
+const STATIC: Record<string, { file: string; type: string; immutable?: true }> = {
   '/': { file: 'index.html', type: 'text/html; charset=utf-8' },
   '/app.js': { file: 'app.js', type: 'text/javascript; charset=utf-8' },
   '/markdown.js': { file: 'markdown.js', type: 'text/javascript; charset=utf-8' },
   '/connection.js': { file: 'connection.js', type: 'text/javascript; charset=utf-8' },
   '/session-status.js': { file: 'session-status.js', type: 'text/javascript; charset=utf-8' },
+  '/terminal-panel.js': { file: 'terminal-panel.js', type: 'text/javascript; charset=utf-8' },
   '/style.css': { file: 'style.css', type: 'text/css; charset=utf-8' },
+  '/vendor/xterm.js': {
+    file: 'vendor/xterm.js',
+    type: 'text/javascript; charset=utf-8',
+    immutable: true,
+  },
+  '/vendor/addon-fit.js': {
+    file: 'vendor/addon-fit.js',
+    type: 'text/javascript; charset=utf-8',
+    immutable: true,
+  },
+  '/vendor/xterm.css': { file: 'vendor/xterm.css', type: 'text/css; charset=utf-8', immutable: true },
 }
 
 function toast(ws: Ws, text: string): void {
@@ -121,6 +144,7 @@ function configMsg(): string {
     projects: favorites,
     canSpawn: CAN_SPAWN,
     canInterrupt: CAN_INTERRUPT,
+    canTerminal: CAN_TERMINAL,
     quickPrompts: QUICK_PROMPTS,
     home: HOME,
   } satisfies HubToBrowser)
@@ -169,6 +193,63 @@ function cleanEnv(): Record<string, string | undefined> {
   return Object.fromEntries(
     Object.entries(process.env).filter(([k]) => !k.startsWith('CLAUDE') && k !== 'AI_AGENT'),
   )
+}
+
+const terminals = new Terminals(cleanEnv())
+
+/** Terminal que cada navegador assiste — no máximo um painel aberto por socket. */
+const watching = new Map<Ws, { dir: string; listener: TermListener }>()
+
+/** Teto do que fica represado entre o `attach` e o `term_ready` do navegador. */
+const MAX_PENDING_TERM_BYTES = 256 * 1024
+
+function toBrowser(ws: Ws, msg: HubToBrowser): void {
+  try {
+    ws.send(JSON.stringify(msg))
+  } catch {}
+}
+
+function stopWatching(ws: Ws): void {
+  const w = watching.get(ws)
+  if (!w) return
+  watching.delete(ws)
+  void terminals.detach(w.dir, w.listener)
+}
+
+function openTerminal(ws: Ws, dir: string, size: { cols: number; rows: number }): void {
+  stopWatching(ws)
+  // A saída do tmux já corre antes da foto ficar pronta; sem represar, o
+  // navegador receberia bytes novos antes do seed e o xterm os perderia.
+  let ready = false
+  let pending: string[] = []
+  let pendingBytes = 0
+  const listener: TermListener = {
+    data: text => {
+      if (ready) {
+        toBrowser(ws, { type: 'term_data', data: text })
+        return
+      }
+      pendingBytes += text.length
+      if (pendingBytes <= MAX_PENDING_TERM_BYTES) pending.push(text)
+    },
+    exit: reason => {
+      watching.delete(ws)
+      toBrowser(ws, { type: 'term_exit', reason })
+    },
+  }
+  watching.set(ws, { dir, listener })
+
+  void terminals.attach(dir, size, listener).then(res => {
+    if (!res.ok) {
+      watching.delete(ws)
+      toBrowser(ws, { type: 'term_exit', reason: res.error })
+      return
+    }
+    toBrowser(ws, { type: 'term_ready', dir, seed: res.seed, cols: res.cols, rows: res.rows })
+    ready = true
+    for (const chunk of pending) toBrowser(ws, { type: 'term_data', data: chunk })
+    pending = []
+  })
 }
 
 // O claude é um app de TTY: sem terminal não há sessão interativa. O tmux dá o
@@ -625,6 +706,57 @@ function onBrowserMessage(ws: Ws, msg: BrowserToHub): void {
       void killSession(s.pid).then(err => (err ? toast(ws, err) : drop()))
       return
     }
+    case 'term_open': {
+      if (typeof msg.dir !== 'string') return
+      if (!CAN_TERMINAL) {
+        toast(ws, 'tmux indisponível — terminal desligado nesta máquina')
+        return
+      }
+      const dir = resolve(msg.dir)
+      if (!allowedBase(dir) || !isDir(dir)) {
+        toast(ws, 'diretório não autorizado para terminal')
+        return
+      }
+      openTerminal(ws, dir, { cols: clampCols(msg.cols), rows: clampRows(msg.rows) })
+      return
+    }
+    case 'term_input': {
+      const w = watching.get(ws)
+      if (!w) return
+      const text = String(msg.text ?? '').slice(0, MAX_TERM_INPUT)
+      const enter = msg.enter === true
+      if (text === '' && !enter) return
+      void terminals.write(w.dir, text, enter).then(err => {
+        if (err) toast(ws, err)
+      })
+      return
+    }
+    case 'term_key': {
+      const w = watching.get(ws)
+      if (!w || !isTermKey(msg.key)) return
+      void terminals.key(w.dir, msg.key).then(err => {
+        if (err) toast(ws, err)
+      })
+      return
+    }
+    case 'term_resize': {
+      const w = watching.get(ws)
+      if (!w) return
+      void terminals.resize(w.dir, { cols: clampCols(msg.cols), rows: clampRows(msg.rows) })
+      return
+    }
+    case 'term_close': {
+      stopWatching(ws)
+      return
+    }
+    case 'term_kill': {
+      const w = watching.get(ws)
+      if (!w) return
+      void terminals.kill(w.dir).then(err => {
+        if (err) toast(ws, err)
+      })
+      return
+    }
     case 'interrupt': {
       if (typeof msg.sessionId !== 'string') return
       const s = registry.summaries().find(x => x.id === msg.sessionId)
@@ -676,7 +808,9 @@ try {
       if (!asset) return notFound()
       const headers: Record<string, string> = {
         'content-type': asset.type,
-        'cache-control': 'no-store',
+        'cache-control': asset.immutable
+          ? 'private, max-age=31536000, immutable'
+          : 'no-store',
       }
       if (url.pathname === '/') {
         headers['set-cookie'] =
@@ -709,6 +843,7 @@ try {
       close(ws: Ws) {
         if (ws.data.role === 'browser') {
           browserSockets.delete(ws)
+          stopWatching(ws)
           registry.removeBrowser(ws as Sink)
         } else {
           registry.removeSession(ws as Sink)

@@ -108,6 +108,15 @@ olhar); **escrever no celular é caro**; e o feed é **plano**, sem colapso nem 
   o prompt sai com o caminho. O tipo é decidido pelos **bytes** (PNG/JPEG/GIF/WebP), nunca
   pelo nome ou content-type, e o nome do arquivo é derivado da sessão — o original vem de
   fora. Teto de 8 MB. Falta: limpeza dos uploads antigos, que hoje ficam para sempre.
+- ~~**Terminal remoto**~~ — feito: o botão `▮ terminal` abre um shell tmux no diretório da
+  sessão. O tmux é o emulador (nada de emular VT100 no navegador): o `pipe-pane` despeja o
+  output cru num fifo, o hub lê e repassa pelo WebSocket, e o xterm.js desenha. O terminal
+  pertence ao **diretório**, não à sessão — sobrevive à página, ao hub e ao fim da sessão do
+  Claude, e só o `✕ encerrar` o mata. Entrada por linha mais uma fileira de teclas de
+  controle, porque a captura tecla a tecla do xterm briga com o teclado virtual do Android.
+  Pontos a saber: `send-keys`/`capture-pane`/`pipe-pane` **recusam** `=nome` como alvo e
+  exigem o id do pane (`%12`); e na abertura o pipe entra antes da foto da tela, o que pode
+  repetir alguns bytes em vez de perdê-los.
 - **Colapsar rajadas no feed** — "12 leituras de arquivo" numa linha expansível, com busca
   dentro da sessão. Junto com o render incremental do item 4.
 - **Menores** — renomear e fixar sessões (o rótulo é só o nome da pasta), feed unificado de

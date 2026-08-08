@@ -134,6 +134,12 @@ export type BrowserToHub =
   | { type: 'changes'; sessionId: string }
   | { type: 'browse'; path: string }
   | { type: 'favorite'; path: string; on: boolean }
+  | { type: 'term_open'; dir: string; cols: number; rows: number }
+  | { type: 'term_input'; text: string; enter?: boolean }
+  | { type: 'term_key'; key: string }
+  | { type: 'term_resize'; cols: number; rows: number }
+  | { type: 'term_close' }
+  | { type: 'term_kill' }
 
 export type HubToBrowser =
   | { type: 'pong' }
@@ -145,12 +151,16 @@ export type HubToBrowser =
       projects: string[]
       canSpawn: boolean
       canInterrupt: boolean
+      canTerminal: boolean
       quickPrompts: string[]
       home?: string
     }
   | { type: 'dir'; path: string; parent: string | null; dirs: { name: string; path: string }[] }
   | { type: 'changes'; sessionId: string; ok: boolean; text: string }
   | { type: 'toast'; text: string }
+  | { type: 'term_ready'; dir: string; seed: string; cols: number; rows: number }
+  | { type: 'term_data'; data: string }
+  | { type: 'term_exit'; reason: string }
 
 export type QuestionOption = { label: string; description: string }
 

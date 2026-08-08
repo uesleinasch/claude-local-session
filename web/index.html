@@ -6,6 +6,7 @@
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#0b0c0e" />
     <title>local-session</title>
+    <link rel="stylesheet" href="/vendor/xterm.css" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
@@ -55,6 +56,7 @@
             <div id="model-menu" role="menu" hidden></div>
           </div>
           <button id="changes" type="button" hidden>⑂ mudanças</button>
+          <button id="terminal" type="button" hidden>▮ terminal</button>
         </div>
         <div id="quick" hidden aria-label="Atalhos de prompt"></div>
         <p id="attach-state" hidden></p>
@@ -82,10 +84,36 @@
         <pre id="sheet-body"></pre>
       </div>
 
+      <div id="term" hidden role="dialog" aria-modal="true" aria-labelledby="term-title">
+        <header id="term-bar">
+          <h2 id="term-title">terminal</h2>
+          <button id="term-kill" type="button">✕ encerrar</button>
+          <button id="term-close" type="button" aria-label="Fechar o terminal">▾</button>
+        </header>
+        <div id="term-screen"></div>
+        <div id="term-keys" aria-label="Teclas de controle"></div>
+        <div id="term-row">
+          <label class="sr-only" for="term-input">Comando para o terminal</label>
+          <input
+            id="term-input"
+            type="text"
+            placeholder="comando…"
+            autocomplete="off"
+            autocapitalize="off"
+            autocorrect="off"
+            spellcheck="false"
+            enterkeyhint="send"
+          />
+          <button id="term-send" type="button">rodar</button>
+        </div>
+      </div>
+
       <p id="offline" role="status" hidden>sem conexão com o hub — tentando de novo…</p>
       <p id="toast" role="status" hidden></p>
     </div>
 
+    <script src="/vendor/xterm.js"></script>
+    <script src="/vendor/addon-fit.js"></script>
     <script src="/app.js" type="module"></script>
   </body>
 </html>

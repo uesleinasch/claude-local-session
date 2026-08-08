@@ -7,6 +7,7 @@ import {
 } from './connection.js'
 import { renderMarkdown } from './markdown.js'
 import { sessionStatus } from './session-status.js'
+import { createTerminalPanel } from './terminal-panel.js'
 
 const app = document.getElementById('app')
 const bar = { title: document.getElementById('title'), state: document.getElementById('state') }
@@ -26,6 +27,7 @@ const modelName = document.getElementById('model-name')
 const modelMenu = document.getElementById('model-menu')
 const quickBar = document.getElementById('quick')
 const changesBtn = document.getElementById('changes')
+const terminalBtn = document.getElementById('terminal')
 const sheet = document.getElementById('sheet')
 const sheetTitle = document.getElementById('sheet-title')
 const sheetBody = document.getElementById('sheet-body')
@@ -74,6 +76,7 @@ let hubConfig = {
   projects: [],
   canSpawn: false,
   canInterrupt: false,
+  canTerminal: false,
   quickPrompts: [],
   home: '',
 }
@@ -230,6 +233,18 @@ function handle(msg) {
     openSheet(msg.ok ? 'mudanças' : 'sem git', String(msg.text ?? ''))
     return
   }
+  if (msg.type === 'term_data') {
+    terminalPanel.onData(String(msg.data ?? ''))
+    return
+  }
+  if (msg.type === 'term_ready') {
+    terminalPanel.onReady(msg)
+    return
+  }
+  if (msg.type === 'term_exit') {
+    terminalPanel.onExit(String(msg.reason ?? 'terminal encerrado'))
+    return
+  }
   if (msg.type === 'pong') {
     if (pongTimer !== null) {
       clearTimeout(pongTimer)
@@ -293,6 +308,7 @@ function handle(msg) {
       projects: Array.isArray(msg.projects) ? msg.projects : [],
       canSpawn: msg.canSpawn === true,
       canInterrupt: msg.canInterrupt === true,
+      canTerminal: msg.canTerminal === true,
       quickPrompts: Array.isArray(msg.quickPrompts) ? msg.quickPrompts : [],
       home: typeof msg.home === 'string' ? msg.home : '',
     }
@@ -426,6 +442,12 @@ function closeSheet() {
   sheet.hidden = true
 }
 
+const terminalPanel = createTerminalPanel({
+  send,
+  toast: showToast,
+  confirmKill: label => confirm(`encerrar o terminal de ${label}? o que estiver rodando morre junto.`),
+})
+
 // Um toque manda o prompt: é o ponto do atalho. Por isso os padrões do hub não
 // têm efeito colateral — nada de commit/push por engano no bolso.
 function renderQuick() {
@@ -451,6 +473,7 @@ function renderBar() {
   renderModel(s)
   renderQuick()
   changesBtn.hidden = app.dataset.view !== 'feed' || !s
+  terminalBtn.hidden = changesBtn.hidden || !hubConfig.canTerminal || !s?.cwd
   if (app.dataset.view === 'sessions' || !s) {
     bar.title.textContent = 'sessões'
     bar.state.dataset.alive = 'false'
@@ -1097,9 +1120,24 @@ changesBtn.addEventListener('click', () => {
   else showToast('sem conexão com o hub')
 })
 
+terminalBtn.addEventListener('click', () => {
+  const s = current()
+  if (!s || s.cwd === '') {
+    showToast('não sei em que diretório essa sessão roda')
+    return
+  }
+  if (ws?.readyState !== WebSocket.OPEN) {
+    showToast('sem conexão com o hub')
+    return
+  }
+  terminalPanel.open(s.cwd, s.label)
+})
+
 sheetClose.addEventListener('click', closeSheet)
 document.addEventListener('keydown', ev => {
-  if (ev.key === 'Escape' && !sheet.hidden) closeSheet()
+  if (ev.key !== 'Escape') return
+  if (!sheet.hidden) closeSheet()
+  else terminalPanel.close()
 })
 
 modelBtn.addEventListener('click', ev => {
