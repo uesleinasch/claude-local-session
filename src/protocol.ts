@@ -20,6 +20,16 @@ export type FeedEvent =
       inputPreview: string
       preview?: string
       resolved?: PermissionBehavior
+      /** Resolvido pelo auto mode do hub, sem toque humano. */
+      auto?: boolean
+    }
+  | {
+      kind: 'question'
+      ts: number
+      questionId: string
+      questions: QuestionSpec[]
+      /** Respostas por pergunta quando respondida; objeto vazio = cancelada. */
+      resolved?: Record<string, string>
     }
 
 export type SessionSummary = {
@@ -30,6 +40,8 @@ export type SessionSummary = {
   alive: boolean
   /** Turno em andamento: prompt/tool start liga, Stop hook ou interrupção desliga. */
   busy?: boolean
+  /** Auto mode: o hub aprova sozinho os pedidos de permissão desta sessão. */
+  auto?: boolean
   endedAt?: number
 }
 
@@ -57,6 +69,8 @@ export type BrowserToHub =
       requestId: string
       behavior: PermissionBehavior
     }
+  | { type: 'answer'; sessionId: string; questionId: string; answers: QuestionAnswer[] }
+  | { type: 'automode'; sessionId: string; on: boolean }
   | { type: 'spawn'; dir: string }
   | { type: 'interrupt'; sessionId: string }
   | { type: 'kill'; sessionId: string }
@@ -77,12 +91,31 @@ export type HubToBrowser =
   | { type: 'dir'; path: string; parent: string | null; dirs: { name: string; path: string }[] }
   | { type: 'toast'; text: string }
 
+export type QuestionOption = { label: string; description: string }
+
+export type QuestionSpec = {
+  question: string
+  header: string
+  options: QuestionOption[]
+  multiSelect: boolean
+}
+
+export type QuestionPayload = {
+  questionId: string
+  questions?: QuestionSpec[]
+  answers?: Record<string, string>
+}
+
+/** Resposta do navegador a uma pergunta: índices escolhidos e/ou texto do "Other". */
+export type QuestionAnswer = { chosen: number[]; otherText?: string }
+
 export type ActivityPost = {
   sessionId: string
   tool: string
   detail: string
   status: ActivityStatus
   preview?: string
+  question?: QuestionPayload
 }
 
 export function isPermissionBehavior(v: unknown): v is PermissionBehavior {
@@ -94,6 +127,55 @@ export function isActivityStatus(v: unknown): v is ActivityStatus {
 }
 
 export const MAX_PREVIEW = 4_000
+export const MAX_QUESTIONS = 4
+export const MAX_OPTIONS = 8
+
+const clip = (v: unknown, max: number): string | null =>
+  typeof v === 'string' && v !== '' ? v.slice(0, max) : null
+
+export function parseQuestionSpecs(raw: unknown): QuestionSpec[] | null {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_QUESTIONS) return null
+  const out: QuestionSpec[] = []
+  for (const item of raw) {
+    if (typeof item !== 'object' || item === null) return null
+    const q = item as Record<string, unknown>
+    const question = clip(q.question, 500)
+    const header = clip(q.header, 60)
+    if (question === null || header === null) return null
+    if (!Array.isArray(q.options) || q.options.length === 0 || q.options.length > MAX_OPTIONS) {
+      return null
+    }
+    const options: QuestionOption[] = []
+    for (const o of q.options) {
+      const label = clip((o as Record<string, unknown>)?.label, 200)
+      if (label === null) return null
+      options.push({ label, description: clip((o as Record<string, unknown>)?.description, 500) ?? '' })
+    }
+    out.push({ question, header, options, multiSelect: q.multiSelect === true })
+  }
+  return out
+}
+
+function parseQuestionPayload(raw: unknown): QuestionPayload | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const o = raw as Record<string, unknown>
+  const questionId = clip(o.questionId, 200)
+  if (questionId === null) return null
+  const payload: QuestionPayload = { questionId }
+  if (o.questions !== undefined) {
+    const questions = parseQuestionSpecs(o.questions)
+    if (questions === null) return null
+    payload.questions = questions
+  }
+  if (typeof o.answers === 'object' && o.answers !== null) {
+    const answers: Record<string, string> = {}
+    for (const [k, v] of Object.entries(o.answers).slice(0, MAX_OPTIONS)) {
+      if (typeof v === 'string') answers[k.slice(0, 500)] = v.slice(0, 1_000)
+    }
+    payload.answers = answers
+  }
+  return payload
+}
 
 export function parseActivityPost(raw: unknown): ActivityPost | null {
   if (typeof raw !== 'object' || raw === null) return null
@@ -108,6 +190,10 @@ export function parseActivityPost(raw: unknown): ActivityPost | null {
   }
   if (typeof o.preview === 'string' && o.preview !== '') {
     post.preview = o.preview.slice(0, MAX_PREVIEW)
+  }
+  if (o.question !== undefined) {
+    const question = parseQuestionPayload(o.question)
+    if (question !== null) post.question = question
   }
   return post
 }

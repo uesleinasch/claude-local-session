@@ -107,6 +107,70 @@ describe('toActivityPost', () => {
   })
 })
 
+describe('AskUserQuestion vira payload de pergunta', () => {
+  const questions = [
+    {
+      question: 'Qual fruta você prefere?',
+      header: 'Fruta',
+      options: [
+        { label: 'Maçã', description: 'fruta vermelha' },
+        { label: 'Banana', description: 'fruta amarela' },
+      ],
+      multiSelect: false,
+    },
+  ]
+
+  test('PreToolUse carrega questionId e perguntas', () => {
+    const post = toActivityPost({
+      ...base,
+      hook_event_name: 'PreToolUse',
+      tool_name: 'AskUserQuestion',
+      tool_input: { questions },
+      tool_use_id: 'toolu_123',
+    })
+    expect(post?.question).toEqual({ questionId: 'toolu_123', questions })
+    expect(post?.status).toBe('start')
+    expect(post?.detail).toBe('Qual fruta você prefere?')
+  })
+
+  test('PostToolUse carrega as respostas com o mesmo questionId', () => {
+    const post = toActivityPost({
+      ...base,
+      hook_event_name: 'PostToolUse',
+      tool_name: 'AskUserQuestion',
+      tool_input: { questions },
+      tool_use_id: 'toolu_123',
+      tool_response: { questions, answers: { 'Qual fruta você prefere?': 'Banana' } },
+    })
+    expect(post?.question).toEqual({
+      questionId: 'toolu_123',
+      answers: { 'Qual fruta você prefere?': 'Banana' },
+    })
+    expect(post?.status).toBe('end')
+  })
+
+  test('sem tool_use_id não há payload de pergunta', () => {
+    const post = toActivityPost({
+      ...base,
+      hook_event_name: 'PreToolUse',
+      tool_name: 'AskUserQuestion',
+      tool_input: { questions },
+    })
+    expect(post?.question).toBeUndefined()
+  })
+
+  test('outras tools não ganham payload de pergunta', () => {
+    const post = toActivityPost({
+      ...base,
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: 'ls' },
+      tool_use_id: 'toolu_9',
+    })
+    expect(post?.question).toBeUndefined()
+  })
+})
+
 describe('preview para o card de permissão', () => {
   test('Bash leva o comando completo, além do detail truncado', () => {
     const command = `echo ${'x'.repeat(200)}`

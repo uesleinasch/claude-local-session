@@ -280,6 +280,168 @@ describe('ciclo completo', () => {
     browser.socket.close()
   })
 
+  test('pergunta do hook vira card, resposta do hook resolve o card', async () => {
+    const session = await connect('session')
+    session.socket.send(
+      JSON.stringify({ type: 'register', sessionId: 'it-q', cwd: '/p', label: 'p', pid: 7 }),
+    )
+
+    const browser = await connect('browser')
+    await browser.wait(m => m.type === 'sessions' && m.sessions.some((s: any) => s.id === 'it-q'))
+    browser.socket.send(JSON.stringify({ type: 'subscribe', sessionId: 'it-q' }))
+    await Bun.sleep(50)
+
+    const questions = [
+      {
+        question: 'Qual fruta?',
+        header: 'Fruta',
+        options: [
+          { label: 'Maçã', description: '' },
+          { label: 'Banana', description: '' },
+        ],
+        multiSelect: false,
+      },
+    ]
+    const post = (body: unknown) =>
+      fetch(`${base()}/_activity`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-ls-token': token },
+        body: JSON.stringify(body),
+      })
+
+    const started = await post({
+      sessionId: 'it-q',
+      tool: 'AskUserQuestion',
+      detail: 'Qual fruta?',
+      status: 'start',
+      question: { questionId: 'toolu_q1', questions },
+    })
+    expect(started.status).toBe(200)
+
+    const card = await browser.wait(m => m.type === 'event' && m.event.kind === 'question')
+    expect(card.event).toMatchObject({ questionId: 'toolu_q1', questions })
+    expect(card.event.resolved).toBeUndefined()
+
+    // a pergunta deixa a sessão ocupada
+    const busy = await browser.wait(
+      m => m.type === 'sessions' && m.sessions.some((s: any) => s.id === 'it-q' && s.busy),
+    )
+    expect(busy).toBeDefined()
+
+    const ended = await post({
+      sessionId: 'it-q',
+      tool: 'AskUserQuestion',
+      detail: 'Qual fruta?',
+      status: 'end',
+      question: { questionId: 'toolu_q1', answers: { 'Qual fruta?': 'Banana' } },
+    })
+    expect(ended.status).toBe(200)
+
+    const resolved = await browser.wait(
+      m => m.type === 'event' && m.event.kind === 'question' && m.event.resolved !== undefined,
+    )
+    expect(resolved.event.resolved).toEqual({ 'Qual fruta?': 'Banana' })
+
+    session.socket.close()
+    browser.socket.close()
+  })
+
+  test('answer para pergunta desconhecida devolve toast de erro', async () => {
+    const session = await connect('session')
+    session.socket.send(
+      JSON.stringify({ type: 'register', sessionId: 'it-q2', cwd: '/p', label: 'p', pid: 8 }),
+    )
+
+    const browser = await connect('browser')
+    await browser.wait(m => m.type === 'sessions' && m.sessions.some((s: any) => s.id === 'it-q2'))
+    browser.socket.send(
+      JSON.stringify({
+        type: 'answer',
+        sessionId: 'it-q2',
+        questionId: 'fantasma',
+        answers: [{ chosen: [0] }],
+      }),
+    )
+
+    const toast = await browser.wait(m => m.type === 'toast')
+    expect(toast.text).toContain('pergunta')
+
+    session.socket.close()
+    browser.socket.close()
+  })
+
+  test('auto mode aprova pedido novo sem toque e marca o card', async () => {
+    const session = await connect('session')
+    session.socket.send(
+      JSON.stringify({ type: 'register', sessionId: 'it-a', cwd: '/p', label: 'p', pid: 9 }),
+    )
+
+    const browser = await connect('browser')
+    await browser.wait(m => m.type === 'sessions' && m.sessions.some((s: any) => s.id === 'it-a'))
+    browser.socket.send(JSON.stringify({ type: 'subscribe', sessionId: 'it-a' }))
+    browser.socket.send(JSON.stringify({ type: 'automode', sessionId: 'it-a', on: true }))
+    await browser.wait(
+      m => m.type === 'sessions' && m.sessions.some((s: any) => s.id === 'it-a' && s.auto),
+    )
+
+    session.socket.send(
+      JSON.stringify({
+        type: 'permission_request',
+        requestId: 'r-auto',
+        toolName: 'Bash',
+        description: 'rm x',
+        inputPreview: 'rm x',
+      }),
+    )
+
+    const decision = await session.wait(m => m.type === 'permission_decision')
+    expect(decision).toEqual({ type: 'permission_decision', requestId: 'r-auto', behavior: 'allow' })
+
+    const card = await browser.wait(
+      m => m.type === 'event' && m.event.kind === 'permission' && m.event.requestId === 'r-auto',
+    )
+    expect(card.event).toMatchObject({ resolved: 'allow', auto: true })
+
+    session.socket.close()
+    browser.socket.close()
+  })
+
+  test('ligar o auto aprova pedido que já estava pendente', async () => {
+    const session = await connect('session')
+    session.socket.send(
+      JSON.stringify({ type: 'register', sessionId: 'it-a2', cwd: '/p', label: 'p', pid: 10 }),
+    )
+
+    const browser = await connect('browser')
+    await browser.wait(m => m.type === 'sessions' && m.sessions.some((s: any) => s.id === 'it-a2'))
+    browser.socket.send(JSON.stringify({ type: 'subscribe', sessionId: 'it-a2' }))
+
+    session.socket.send(
+      JSON.stringify({
+        type: 'permission_request',
+        requestId: 'r-antes',
+        toolName: 'Bash',
+        description: 'x',
+        inputPreview: 'x',
+      }),
+    )
+    await browser.wait(m => m.type === 'event' && m.event.kind === 'permission')
+
+    browser.socket.send(JSON.stringify({ type: 'automode', sessionId: 'it-a2', on: true }))
+
+    const decision = await session.wait(m => m.type === 'permission_decision')
+    expect(decision.requestId).toBe('r-antes')
+    expect(decision.behavior).toBe('allow')
+
+    const resolved = await browser.wait(
+      m => m.type === 'event' && m.event.kind === 'permission' && m.event.resolved === 'allow',
+    )
+    expect(resolved.event.auto).toBe(true)
+
+    session.socket.close()
+    browser.socket.close()
+  })
+
   test('atividade sem token é rejeitada', async () => {
     const res = await fetch(`${base()}/_activity`, {
       method: 'POST',

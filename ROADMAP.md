@@ -35,8 +35,13 @@ pedido de permissão e decisão allow/deny
 - **Interrupção de turno via canal** — não documentado. Por isso o botão "parar" usa
   `tmux send-keys Escape` no pane da sessão; funciona para qualquer sessão dentro de tmux
   e para as spawnadas pela página. Se o protocolo ganhar um método nativo, migrar.
-- **AskUserQuestion via canal** — perguntas de múltipla escolha não chegam ao canal; a
-  sessão fica parada esperando o terminal. Reavaliar a cada release do Claude Code.
+- ~~**AskUserQuestion via canal**~~ — perguntas de múltipla escolha continuam não chegando
+  ao canal, mas o plugin contorna: o hook `PreToolUse` captura a pergunta completa
+  (`tool_input.questions` + `tool_use_id`), a página mostra o card com as opções, e a
+  resposta vira teclas no pane do tmux (dígitos/Tab/Enter, texto literal para "Other") —
+  mesmo braço remoto do botão "parar". `PostToolUse` traz as respostas e resolve o card,
+  respondido de qualquer lado. Fora do tmux o card é somente leitura. Se o protocolo
+  ganhar um método nativo, migrar.
 - **Sessão interativa sem TTY** — `claude --channels` headless morre com erro de stdin
   (issues [#30447](https://github.com/anthropics/claude-code/issues/30447) e
   [#40726](https://github.com/anthropics/claude-code/issues/40726)); tmux é a solução

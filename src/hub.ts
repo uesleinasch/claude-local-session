@@ -9,11 +9,14 @@ import { Registry, type Sink } from './hub-state'
 import {
   IDLE_SHUTDOWN_MS,
   isPermissionBehavior,
+  MAX_QUESTIONS,
   parseActivityPost,
   type BrowserToHub,
   type HubToBrowser,
+  type QuestionAnswer,
   type SessionToHub,
 } from './protocol'
+import { keySequenceFor, type KeyStep } from './question-keys'
 import { detectPluginIdentity, type PluginIdentity } from './setup-core'
 
 const cfg = loadConfig()
@@ -194,6 +197,40 @@ async function interruptSession(pid: number): Promise<string | null> {
   return sent.ok ? null : 'falha ao enviar Escape para o tmux'
 }
 
+// O diálogo redesenha entre um passo e outro; tecla enviada cedo demais
+// (ex.: Enter antes da tela de review) se perde — daí a pausa entre passos.
+const ANSWER_STEP_DELAY_MS = 300
+
+async function answerQuestion(pid: number, steps: KeyStep[]): Promise<string | null> {
+  const pane = await findPane(pid)
+  if (pane === 'no-tmux') return 'tmux indisponível para responder'
+  if (pane === 'not-found') return 'esta sessão não roda dentro de tmux — responda pelo terminal'
+  for (const step of steps) {
+    const args =
+      'text' in step
+        ? ['send-keys', '-t', pane.paneId, '-l', '--', step.text]
+        : ['send-keys', '-t', pane.paneId, step.key]
+    const sent = await run('tmux', args)
+    if (!sent.ok) return 'falha ao enviar teclas para o tmux'
+    await Bun.sleep(ANSWER_STEP_DELAY_MS)
+  }
+  return null
+}
+
+function parseAnswers(raw: unknown): QuestionAnswer[] | null {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_QUESTIONS) return null
+  const out: QuestionAnswer[] = []
+  for (const item of raw) {
+    if (typeof item !== 'object' || item === null) return null
+    const a = item as Record<string, unknown>
+    if (!Array.isArray(a.chosen) || !a.chosen.every(n => typeof n === 'number')) return null
+    const answer: QuestionAnswer = { chosen: a.chosen as number[] }
+    if (typeof a.otherText === 'string') answer.otherText = a.otherText
+    out.push(answer)
+  }
+  return out
+}
+
 function claudeAncestorOf(pid: number): number | null {
   let cur = pid
   for (let i = 0; i < 25 && cur > 1; i++) {
@@ -250,6 +287,21 @@ async function handleActivity(req: Request): Promise<Response> {
   }
   const post = parseActivityPost(body)
   if (!post) return new Response('bad request', { status: 400 })
+  // AskUserQuestion não entra na régua de atividade: o card de pergunta é o
+  // próprio registro — start abre o card, end resolve com as respostas.
+  if (post.question !== undefined) {
+    if (post.status === 'start' && post.question.questions !== undefined) {
+      registry.push(post.sessionId, {
+        kind: 'question',
+        ts: Date.now(),
+        questionId: post.question.questionId,
+        questions: post.question.questions,
+      })
+    } else if (post.status === 'end') {
+      registry.resolveQuestion(post.sessionId, post.question.questionId, post.question.answers ?? {})
+    }
+    return new Response('ok')
+  }
   // O preview não entra na régua de atividade — ele existe para enriquecer o
   // card de permissão da mesma tool, que chega pelo WebSocket da sessão.
   if (post.status === 'start' && post.preview !== undefined) {
@@ -288,6 +340,7 @@ function onSessionMessage(ws: Ws, msg: SessionToHub): void {
     case 'permission_request': {
       const id = registry.sessionIdFor(ws as Sink)
       if (!id || typeof msg.requestId !== 'string') return
+      const auto = registry.isAuto(id)
       registry.push(id, {
         kind: 'permission',
         ts: Date.now(),
@@ -295,7 +348,15 @@ function onSessionMessage(ws: Ws, msg: SessionToHub): void {
         toolName: String(msg.toolName ?? ''),
         description: String(msg.description ?? ''),
         inputPreview: String(msg.inputPreview ?? ''),
+        ...(auto ? { resolved: 'allow' as const, auto: true } : {}),
       })
+      if (auto) {
+        registry.toSession(id, {
+          type: 'permission_decision',
+          requestId: msg.requestId,
+          behavior: 'allow',
+        })
+      }
       return
     }
   }
@@ -325,6 +386,49 @@ function onBrowserMessage(ws: Ws, msg: BrowserToHub): void {
       })
       if (!sent) return
       registry.resolvePermission(msg.sessionId, msg.requestId, msg.behavior)
+      return
+    }
+    case 'automode': {
+      if (typeof msg.sessionId !== 'string' || typeof msg.on !== 'boolean') return
+      if (!registry.setAuto(msg.sessionId, msg.on)) {
+        toast(ws, 'sessão desconhecida')
+        return
+      }
+      if (msg.on) {
+        // Pedido parado esperando é justamente o que motiva ligar o auto agora.
+        for (const requestId of registry.openPermissions(msg.sessionId)) {
+          const sent = registry.toSession(msg.sessionId, {
+            type: 'permission_decision',
+            requestId,
+            behavior: 'allow',
+          })
+          if (sent) registry.resolvePermission(msg.sessionId, requestId, 'allow', true)
+        }
+      }
+      toast(ws, msg.on ? 'auto ligado — permissões desta sessão serão aprovadas' : 'auto desligado')
+      return
+    }
+    case 'answer': {
+      if (typeof msg.sessionId !== 'string' || typeof msg.questionId !== 'string') return
+      const questions = registry.openQuestion(msg.sessionId, msg.questionId)
+      if (!questions) {
+        toast(ws, 'pergunta já respondida ou desconhecida')
+        return
+      }
+      const s = registry.summaries().find(x => x.id === msg.sessionId)
+      if (!s || !s.alive || s.pid <= 0) {
+        toast(ws, 'sessão sem processo conhecido')
+        return
+      }
+      const answers = parseAnswers(msg.answers)
+      const steps = answers === null ? null : keySequenceFor(questions, answers)
+      if (steps === null) {
+        toast(ws, 'resposta inválida para esta pergunta')
+        return
+      }
+      void answerQuestion(s.pid, steps).then(err => {
+        if (err) toast(ws, err)
+      })
       return
     }
     case 'spawn': {

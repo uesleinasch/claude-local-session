@@ -9,6 +9,7 @@ const feedEmpty = document.getElementById('feed-empty')
 const input = document.getElementById('input')
 const sendBtn = document.getElementById('send')
 const stopBtn = document.getElementById('stop')
+const autoBtn = document.getElementById('automode')
 const offline = document.getElementById('offline')
 const toastEl = document.getElementById('toast')
 const spawnBox = document.getElementById('spawn')
@@ -151,6 +152,15 @@ function handle(msg) {
         return
       }
     }
+    if (e.kind === 'question') {
+      if (e.resolved !== undefined) questionDraft.delete(e.questionId)
+      const at = events.findIndex(x => x.kind === 'question' && x.questionId === e.questionId)
+      if (at !== -1) {
+        events[at] = e
+        renderFeed()
+        return
+      }
+    }
     events.push(e)
     if (events.length > MAX_EVENTS) events.splice(0, events.length - MAX_EVENTS)
     renderFeed()
@@ -215,12 +225,21 @@ function renderBar() {
     bar.title.textContent = 'sessões'
     bar.state.dataset.alive = 'false'
     stopBtn.hidden = true
+    autoBtn.hidden = true
     return
   }
   bar.title.textContent = s.label
   bar.state.dataset.alive = String(s.alive)
   bar.state.dataset.busy = String(s.busy === true)
   stopBtn.hidden = !(s.alive && s.busy === true && hubConfig.canInterrupt)
+  autoBtn.hidden = !s.alive
+  autoBtn.dataset.on = String(s.auto === true)
+  autoBtn.setAttribute(
+    'aria-label',
+    s.auto === true
+      ? 'Auto ligado — desligar aprovação automática de permissões'
+      : 'Ligar aprovação automática de permissões desta sessão',
+  )
 }
 
 function tilde(path) {
@@ -337,6 +356,12 @@ function renderSessions() {
     const name = document.createElement('span')
     name.className = 'session-name'
     name.textContent = s.label
+    if (s.auto === true) {
+      const badge = document.createElement('span')
+      badge.className = 'session-auto'
+      badge.textContent = 'auto'
+      name.append(badge)
+    }
 
     const path = document.createElement('span')
     path.className = 'session-path'
@@ -476,7 +501,8 @@ function permNode(e) {
   if (e.resolved) {
     const verdict = document.createElement('p')
     verdict.className = 'perm-verdict'
-    verdict.textContent = e.resolved === 'allow' ? '✓ permitido' : '✕ negado'
+    const label = e.resolved === 'allow' ? '✓ permitido' : '✕ negado'
+    verdict.textContent = e.auto === true ? `${label} (auto)` : label
     box.append(verdict)
     return box
   }
@@ -506,6 +532,172 @@ function permNode(e) {
   return box
 }
 
+/* Rascunho das respostas por questionId — vive fora do DOM porque o
+ * renderFeed reconstrói o feed inteiro a cada evento. */
+const questionDraft = new Map()
+
+function draftFor(e) {
+  let draft = questionDraft.get(e.questionId)
+  if (!draft) {
+    draft = { sent: false, answers: e.questions.map(() => ({ chosen: new Set(), other: '' })) }
+    questionDraft.set(e.questionId, draft)
+  }
+  return draft
+}
+
+function draftValid(questions, draft) {
+  return questions.every((q, i) => {
+    const a = draft.answers[i]
+    const hasOther = a.other.trim() !== ''
+    if (q.multiSelect) return a.chosen.size > 0 || hasOther
+    return (a.chosen.size === 1) !== hasOther && a.chosen.size <= 1
+  })
+}
+
+function askQuestionBlock(q, a, draft, canAnswer, rerender) {
+  const block = document.createElement('div')
+  block.className = 'ask-q'
+
+  const header = document.createElement('p')
+  header.className = 'ask-header'
+  header.textContent = q.header
+
+  const text = document.createElement('p')
+  text.className = 'ask-question'
+  text.textContent = q.question
+
+  block.append(header, text)
+
+  const options = document.createElement('div')
+  options.className = 'ask-options'
+  q.options.forEach((opt, oi) => {
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'ask-opt'
+    btn.dataset.on = String(a.chosen.has(oi))
+    btn.disabled = !canAnswer || draft.sent
+
+    const label = document.createElement('span')
+    label.className = 'ask-opt-label'
+    label.textContent = opt.label
+    btn.append(label)
+
+    if (opt.description) {
+      const desc = document.createElement('span')
+      desc.className = 'ask-opt-desc'
+      desc.textContent = opt.description
+      btn.append(desc)
+    }
+
+    btn.addEventListener('click', () => {
+      if (q.multiSelect) {
+        a.chosen.has(oi) ? a.chosen.delete(oi) : a.chosen.add(oi)
+      } else {
+        const was = a.chosen.has(oi)
+        a.chosen.clear()
+        if (!was) a.chosen.add(oi)
+        a.other = ''
+      }
+      rerender()
+    })
+    options.append(btn)
+  })
+  block.append(options)
+
+  if (canAnswer) {
+    const other = document.createElement('input')
+    other.className = 'ask-other'
+    other.type = 'text'
+    other.placeholder = 'outra resposta…'
+    other.value = a.other
+    other.disabled = draft.sent
+    other.addEventListener('input', () => {
+      a.other = other.value
+      if (!q.multiSelect && other.value.trim() !== '' && a.chosen.size > 0) {
+        a.chosen.clear()
+        rerender()
+        other.focus()
+        return
+      }
+      // botão "responder" acompanha a validade sem re-render (para não perder o foco)
+      draft.onValidity?.()
+    })
+    block.append(other)
+  }
+
+  return block
+}
+
+function askNode(e) {
+  const box = document.createElement('div')
+  box.className = 'ask'
+  if (e.resolved !== undefined) box.dataset.resolved = 'true'
+
+  const tool = document.createElement('p')
+  tool.className = 'ask-tool'
+  tool.textContent = 'pergunta do claude'
+  box.append(tool)
+
+  if (e.resolved !== undefined) {
+    const answered = Object.entries(e.resolved)
+    for (const q of e.questions) {
+      const header = document.createElement('p')
+      header.className = 'ask-header'
+      header.textContent = q.header
+      const line = document.createElement('p')
+      line.className = answered.length === 0 ? 'ask-verdict ask-verdict-cancel' : 'ask-verdict'
+      line.textContent = answered.length === 0 ? 'cancelada' : `→ ${e.resolved[q.question] ?? '—'}`
+      box.append(header, line)
+    }
+    return box
+  }
+
+  const s = current()
+  const canAnswer = Boolean(s?.alive) && hubConfig.canInterrupt
+  const draft = draftFor(e)
+
+  for (let i = 0; i < e.questions.length; i++) {
+    box.append(askQuestionBlock(e.questions[i], draft.answers[i], draft, canAnswer, renderFeed))
+  }
+
+  if (!canAnswer) {
+    const note = document.createElement('p')
+    note.className = 'ask-note'
+    note.textContent = s?.alive
+      ? 'esta sessão não roda dentro de tmux — responda pelo terminal'
+      : 'sessão encerrada — pergunta sem resposta'
+    box.append(note)
+    return box
+  }
+
+  const actions = document.createElement('div')
+  actions.className = 'ask-actions'
+  const sendAnswer = document.createElement('button')
+  sendAnswer.type = 'button'
+  sendAnswer.className = 'ask-send'
+  sendAnswer.textContent = draft.sent ? 'resposta enviada…' : 'responder'
+  draft.onValidity = () => {
+    sendAnswer.disabled = draft.sent || !draftValid(e.questions, draft)
+  }
+  draft.onValidity()
+  sendAnswer.addEventListener('click', () => {
+    const answers = draft.answers.map(a => {
+      const chosen = [...a.chosen].sort((x, y) => x - y)
+      const other = a.other.trim()
+      return other === '' ? { chosen } : { chosen, otherText: other }
+    })
+    if (!send({ type: 'answer', sessionId: currentId, questionId: e.questionId, answers })) {
+      showToast('sem conexão com o hub')
+      return
+    }
+    draft.sent = true
+    renderFeed()
+  })
+  actions.append(sendAnswer)
+  box.append(actions)
+  return box
+}
+
 function renderFeed() {
   const atBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 80
   const pending = outbox.filter(o => o.sessionId === currentId)
@@ -521,6 +713,7 @@ function renderFeed() {
     else if (g.type === 'prompt') feed.append(turnNode('você', g.event.text, 'prompt'))
     else if (g.type === 'reply') feed.append(turnNode('claude', g.event.text, 'reply'))
     else if (g.type === 'permission') feed.append(permNode(g.event))
+    else if (g.type === 'question') feed.append(askNode(g.event))
   }
 
   for (const o of pending) {
@@ -567,6 +760,22 @@ input.addEventListener('keydown', ev => {
   }
 })
 sendBtn.addEventListener('click', submit)
+
+autoBtn.addEventListener('click', () => {
+  const s = current()
+  if (!s) return
+  const on = !(s.auto === true)
+  if (
+    on &&
+    !confirm(
+      `Ligar o auto para ${s.label}? TODOS os pedidos de permissão desta sessão serão aprovados sem confirmação — inclusive comandos destrutivos.`,
+    )
+  ) {
+    return
+  }
+  // O hub confirma com toast e a lista de sessões volta com o estado novo.
+  if (!send({ type: 'automode', sessionId: s.id, on })) showToast('sem conexão com o hub')
+})
 
 stopBtn.addEventListener('click', () => {
   if (!currentId) return

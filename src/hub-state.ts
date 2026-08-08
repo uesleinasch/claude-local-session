@@ -5,6 +5,7 @@ import {
   type HubToBrowser,
   type HubToSession,
   type PermissionBehavior,
+  type QuestionSpec,
   type SessionSummary,
 } from './protocol'
 
@@ -120,7 +121,11 @@ export class Registry {
     if (!entry) return
 
     const wasBusy = entry.summary.busy === true
-    if (event.kind === 'prompt' || (event.kind === 'activity' && event.status === 'start')) {
+    if (
+      event.kind === 'prompt' ||
+      (event.kind === 'question' && event.resolved === undefined) ||
+      (event.kind === 'activity' && event.status === 'start')
+    ) {
       entry.summary.busy = true
     } else if (event.kind === 'activity' && event.status === 'idle') {
       entry.summary.busy = false
@@ -147,10 +152,33 @@ export class Registry {
       }
     }
 
+    if (event.kind === 'question') {
+      const questionId = event.questionId
+      const at = entry.events.findIndex(
+        e => e.kind === 'question' && e.questionId === questionId,
+      )
+      if (at !== -1) {
+        entry.events[at] = event
+        this.onEvent?.(sessionId, event)
+        this.broadcastEvent(sessionId, event)
+        return
+      }
+    }
+
     entry.events.push(event)
     if (entry.events.length > MAX_EVENTS) entry.events.splice(0, entry.events.length - MAX_EVENTS)
     this.onEvent?.(sessionId, event)
     this.broadcastEvent(sessionId, event)
+
+    // Turno encerrado (Stop/interrupção) com diálogo ainda na tela: o card sem
+    // resposta ficaria "aguardando" para sempre — cancela para refletir a TUI.
+    if (event.kind === 'activity' && event.status === 'idle') {
+      for (const open of entry.events.filter(
+        e => e.kind === 'question' && e.resolved === undefined,
+      )) {
+        if (open.kind === 'question') this.push(sessionId, { ...open, resolved: {} })
+      }
+    }
   }
 
   /**
@@ -178,12 +206,56 @@ export class Registry {
     }
   }
 
-  resolvePermission(sessionId: string, requestId: string, behavior: PermissionBehavior): void {
+  resolveQuestion(sessionId: string, questionId: string, answers: Record<string, string>): void {
+    const entry = this.sessions.get(sessionId)
+    if (!entry) return
+    const found = entry.events.find(e => e.kind === 'question' && e.questionId === questionId)
+    if (!found || found.kind !== 'question') return
+    this.push(sessionId, { ...found, resolved: answers })
+  }
+
+  /** Perguntas do card ainda sem resposta — insumo do tradutor de teclas. */
+  openQuestion(sessionId: string, questionId: string): QuestionSpec[] | null {
+    const entry = this.sessions.get(sessionId)
+    if (!entry) return null
+    const found = entry.events.find(
+      e => e.kind === 'question' && e.questionId === questionId && e.resolved === undefined,
+    )
+    return found?.kind === 'question' ? found.questions : null
+  }
+
+  resolvePermission(
+    sessionId: string,
+    requestId: string,
+    behavior: PermissionBehavior,
+    auto = false,
+  ): void {
     const entry = this.sessions.get(sessionId)
     if (!entry) return
     const found = entry.events.find(e => e.kind === 'permission' && e.requestId === requestId)
     if (!found || found.kind !== 'permission') return
-    this.push(sessionId, { ...found, resolved: behavior })
+    this.push(sessionId, { ...found, resolved: behavior, ...(auto ? { auto: true } : {}) })
+  }
+
+  setAuto(sessionId: string, on: boolean): boolean {
+    const entry = this.sessions.get(sessionId)
+    if (!entry) return false
+    entry.summary.auto = on
+    this.broadcastSessions()
+    return true
+  }
+
+  isAuto(sessionId: string): boolean {
+    return this.sessions.get(sessionId)?.summary.auto === true
+  }
+
+  /** Pedidos de permissão ainda sem decisão — aprovados em lote ao ligar o auto. */
+  openPermissions(sessionId: string): string[] {
+    const entry = this.sessions.get(sessionId)
+    if (!entry) return []
+    return entry.events
+      .filter(e => e.kind === 'permission' && e.resolved === undefined)
+      .map(e => (e.kind === 'permission' ? e.requestId : ''))
   }
 
   toSession(sessionId: string, msg: HubToSession): boolean {

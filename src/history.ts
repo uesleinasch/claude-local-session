@@ -28,15 +28,21 @@ export type PersistedSession = { info: RegisterInfo; events: FeedEvent[]; endedA
  */
 export function foldEvents(events: FeedEvent[]): FeedEvent[] {
   const out: FeedEvent[] = []
-  const permAt = new Map<string, number>()
+  const cardAt = new Map<string, number>()
   for (const e of events) {
-    if (e.kind === 'permission') {
-      const at = permAt.get(e.requestId)
+    const cardKey =
+      e.kind === 'permission'
+        ? `perm:${e.requestId}`
+        : e.kind === 'question'
+          ? `q:${e.questionId}`
+          : null
+    if (cardKey !== null) {
+      const at = cardAt.get(cardKey)
       if (at !== undefined) {
         out[at] = e
         continue
       }
-      permAt.set(e.requestId, out.length)
+      cardAt.set(cardKey, out.length)
     }
     out.push(e)
   }

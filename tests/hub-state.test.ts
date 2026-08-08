@@ -260,6 +260,153 @@ describe('permissão', () => {
   })
 })
 
+describe('auto mode', () => {
+  const perm = (requestId: string): FeedEvent => ({
+    kind: 'permission',
+    ts: 1,
+    requestId,
+    toolName: 'Bash',
+    description: 'x',
+    inputPreview: 'x',
+  })
+
+  test('setAuto marca a sessão e a lista broadcastada carrega o estado', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    const browser = spy()
+    reg.addBrowser(browser)
+
+    expect(reg.setAuto('s1', true)).toBe(true)
+    expect(reg.isAuto('s1')).toBe(true)
+    expect(browser.sent.at(-1).sessions[0].auto).toBe(true)
+
+    reg.setAuto('s1', false)
+    expect(reg.isAuto('s1')).toBe(false)
+  })
+
+  test('setAuto em sessão desconhecida é recusado', () => {
+    const reg = new Registry()
+    expect(reg.setAuto('fantasma', true)).toBe(false)
+    expect(reg.isAuto('fantasma')).toBe(false)
+  })
+
+  test('re-registro (reconexão) preserva o auto', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.setAuto('s1', true)
+    reg.registerSession(spy(), INFO)
+    expect(reg.isAuto('s1')).toBe(true)
+  })
+
+  test('openPermissions lista só os pedidos pendentes', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', perm('r1'))
+    reg.push('s1', perm('r2'))
+    reg.resolvePermission('s1', 'r1', 'deny')
+
+    expect(reg.openPermissions('s1')).toEqual(['r2'])
+    expect(reg.openPermissions('fantasma')).toEqual([])
+  })
+
+  test('resolvePermission com auto marca o card', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', perm('r1'))
+    reg.resolvePermission('s1', 'r1', 'allow', true)
+
+    const browser = spy()
+    reg.addBrowser(browser)
+    reg.subscribe(browser, 's1')
+    const { events } = browser.sent.at(-1)
+    expect(events[0]).toMatchObject({ resolved: 'allow', auto: true })
+  })
+})
+
+describe('pergunta (AskUserQuestion)', () => {
+  const question: FeedEvent = {
+    kind: 'question',
+    ts: 1,
+    questionId: 'toolu_1',
+    questions: [
+      {
+        question: 'Qual fruta?',
+        header: 'Fruta',
+        options: [
+          { label: 'Maçã', description: '' },
+          { label: 'Banana', description: '' },
+        ],
+        multiSelect: false,
+      },
+    ],
+  }
+
+  function subscribed(reg: Registry): Spy {
+    const browser = spy()
+    reg.addBrowser(browser)
+    reg.subscribe(browser, 's1')
+    return browser
+  }
+
+  test('pergunta aberta liga busy', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', question)
+    expect(reg.summaries()[0]!.busy).toBe(true)
+  })
+
+  test('resolver atualiza o card no lugar em vez de duplicar', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', question)
+    reg.resolveQuestion('s1', 'toolu_1', { 'Qual fruta?': 'Banana' })
+
+    const { events } = subscribed(reg).sent.at(-1)
+    expect(events).toHaveLength(1)
+    expect(events[0].resolved).toEqual({ 'Qual fruta?': 'Banana' })
+  })
+
+  test('mesmo questionId substitui o card', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', question)
+    reg.push('s1', { ...question, ts: 2 })
+
+    expect(subscribed(reg).sent.at(-1).events).toHaveLength(1)
+  })
+
+  test('resolver questionId desconhecido não cria card', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.resolveQuestion('s1', 'fantasma', {})
+    expect(subscribed(reg).sent.at(-1).events).toHaveLength(0)
+  })
+
+  test('idle cancela pergunta aberta com resolved vazio', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', question)
+    reg.push('s1', { kind: 'activity', ts: 2, tool: '', detail: '', status: 'idle' })
+
+    const { events } = subscribed(reg).sent.at(-1)
+    const card = events.find((e: FeedEvent) => e.kind === 'question')
+    expect(card.resolved).toEqual({})
+    expect(reg.summaries()[0]!.busy).toBe(false)
+  })
+
+  test('openQuestion devolve as perguntas do card aberto e some após resolver', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', question)
+    expect(reg.openQuestion('s1', 'toolu_1')).toEqual(question.kind === 'question' ? question.questions : [])
+
+    reg.resolveQuestion('s1', 'toolu_1', {})
+    expect(reg.openQuestion('s1', 'toolu_1')).toBeNull()
+    expect(reg.openQuestion('s1', 'fantasma')).toBeNull()
+    expect(reg.openQuestion('outra', 'toolu_1')).toBeNull()
+  })
+})
+
 describe('dropSession', () => {
   test('remove da lista na hora e notifica os browsers', () => {
     const reg = new Registry()

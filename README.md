@@ -152,6 +152,16 @@ entrar numa delas você vê:
 - **card de permissão** — em fundo âmbar, com `permitir` e `negar`. Para `Edit`, `Write` e
   `Bash` o card mostra a operação inteira: diff colorido, conteúdo do arquivo ou comando
   completo, capturados pelo hook `PreToolUse`.
+- **card de pergunta** — quando o Claude usa `AskUserQuestion`, as perguntas e opções
+  aparecem na página e a resposta volta pela mesma via do botão de interromper (teclas no
+  tmux). Suporta multiseleção e resposta livre.
+
+**Auto mode.** O botão `auto` no topo do feed liga a aprovação automática de permissões
+daquela sessão: cada pedido que chegar é aprovado pelo hub na hora e o card entra no feed
+já resolvido como `✓ permitido (auto)` — rastro completo, zero toque. Ligar o auto também
+aprova o pedido que estiver pendente. Vale por sessão, pede confirmação ao ligar (aprova
+QUALQUER coisa, inclusive comandos destrutivos) e volta ao normal se o hub reiniciar.
+Perguntas do `AskUserQuestion` nunca são auto-respondidas.
 
 O que o Claude escreve no terminal **não** chega na página: só o texto passado para `reply`.
 Isso é do protocolo de canal, e as instruções do MCP server já orientam o Claude a usá-lo.
@@ -194,6 +204,13 @@ tmux onde a sessão roda — o mesmo gesto que interromperia no terminal. Funcio
 qualquer sessão dentro de tmux (não só as spawnadas pela página); para sessões fora de
 tmux o hub avisa que não há como interromper. O protocolo de canal do Claude Code não tem
 interrupção nativa (ver `ROADMAP.md`).
+
+**Responder perguntas do Claude.** Quando a sessão usa `AskUserQuestion` (pergunta de
+múltipla escolha), o protocolo de canal não entrega a pergunta — mas o hook `PreToolUse`
+sim. A página mostra o card com as perguntas e opções (inclusive multiseleção e resposta
+livre) e traduz sua escolha em teclas no pane do tmux, como o botão de interromper.
+Respondida no terminal ou na página, o card se resolve com as respostas; fora de tmux ele
+fica somente leitura.
 
 **Encerrar a sessão.** O `✕` de cada item da lista finaliza a sessão e a remove da lista
 (apagando o histórico dela): dentro de tmux, via `tmux kill-session`; fora, via `SIGTERM`

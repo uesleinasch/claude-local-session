@@ -1,5 +1,5 @@
 import { relative } from 'node:path'
-import type { ActivityPost } from './protocol'
+import { parseQuestionSpecs, type ActivityPost, type QuestionPayload } from './protocol'
 
 const MAX_DETAIL = 80
 
@@ -31,6 +31,10 @@ function describe(tool: string, input: Record<string, unknown>, cwd: string): st
     case 'Task':
     case 'Agent':
       return truncate(str(input.description))
+    case 'AskUserQuestion': {
+      const first = Array.isArray(input.questions) ? input.questions[0] : undefined
+      return truncate(str((first as Record<string, unknown> | undefined)?.question))
+    }
     case 'Skill':
       return truncate(str(input.skill))
     case 'WebFetch':
@@ -75,6 +79,29 @@ function previewFor(tool: string, input: Record<string, unknown>): string {
   }
 }
 
+function questionStart(p: Record<string, unknown>, input: Record<string, unknown>): QuestionPayload | undefined {
+  const questionId = str(p.tool_use_id)
+  if (questionId === '') return undefined
+  const questions = parseQuestionSpecs(input.questions)
+  return questions === null ? undefined : { questionId, questions }
+}
+
+function questionEnd(p: Record<string, unknown>): QuestionPayload | undefined {
+  const questionId = str(p.tool_use_id)
+  if (questionId === '') return undefined
+  const response =
+    typeof p.tool_response === 'object' && p.tool_response !== null
+      ? (p.tool_response as Record<string, unknown>)
+      : {}
+  const answers: Record<string, string> = {}
+  if (typeof response.answers === 'object' && response.answers !== null) {
+    for (const [k, v] of Object.entries(response.answers)) {
+      if (typeof v === 'string') answers[k] = v
+    }
+  }
+  return { questionId, answers }
+}
+
 export function toActivityPost(raw: unknown): ActivityPost | null {
   if (typeof raw !== 'object' || raw === null) return null
   const p = raw as Record<string, unknown>
@@ -98,10 +125,20 @@ export function toActivityPost(raw: unknown): ActivityPost | null {
       }
       const preview = previewFor(tool, input)
       if (preview !== '') post.preview = preview
+      if (tool === 'AskUserQuestion') {
+        const question = questionStart(p, input)
+        if (question) post.question = question
+      }
       return post
     }
-    case 'PostToolUse':
-      return { sessionId, tool, detail: describe(tool, input, cwd), status: 'end' }
+    case 'PostToolUse': {
+      const post: ActivityPost = { sessionId, tool, detail: describe(tool, input, cwd), status: 'end' }
+      if (tool === 'AskUserQuestion') {
+        const question = questionEnd(p)
+        if (question) post.question = question
+      }
+      return post
+    }
     case 'Stop':
     case 'SessionEnd':
       return { sessionId, tool: '', detail: '', status: 'idle' }

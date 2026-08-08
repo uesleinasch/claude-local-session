@@ -33,12 +33,44 @@ afterEach(() => {
   rmSync(dir, { recursive: true, force: true })
 })
 
+function question(questionId: string, resolved?: Record<string, string>): FeedEvent {
+  return {
+    kind: 'question',
+    ts: 1,
+    questionId,
+    questions: [
+      {
+        question: 'Qual?',
+        header: 'H',
+        options: [
+          { label: 'A', description: '' },
+          { label: 'B', description: '' },
+        ],
+        multiSelect: false,
+      },
+    ],
+    ...(resolved ? { resolved } : {}),
+  }
+}
+
 describe('foldEvents', () => {
   test('a última versão do card de permissão vence, na posição original', () => {
     const folded = foldEvents([perm('r1'), reply('a'), perm('r1', 'allow')])
     expect(folded).toHaveLength(2)
     expect(folded[0]).toMatchObject({ kind: 'permission', resolved: 'allow' })
     expect(folded[1]).toMatchObject({ kind: 'reply' })
+  })
+
+  test('a última versão do card de pergunta vence, na posição original', () => {
+    const folded = foldEvents([question('q1'), reply('a'), question('q1', { 'Qual?': 'B' })])
+    expect(folded).toHaveLength(2)
+    expect(folded[0]).toMatchObject({ kind: 'question', resolved: { 'Qual?': 'B' } })
+    expect(folded[1]).toMatchObject({ kind: 'reply' })
+  })
+
+  test('perguntas de ids diferentes não se misturam', () => {
+    const folded = foldEvents([question('q1', {}), question('q2')])
+    expect(folded).toHaveLength(2)
   })
 })
 
