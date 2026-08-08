@@ -599,26 +599,81 @@ body {
   padding: 0;
 }
 
-.spawn-btn {
+#spawn-empty {
+  margin: 0;
+  padding: 4px 16px 12px;
+  color: var(--ink-dim);
+  font-size: var(--step--1);
+}
+
+#browse-path {
+  margin: 0;
+  padding: 0 16px 8px;
+  color: var(--ink-dim);
+  font-size: var(--step--1);
+  word-break: break-all;
+}
+
+#browse-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dir-item {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--rule);
+}
+
+.spawn-btn,
+.dir-name {
   display: block;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 12px 16px;
   border: 0;
-  border-bottom: 1px solid var(--rule);
   background: none;
   color: inherit;
   font: inherit;
   text-align: left;
   cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.spawn-btn:hover {
+.spawn-btn:hover,
+.dir-name:hover {
   background: var(--bg-raise);
 }
 
 .spawn-btn .session-name::before {
   content: "+";
   color: var(--amber);
+}
+
+.dir-action {
+  flex: none;
+  width: 48px;
+  border: 0;
+  background: none;
+  color: var(--ink-dim);
+  font: inherit;
+  cursor: pointer;
+}
+
+.dir-action:hover {
+  background: var(--bg-raise);
+}
+
+.dir-star[data-on="true"] {
+  color: var(--amber);
+}
+
+.dir-spawn {
+  color: var(--amber);
+  font-weight: 700;
 }
 
 @media (prefers-reduced-motion: reduce) {

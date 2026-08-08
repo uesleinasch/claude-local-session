@@ -1,8 +1,15 @@
 import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
-import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { loadConfig, readConfig, readCookie, tailscaleAddress, tokenMatches } from '../src/config'
+import {
+  loadConfig,
+  readConfig,
+  readCookie,
+  saveProjects,
+  tailscaleAddress,
+  tokenMatches,
+} from '../src/config'
 
 let dir: string
 
@@ -75,6 +82,35 @@ describe('tokenMatches', () => {
     expect(tokenMatches(token, null)).toBe(false)
     expect(tokenMatches(token, 42)).toBe(false)
     expect(tokenMatches(token, '')).toBe(false)
+  })
+})
+
+describe('saveProjects', () => {
+  test('grava os favoritos preservando o resto do arquivo', () => {
+    loadConfig(dir)
+    const before = readConfig(dir)
+    writeFileSync(
+      join(dir, 'config.json'),
+      JSON.stringify({ ...before, projectsRoot: ['/repos'], extra: 'x' }),
+    )
+
+    expect(saveProjects(['/home/u/proj'], dir)).toBe(true)
+    const raw = JSON.parse(readFileSync(join(dir, 'config.json'), 'utf8'))
+    expect(raw.projects).toEqual(['/home/u/proj'])
+    expect(raw.token).toBe(before!.token)
+    expect(raw.projectsRoot).toEqual(['/repos'])
+    expect(raw.extra).toBe('x')
+  })
+
+  test('mantém o modo 0600', () => {
+    loadConfig(dir)
+    saveProjects(['/a'], dir)
+    expect(statSync(join(dir, 'config.json')).mode & 0o777).toBe(0o600)
+  })
+
+  test('falha sem gravar quando não há config', () => {
+    expect(saveProjects(['/a'], dir)).toBe(false)
+    expect(() => statSync(join(dir, 'config.json'))).toThrow()
   })
 })
 

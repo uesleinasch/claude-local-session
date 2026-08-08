@@ -13,6 +13,9 @@ const offline = document.getElementById('offline')
 const toastEl = document.getElementById('toast')
 const spawnBox = document.getElementById('spawn')
 const spawnList = document.getElementById('spawn-list')
+const spawnEmpty = document.getElementById('spawn-empty')
+const browsePathEl = document.getElementById('browse-path')
+const browseList = document.getElementById('browse-list')
 
 const token = new URLSearchParams(location.search).get('t')
 const LAST_KEY = 'local-session.last'
@@ -32,7 +35,8 @@ let backoff = 1000
 let sessions = []
 let currentId = localStorage.getItem(LAST_KEY)
 let events = []
-let hubConfig = { projects: [], canSpawn: false, canInterrupt: false }
+let hubConfig = { projects: [], canSpawn: false, canInterrupt: false, home: '' }
+let browse = null
 let toastTimer = null
 
 let outbox = []
@@ -157,9 +161,20 @@ function handle(msg) {
       projects: Array.isArray(msg.projects) ? msg.projects : [],
       canSpawn: msg.canSpawn === true,
       canInterrupt: msg.canInterrupt === true,
+      home: typeof msg.home === 'string' ? msg.home : '',
     }
+    if (hubConfig.canSpawn && !browse) send({ type: 'browse', path: '' })
     renderSpawn()
     renderBar()
+    return
+  }
+  if (msg.type === 'dir') {
+    browse = {
+      path: msg.path,
+      parent: msg.parent ?? null,
+      dirs: Array.isArray(msg.dirs) ? msg.dirs : [],
+    }
+    renderSpawn()
     return
   }
   if (msg.type === 'toast') {
@@ -208,14 +223,47 @@ function renderBar() {
   stopBtn.hidden = !(s.alive && s.busy === true && hubConfig.canInterrupt)
 }
 
-function renderSpawn() {
-  const usable = hubConfig.canSpawn && hubConfig.projects.length > 0
-  spawnBox.hidden = !usable
-  spawnList.replaceChildren()
-  if (!usable) return
+function tilde(path) {
+  const home = hubConfig.home
+  if (home && path === home) return '~'
+  if (home && path.startsWith(`${home}/`)) return `~${path.slice(home.length)}`
+  return path
+}
 
+function confirmSpawn(dir) {
+  if (!confirm(`Iniciar uma nova sessão do claude em ${tilde(dir)}?`)) return
+  if (send({ type: 'spawn', dir })) showToast('iniciando sessão — ela aparece na lista em instantes')
+  else showToast('sem conexão com o hub')
+}
+
+function starBtn(dir, isFav) {
+  const star = document.createElement('button')
+  star.type = 'button'
+  star.className = 'dir-action dir-star'
+  star.dataset.on = String(isFav)
+  star.setAttribute(
+    'aria-label',
+    isFav ? `Remover ${tilde(dir)} dos favoritos` : `Marcar ${tilde(dir)} como favorito`,
+  )
+  star.textContent = isFav ? '★' : '☆'
+  star.addEventListener('click', () => {
+    if (!send({ type: 'favorite', path: dir, on: !isFav })) showToast('sem conexão com o hub')
+  })
+  return star
+}
+
+function renderSpawn() {
+  spawnBox.hidden = !hubConfig.canSpawn
+  spawnList.replaceChildren()
+  browseList.replaceChildren()
+  if (!hubConfig.canSpawn) return
+
+  // Favoritos: um toque abre sessão, a estrela desfaz a marcação.
+  spawnEmpty.hidden = hubConfig.projects.length > 0
   for (const dir of hubConfig.projects) {
     const li = document.createElement('li')
+    li.className = 'dir-item'
+
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className = 'spawn-btn'
@@ -226,16 +274,49 @@ function renderSpawn() {
 
     const path = document.createElement('span')
     path.className = 'session-path'
-    path.textContent = dir
+    path.textContent = tilde(dir)
 
     btn.append(name, path)
-    btn.addEventListener('click', () => {
-      if (!confirm(`Iniciar uma nova sessão do claude em ${dir}?`)) return
-      if (send({ type: 'spawn', dir })) showToast('iniciando sessão — ela aparece na lista em instantes')
-      else showToast('sem conexão com o hub')
-    })
-    li.append(btn)
+    btn.addEventListener('click', () => confirmSpawn(dir))
+    li.append(btn, starBtn(dir, true))
     spawnList.append(li)
+  }
+
+  // Navegador: nome navega, ★ favorita, + abre sessão ali.
+  browsePathEl.textContent = browse ? tilde(browse.path) : '…'
+  if (!browse) return
+
+  if (browse.parent) {
+    const li = document.createElement('li')
+    li.className = 'dir-item'
+    const up = document.createElement('button')
+    up.type = 'button'
+    up.className = 'dir-name'
+    up.textContent = '‹ voltar'
+    up.addEventListener('click', () => send({ type: 'browse', path: browse.parent }))
+    li.append(up)
+    browseList.append(li)
+  }
+
+  for (const d of browse.dirs) {
+    const li = document.createElement('li')
+    li.className = 'dir-item'
+
+    const name = document.createElement('button')
+    name.type = 'button'
+    name.className = 'dir-name'
+    name.textContent = `${d.name}/`
+    name.addEventListener('click', () => send({ type: 'browse', path: d.path }))
+
+    const plus = document.createElement('button')
+    plus.type = 'button'
+    plus.className = 'dir-action dir-spawn'
+    plus.setAttribute('aria-label', `Nova sessão em ${tilde(d.path)}`)
+    plus.textContent = '+'
+    plus.addEventListener('click', () => confirmSpawn(d.path))
+
+    li.append(name, starBtn(d.path, hubConfig.projects.includes(d.path)), plus)
+    browseList.append(li)
   }
 }
 

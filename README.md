@@ -165,16 +165,20 @@ das últimas 48h reaparecem na lista após um reboot.
 
 Dois recursos dependem do `tmux` estar instalado:
 
-**Nova sessão pelo celular.** Declare os projetos permitidos em
-`~/.claude/local-session/config.json` — um a um (`projects`) ou pelo diretório-pai
-(`projectsRoot`, todo subdiretório vira opção, inclusive repositórios clonados depois):
+**Nova sessão pelo celular.** A lista de sessões ganha a seção **nova sessão**: um
+navegador de diretórios que parte da sua home (`~`) — o nome navega, o `+` abre uma
+sessão ali, e a `★` marca o diretório como favorito. Favoritos ficam no topo como
+atalho de um toque e são persistidos na chave `projects` do
+`~/.claude/local-session/config.json` (dá para editá-la à mão também). A navegação e o
+spawn ficam confinados à sua home; a chave opcional `projectsRoot` adiciona outras
+áreas navegáveis fora dela:
 
 ```json
 {
   "token": "…",
   "port": 7777,
   "projects": ["/home/voce/repos/meu-projeto"],
-  "projectsRoot": ["/home/voce/repos"]
+  "projectsRoot": ["/srv/projetos"]
 }
 ```
 

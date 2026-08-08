@@ -60,12 +60,21 @@ export type BrowserToHub =
   | { type: 'spawn'; dir: string }
   | { type: 'interrupt'; sessionId: string }
   | { type: 'kill'; sessionId: string }
+  | { type: 'browse'; path: string }
+  | { type: 'favorite'; path: string; on: boolean }
 
 export type HubToBrowser =
   | { type: 'sessions'; sessions: SessionSummary[] }
   | { type: 'history'; sessionId: string; events: FeedEvent[] }
   | { type: 'event'; sessionId: string; event: FeedEvent }
-  | { type: 'config'; projects: string[]; canSpawn: boolean; canInterrupt: boolean }
+  | {
+      type: 'config'
+      projects: string[]
+      canSpawn: boolean
+      canInterrupt: boolean
+      home?: string
+    }
+  | { type: 'dir'; path: string; parent: string | null; dirs: { name: string; path: string }[] }
   | { type: 'toast'; text: string }
 
 export type ActivityPost = {

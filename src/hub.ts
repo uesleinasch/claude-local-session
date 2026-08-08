@@ -1,8 +1,9 @@
 import type { Server, ServerWebSocket } from 'bun'
 import { execFile } from 'node:child_process'
-import { readdirSync, readFileSync } from 'node:fs'
-import { basename, join } from 'node:path'
-import { configDir, loadConfig, readCookie, tokenMatches } from './config'
+import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { homedir } from 'node:os'
+import { basename, dirname, join, resolve } from 'node:path'
+import { configDir, loadConfig, readCookie, saveProjects, tokenMatches } from './config'
 import { HistoryStore } from './history'
 import { Registry, type Sink } from './hub-state'
 import {
@@ -38,32 +39,41 @@ function pluginIdentity(root: string): PluginIdentity | null {
   return null
 }
 
-const PROJECTS = (cfg.projects ?? []).filter(p => typeof p === 'string' && p.startsWith('/'))
+const HOME = homedir()
 const ROOTS = (cfg.projectsRoot ?? []).filter(p => typeof p === 'string' && p.startsWith('/'))
 const IDENTITY = pluginIdentity(ROOT)
 const HAS_TMUX = Bun.which('tmux') !== null
-const CAN_SPAWN =
-  HAS_TMUX &&
-  Bun.which('claude') !== null &&
-  IDENTITY !== null &&
-  (PROJECTS.length > 0 || ROOTS.length > 0)
+const CAN_SPAWN = HAS_TMUX && Bun.which('claude') !== null && IDENTITY !== null
 const CAN_INTERRUPT = HAS_TMUX
+const MAX_DIRS = 400
 
-/**
- * Recalculado a cada uso: um repositório clonado depois do boot do hub já
- * aparece como opção. O navegador só escolhe dentro desta lista — nunca envia
- * caminho arbitrário.
- */
-function projectDirs(): string[] {
-  const out = new Set<string>(PROJECTS)
-  for (const root of ROOTS) {
-    try {
-      for (const entry of readdirSync(root, { withFileTypes: true })) {
-        if (entry.isDirectory() && !entry.name.startsWith('.')) out.add(join(root, entry.name))
-      }
-    } catch {}
+// Favoritos: persistidos como `projects` no config.json, editáveis pela página.
+let favorites = (cfg.projects ?? []).filter(p => typeof p === 'string' && p.startsWith('/'))
+
+/** Fronteira de navegação/spawn: a home do usuário e os projectsRoot do config. */
+function allowedBase(path: string): boolean {
+  if (path === HOME || path.startsWith(`${HOME}/`)) return true
+  return ROOTS.some(root => path === root || path.startsWith(`${root}/`))
+}
+
+function isDir(path: string): boolean {
+  try {
+    return statSync(path).isDirectory()
+  } catch {
+    return false
   }
-  return [...out].sort()
+}
+
+function listDirs(path: string): { name: string; path: string }[] | null {
+  try {
+    return readdirSync(path, { withFileTypes: true })
+      .filter(e => e.isDirectory() && !e.name.startsWith('.'))
+      .map(e => ({ name: e.name, path: join(path, e.name) }))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, MAX_DIRS)
+  } catch {
+    return null
+  }
 }
 
 type WsData = { role: 'session' | 'browser' }
@@ -80,6 +90,27 @@ function toast(ws: Ws, text: string): void {
   try {
     ws.send(JSON.stringify({ type: 'toast', text } satisfies HubToBrowser))
   } catch {}
+}
+
+const browserSockets = new Set<Ws>()
+
+function configMsg(): string {
+  return JSON.stringify({
+    type: 'config',
+    projects: favorites,
+    canSpawn: CAN_SPAWN,
+    canInterrupt: CAN_INTERRUPT,
+    home: HOME,
+  } satisfies HubToBrowser)
+}
+
+// Favorito marcado num navegador aparece em todos os outros na hora.
+function broadcastConfig(): void {
+  for (const sock of browserSockets) {
+    try {
+      sock.send(configMsg())
+    } catch {}
+  }
 }
 
 function run(cmd: string, args: string[]): Promise<{ ok: boolean; out: string }> {
@@ -298,15 +329,56 @@ function onBrowserMessage(ws: Ws, msg: BrowserToHub): void {
     }
     case 'spawn': {
       if (typeof msg.dir !== 'string') return
-      // Allowlist por igualdade exata: o browser escolhe entre os projetos
-      // declarados em config.json, nunca envia um caminho arbitrário.
-      if (!CAN_SPAWN || !projectDirs().includes(msg.dir)) {
+      const dir = resolve(msg.dir)
+      if (!CAN_SPAWN || !allowedBase(dir) || !isDir(dir)) {
         toast(ws, 'diretório não autorizado para nova sessão')
         return
       }
-      void spawnSession(msg.dir).then(err => {
+      void spawnSession(dir).then(err => {
         if (err) toast(ws, err)
       })
+      return
+    }
+    case 'browse': {
+      if (typeof msg.path !== 'string') return
+      const path = resolve(msg.path === '' ? HOME : msg.path)
+      if (!allowedBase(path)) {
+        toast(ws, 'fora da área permitida')
+        return
+      }
+      const dirs = listDirs(path)
+      if (dirs === null) {
+        toast(ws, 'não consegui ler o diretório')
+        return
+      }
+      const up = dirname(path)
+      const parent = up !== path && allowedBase(up) ? up : null
+      try {
+        ws.send(JSON.stringify({ type: 'dir', path, parent, dirs } satisfies HubToBrowser))
+      } catch {}
+      return
+    }
+    case 'favorite': {
+      if (typeof msg.path !== 'string' || typeof msg.on !== 'boolean') return
+      const path = resolve(msg.path)
+      if (!allowedBase(path)) {
+        toast(ws, 'fora da área permitida')
+        return
+      }
+      const has = favorites.includes(path)
+      if (msg.on && !has) {
+        if (!isDir(path)) {
+          toast(ws, 'diretório inexistente')
+          return
+        }
+        favorites = [...favorites, path].sort()
+      } else if (!msg.on && has) {
+        favorites = favorites.filter(p => p !== path)
+      } else {
+        return
+      }
+      saveProjects(favorites)
+      broadcastConfig()
       return
     }
     case 'kill': {
@@ -392,16 +464,10 @@ try {
     websocket: {
       open(ws: Ws) {
         if (ws.data.role === 'browser') {
+          browserSockets.add(ws)
           registry.addBrowser(ws as Sink)
           try {
-            ws.send(
-              JSON.stringify({
-                type: 'config',
-                projects: CAN_SPAWN ? projectDirs() : [],
-                canSpawn: CAN_SPAWN,
-                canInterrupt: CAN_INTERRUPT,
-              } satisfies HubToBrowser),
-            )
+            ws.send(configMsg())
           } catch {}
         }
       },
@@ -417,8 +483,12 @@ try {
         else onBrowserMessage(ws, msg as BrowserToHub)
       },
       close(ws: Ws) {
-        if (ws.data.role === 'browser') registry.removeBrowser(ws as Sink)
-        else registry.removeSession(ws as Sink)
+        if (ws.data.role === 'browser') {
+          browserSockets.delete(ws)
+          registry.removeBrowser(ws as Sink)
+        } else {
+          registry.removeSession(ws as Sink)
+        }
       },
     },
   })

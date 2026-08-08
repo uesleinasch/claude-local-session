@@ -67,6 +67,24 @@ export function loadConfig(dir = configDir()): Config {
   return withPortOverride(fresh)
 }
 
+/**
+ * Persiste os favoritos (chave `projects`) preservando o resto do arquivo.
+ * Lê o JSON cru — nunca o Config já processado — para não gravar de volta
+ * um port sobreposto por LOCAL_SESSION_PORT.
+ */
+export function saveProjects(projects: string[], dir = configDir()): boolean {
+  const file = join(dir, 'config.json')
+  try {
+    const raw = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
+    const tmp = join(dir, `config.json.${process.pid}.tmp`)
+    writeFileSync(tmp, `${JSON.stringify({ ...raw, projects }, null, 2)}\n`, { mode: 0o600 })
+    renameSync(tmp, file)
+    return true
+  } catch {
+    return false
+  }
+}
+
 export function tokenMatches(expected: string, given: unknown): boolean {
   if (typeof given !== 'string' || given.length !== expected.length) return false
   return timingSafeEqual(Buffer.from(expected), Buffer.from(given))

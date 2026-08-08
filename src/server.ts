@@ -22,7 +22,7 @@ const CWD = process.env.CLAUDE_PROJECT_DIR ?? process.cwd()
 const PID = process.ppid
 
 const mcp = new Server(
-  { name: 'local-session', version: '0.2.7' },
+  { name: 'local-session', version: '0.3.0' },
   {
     capabilities: {
       tools: {},
