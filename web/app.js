@@ -24,6 +24,15 @@ const ctxPct = document.getElementById('context-pct')
 const modelBtn = document.getElementById('model')
 const modelName = document.getElementById('model-name')
 const modelMenu = document.getElementById('model-menu')
+const quickBar = document.getElementById('quick')
+const changesBtn = document.getElementById('changes')
+const sheet = document.getElementById('sheet')
+const sheetTitle = document.getElementById('sheet-title')
+const sheetBody = document.getElementById('sheet-body')
+const sheetClose = document.getElementById('sheet-close')
+const attachBtn = document.getElementById('attach')
+const attachInput = document.getElementById('attach-input')
+const attachState = document.getElementById('attach-state')
 
 // Espelha protocol.MODELS — display_name do statusline casa com esses nomes.
 const MODELS = [
@@ -61,7 +70,13 @@ let pongTimer = null
 let sessions = []
 let currentId = localStorage.getItem(LAST_KEY)
 let events = []
-let hubConfig = { projects: [], canSpawn: false, canInterrupt: false, home: '' }
+let hubConfig = {
+  projects: [],
+  canSpawn: false,
+  canInterrupt: false,
+  quickPrompts: [],
+  home: '',
+}
 let browse = null
 let toastTimer = null
 
@@ -210,6 +225,11 @@ function send(msg) {
 }
 
 function handle(msg) {
+  if (msg.type === 'changes') {
+    if (msg.sessionId !== currentId) return
+    openSheet(msg.ok ? 'mudanças' : 'sem git', String(msg.text ?? ''))
+    return
+  }
   if (msg.type === 'pong') {
     if (pongTimer !== null) {
       clearTimeout(pongTimer)
@@ -273,10 +293,12 @@ function handle(msg) {
       projects: Array.isArray(msg.projects) ? msg.projects : [],
       canSpawn: msg.canSpawn === true,
       canInterrupt: msg.canInterrupt === true,
+      quickPrompts: Array.isArray(msg.quickPrompts) ? msg.quickPrompts : [],
       home: typeof msg.home === 'string' ? msg.home : '',
     }
     if (hubConfig.canSpawn && !browse) send({ type: 'browse', path: '' })
     renderSpawn()
+    renderQuick()
     renderBar()
     return
   }
@@ -384,10 +406,51 @@ function buildModelMenu(s) {
   }
 }
 
+function openSheet(title, text) {
+  sheetTitle.textContent = title
+  sheetBody.replaceChildren()
+  // Colore o diff sem interpretar nada: cada linha é texto puro num span.
+  for (const line of text.split('\n')) {
+    const row = document.createElement('span')
+    row.className = 'sheet-line'
+    if (line.startsWith('+') && !line.startsWith('+++')) row.dataset.sign = 'add'
+    else if (line.startsWith('-') && !line.startsWith('---')) row.dataset.sign = 'del'
+    else if (line.startsWith('@@')) row.dataset.sign = 'hunk'
+    row.textContent = `${line}\n`
+    sheetBody.append(row)
+  }
+  sheet.hidden = false
+}
+
+function closeSheet() {
+  sheet.hidden = true
+}
+
+// Um toque manda o prompt: é o ponto do atalho. Por isso os padrões do hub não
+// têm efeito colateral — nada de commit/push por engano no bolso.
+function renderQuick() {
+  const s = current()
+  const show = app.dataset.view === 'feed' && Boolean(s?.alive) && hubConfig.quickPrompts.length > 0
+  quickBar.hidden = !show
+  if (!show) return
+
+  quickBar.replaceChildren()
+  for (const text of hubConfig.quickPrompts) {
+    const chip = document.createElement('button')
+    chip.type = 'button'
+    chip.className = 'quick-chip'
+    chip.textContent = text
+    chip.addEventListener('click', () => sendPrompt(text))
+    quickBar.append(chip)
+  }
+}
+
 function renderBar() {
   const s = current()
   renderContext(s)
   renderModel(s)
+  renderQuick()
+  changesBtn.hidden = app.dataset.view !== 'feed' || !s
   if (app.dataset.view === 'sessions' || !s) {
     bar.title.textContent = 'sessões'
     bar.state.dataset.alive = 'false'
@@ -619,6 +682,21 @@ function turnNode(who, text, kind) {
   else body.textContent = text
 
   wrap.append(label, body)
+
+  // Reaproveitar o que você já escreveu é o histórico de prompts mais barato:
+  // um toque devolve o texto ao composer, pronto para editar e reenviar.
+  if (kind === 'prompt') {
+    const again = document.createElement('button')
+    again.type = 'button'
+    again.className = 'turn-again'
+    again.textContent = '↻ reenviar'
+    again.addEventListener('click', () => {
+      input.value = text
+      resize()
+      input.focus()
+    })
+    wrap.append(again)
+  }
   return wrap
 }
 
@@ -914,8 +992,49 @@ function renderFeed() {
 
 /* ---------- composer ---------- */
 
-function submit() {
-  const text = input.value.trim()
+let attached = null
+
+function renderAttach() {
+  attachState.hidden = attached === null
+  if (attached) attachState.textContent = `📎 ${attached.split('/').at(-1)} — vai junto no envio`
+}
+
+function clearAttach() {
+  attached = null
+  attachInput.value = ''
+  renderAttach()
+}
+
+// O canal transporta texto: a imagem sobe para o disco do hub e o prompt aponta
+// para o arquivo, que o Claude abre com Read.
+async function uploadImage(file) {
+  if (!currentId) return
+  showToast('enviando imagem…')
+  try {
+    const res = await fetch(`/_upload?session=${encodeURIComponent(currentId)}`, {
+      method: 'POST',
+      body: file,
+    })
+    if (!res.ok) {
+      showToast(res.status === 400 ? 'arquivo não é uma imagem suportada' : 'falha no envio')
+      return
+    }
+    const body = await res.json()
+    attached = String(body.path ?? '')
+    renderAttach()
+    showToast('imagem anexada')
+  } catch {
+    showToast('falha no envio da imagem')
+  }
+}
+
+function withAttachment(text) {
+  if (attached === null) return text
+  const note = `imagem anexada: ${attached}`
+  return text === '' ? note : `${text}\n\n${note}`
+}
+
+function sendPrompt(text) {
   if (text === '' || !currentId) return
   // Sem conexão o prompt não se perde: entra na outbox, aparece como "na fila"
   // e é entregue na reconexão.
@@ -924,7 +1043,14 @@ function submit() {
     saveOutbox()
     renderFeed()
   }
+}
+
+function submit() {
+  const text = withAttachment(input.value.trim())
+  if (text === '') return
+  sendPrompt(text)
   input.value = ''
+  clearAttach()
   resize()
 }
 
@@ -956,6 +1082,24 @@ autoBtn.addEventListener('click', () => {
   }
   // O hub confirma com toast e a lista de sessões volta com o estado novo.
   if (!send({ type: 'automode', sessionId: s.id, on })) showToast('sem conexão com o hub')
+})
+
+attachBtn.addEventListener('click', () => attachInput.click())
+attachInput.addEventListener('change', () => {
+  const file = attachInput.files?.[0]
+  if (file) void uploadImage(file)
+})
+attachState.addEventListener('click', clearAttach)
+
+changesBtn.addEventListener('click', () => {
+  if (!currentId) return
+  if (send({ type: 'changes', sessionId: currentId })) openSheet('mudanças', 'lendo o repositório…')
+  else showToast('sem conexão com o hub')
+})
+
+sheetClose.addEventListener('click', closeSheet)
+document.addEventListener('keydown', ev => {
+  if (ev.key === 'Escape' && !sheet.hidden) closeSheet()
 })
 
 modelBtn.addEventListener('click', ev => {

@@ -178,6 +178,31 @@ ativo e abre um dropup com Fable 5, Opus 5, Sonnet 5 e Haiku 4.5. Escolher envia
 se atualiza. Como no terminal, `/model` **também salva o modelo como default das próximas
 sessões** — o dropup avisa isso. Fora do tmux o botão não aparece.
 
+**Prompts de um toque.** Acima do composer há uma fila de chips (`continuar`, `rodar os
+testes`, `explique o que você fez`, `resuma o diff`, `o que falta?`). Um toque **envia na
+hora** — por isso nenhum padrão tem efeito colateral: um esbarrão no bolso não commita nem
+faz deploy. Para trocar a lista, a chave `quickPrompts` no `config.json`:
+
+```json
+{ "quickPrompts": ["continuar", "rodar os testes", "subir o servidor"] }
+```
+
+Até 8 chips, 200 caracteres cada; lista vazia ou ausente cai nos padrões. E cada prompt seu
+no feed ganha um `↻ reenviar`, que devolve o texto ao composer para editar e mandar de novo
+— o histórico de prompts mais barato que existe.
+
+**O que mudou.** O botão `⑂ mudanças` no rodapé abre o estado do repositório da sessão:
+arquivos tocados (`git status --short`, incluindo os não rastreados), o resumo do
+`git diff --stat` e o diff completo, colorido. É leitura pura — o hub só roda `git` no
+diretório que a sessão já declarou. Diff acima de 40 mil caracteres é cortado com aviso.
+Sessão fora de um repositório git diz isso em vez de falhar.
+
+**Mandar foto.** O botão 📎 no composer abre a câmera ou a galeria. A imagem sobe para
+`~/.claude/local-session/uploads/` e o prompt sai com o caminho — o canal só transporta
+texto, então o Claude abre o arquivo com `Read` como faria com qualquer arquivo do projeto.
+O hub valida pelos **bytes**, não pelo nome ou content-type: PNG, JPEG, GIF e WebP passam,
+o resto é recusado com 400. Teto de 8 MB. Os arquivos ficam no disco até você apagá-los.
+
 **Auto mode.** O botão `auto` no topo do feed liga a aprovação automática de permissões
 daquela sessão: cada pedido que chegar é aprovado pelo hub na hora e o card entra no feed
 já resolvido como `✓ permitido (auto)` — rastro completo, zero toque. Ligar o auto também
@@ -366,9 +391,10 @@ responder `200` da própria máquina.
 | `LOCAL_SESSION_DIR`   | Onde fica o `config.json` (padrão `~/.claude/local-session`) |
 | `LOCAL_SESSION_PORT`  | Porta do hub, sobrepondo a do arquivo (padrão 7777) |
 
-No `config.json`, além de `token` e `port`, a chave opcional `projects` (lista de caminhos
-absolutos) habilita a criação de sessões pela página e `notifyUrl` liga os avisos por push
-— ver "Trabalhar de longe".
+No `config.json`, além de `token` e `port`, as chaves opcionais: `projects` (lista de
+caminhos absolutos) habilita a criação de sessões pela página, `projectsRoot` amplia a área
+navegável, `notifyUrl` liga os avisos por push e `quickPrompts` troca os atalhos do
+composer.
 
 ## Desenvolvimento
 
@@ -398,6 +424,8 @@ Estrutura:
 | `src/config.ts`     | Token, porta, IP da rota default                  |
 | `src/notify.ts`     | Evento → aviso ntfy, com dedupe (sem I/O no core) |
 | `src/update-core.ts`| PID na porta e versões no cache — parsing testável |
+| `src/git-changes.ts`| Saídas do git → o texto do painel "mudanças"       |
+| `src/upload.ts`     | Imagem reconhecida pelos bytes e nome de arquivo derivado |
 | `scripts/service.ts`| Instala a unit de usuário do systemd              |
 | `scripts/update.ts` | Espelha o repo no cache e troca o hub             |
 | `src/history.ts`    | Histórico em JSONL — persistência e hidratação    |

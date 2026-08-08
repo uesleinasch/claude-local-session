@@ -46,6 +46,7 @@
       </main>
 
       <footer id="composer">
+        <div id="quick" hidden aria-label="Atalhos de prompt"></div>
         <div id="modelbar">
           <div id="model-wrap">
             <button id="model" type="button" hidden aria-haspopup="menu" aria-expanded="false">
@@ -54,8 +55,12 @@
             </button>
             <div id="model-menu" role="menu" hidden></div>
           </div>
+          <button id="changes" type="button" hidden>⑂ mudanças</button>
         </div>
+        <p id="attach-state" hidden></p>
         <div id="composer-row">
+          <input id="attach-input" type="file" accept="image/*" hidden />
+          <button id="attach" type="button" aria-label="Anexar imagem">📎</button>
           <label class="sr-only" for="input">Prompt para a sessão</label>
           <textarea
             id="input"
@@ -68,6 +73,14 @@
           <button id="send" type="button">enviar</button>
         </div>
       </footer>
+
+      <div id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+        <header id="sheet-bar">
+          <h2 id="sheet-title">mudanças</h2>
+          <button id="sheet-close" type="button" aria-label="Fechar">✕</button>
+        </header>
+        <pre id="sheet-body"></pre>
+      </div>
 
       <p id="offline" role="status" hidden>sem conexão com o hub — tentando de novo…</p>
       <p id="toast" role="status" hidden></p>

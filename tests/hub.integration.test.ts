@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import type { Subprocess } from 'bun'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { loadConfig } from '../src/config'
@@ -231,6 +232,85 @@ describe('notificações', () => {
 
     await waitFor(() => pushes.some(p => p.title === 'proj-idle'))
     session.socket.close()
+  })
+})
+
+describe('o que mudou', () => {
+  test('o hub devolve o estado do repositório da sessão', async () => {
+    const repo = mkdtempSync(join(tmpdir(), 'ls-repo-'))
+    execFileSync('git', ['init', '-q'], { cwd: repo })
+    execFileSync('git', ['config', 'user.email', 'teste@local'], { cwd: repo })
+    execFileSync('git', ['config', 'user.name', 'teste'], { cwd: repo })
+    writeFileSync(join(repo, 'a.txt'), 'um\n')
+    execFileSync('git', ['add', '.'], { cwd: repo })
+    execFileSync('git', ['commit', '-qm', 'inicial'], { cwd: repo })
+    writeFileSync(join(repo, 'a.txt'), 'dois\n')
+    writeFileSync(join(repo, 'novo.txt'), 'novo\n')
+
+    const session = await connect('session')
+    session.socket.send(
+      JSON.stringify({ type: 'register', sessionId: 'chg-1', cwd: repo, label: 'repo', pid: 0 }),
+    )
+    const browser = await connect('browser')
+    await browser.wait(m => m.type === 'sessions' && m.sessions.some((s: any) => s.id === 'chg-1'))
+
+    browser.socket.send(JSON.stringify({ type: 'changes', sessionId: 'chg-1' }))
+    const msg = await browser.wait(m => m.type === 'changes')
+
+    expect(msg.ok).toBe(true)
+    expect(msg.text).toContain('a.txt')
+    expect(msg.text).toContain('novo.txt')
+
+    session.socket.close()
+    browser.socket.close()
+    rmSync(repo, { recursive: true, force: true })
+  })
+
+  test('diretório fora do git responde sem quebrar', async () => {
+    const plain = mkdtempSync(join(tmpdir(), 'ls-plain-'))
+    const session = await connect('session')
+    session.socket.send(
+      JSON.stringify({ type: 'register', sessionId: 'chg-2', cwd: plain, label: 'plain', pid: 0 }),
+    )
+    const browser = await connect('browser')
+    await browser.wait(m => m.type === 'sessions' && m.sessions.some((s: any) => s.id === 'chg-2'))
+
+    browser.socket.send(JSON.stringify({ type: 'changes', sessionId: 'chg-2' }))
+    const msg = await browser.wait(m => m.type === 'changes')
+    expect(msg.ok).toBe(false)
+
+    session.socket.close()
+    browser.socket.close()
+    rmSync(plain, { recursive: true, force: true })
+  })
+})
+
+describe('upload de imagem', () => {
+  const png = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4])
+
+  test('imagem vira arquivo em disco e o hub devolve o caminho', async () => {
+    const res = await fetch(`${base()}/_upload?t=${token}&session=up-1`, {
+      method: 'POST',
+      body: png,
+    })
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as { path: string }
+    expect(body.path).toContain('up-1')
+    expect(body.path).toEndWith('.png')
+    expect(existsSync(body.path)).toBe(true)
+  })
+
+  test('arquivo que não é imagem é recusado', async () => {
+    const res = await fetch(`${base()}/_upload?t=${token}&session=up-2`, {
+      method: 'POST',
+      body: '#!/bin/sh\nrm -rf /\n',
+    })
+    expect(res.status).toBe(400)
+  })
+
+  test('sem token não sobe nada', async () => {
+    const res = await fetch(`${base()}/_upload?session=up-3`, { method: 'POST', body: png })
+    expect(res.status).toBe(404)
   })
 })
 

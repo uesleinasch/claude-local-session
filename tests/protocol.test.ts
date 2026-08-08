@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test'
+import { DEFAULT_QUICK_PROMPTS, MAX_QUICK_PROMPTS, parseQuickPrompts } from '../src/protocol'
 import { isModelAlias, MODELS, parseActivityPost, parseContextPost } from '../src/protocol'
 
 const spec = {
@@ -168,5 +169,41 @@ describe('parseActivityPost com pergunta', () => {
       detail: '',
       status: 'start',
     })
+  })
+})
+
+describe('parseQuickPrompts', () => {
+  test('aceita a lista configurada, aparada', () => {
+    expect(parseQuickPrompts(['continuar', '  rodar os testes  '])).toEqual([
+      'continuar',
+      'rodar os testes',
+    ])
+  })
+
+  test('descarta entrada vazia ou de outro tipo em vez de derrubar a lista', () => {
+    expect(parseQuickPrompts(['ok', '', '   ', 42, null])).toEqual(['ok'])
+  })
+
+  test('lista vazia vira null — quem chama cai no padrão', () => {
+    expect(parseQuickPrompts([])).toBeNull()
+    expect(parseQuickPrompts('continuar')).toBeNull()
+    expect(parseQuickPrompts(undefined)).toBeNull()
+  })
+
+  test('corta o excesso: a barra de chips não pode virar rolagem infinita', () => {
+    const many = Array.from({ length: MAX_QUICK_PROMPTS + 5 }, (_, i) => `p${i}`)
+    expect(parseQuickPrompts(many)).toHaveLength(MAX_QUICK_PROMPTS)
+  })
+
+  test('chip gigante é cortado, não some', () => {
+    const [only] = parseQuickPrompts(['x'.repeat(500)])!
+    expect(only!.length).toBeLessThanOrEqual(200)
+  })
+
+  test('os padrões não têm efeito colateral — um toque acidental não commita', () => {
+    expect(DEFAULT_QUICK_PROMPTS.length).toBeGreaterThan(0)
+    for (const p of DEFAULT_QUICK_PROMPTS) {
+      expect(p).not.toMatch(/commit|push|deploy|rm |merge/i)
+    }
   })
 })

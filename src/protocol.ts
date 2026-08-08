@@ -131,6 +131,7 @@ export type BrowserToHub =
   | { type: 'spawn'; dir: string }
   | { type: 'interrupt'; sessionId: string }
   | { type: 'kill'; sessionId: string }
+  | { type: 'changes'; sessionId: string }
   | { type: 'browse'; path: string }
   | { type: 'favorite'; path: string; on: boolean }
 
@@ -144,9 +145,11 @@ export type HubToBrowser =
       projects: string[]
       canSpawn: boolean
       canInterrupt: boolean
+      quickPrompts: string[]
       home?: string
     }
   | { type: 'dir'; path: string; parent: string | null; dirs: { name: string; path: string }[] }
+  | { type: 'changes'; sessionId: string; ok: boolean; text: string }
   | { type: 'toast'; text: string }
 
 export type QuestionOption = { label: string; description: string }
@@ -182,6 +185,28 @@ export function isPermissionBehavior(v: unknown): v is PermissionBehavior {
 
 export function isActivityStatus(v: unknown): v is ActivityStatus {
   return v === 'start' || v === 'end' || v === 'idle'
+}
+
+export const MAX_QUICK_PROMPTS = 8
+const MAX_QUICK_PROMPT_LEN = 200
+
+/** Atalhos do composer. Nenhum com efeito colateral: um toque acidental não pode commitar. */
+export const DEFAULT_QUICK_PROMPTS = [
+  'continuar',
+  'rodar os testes',
+  'explique o que você fez',
+  'resuma o diff',
+  'o que falta?',
+]
+
+export function parseQuickPrompts(raw: unknown): string[] | null {
+  if (!Array.isArray(raw)) return null
+  const out = raw
+    .filter((p): p is string => typeof p === 'string')
+    .map(p => p.trim().slice(0, MAX_QUICK_PROMPT_LEN))
+    .filter(p => p !== '')
+    .slice(0, MAX_QUICK_PROMPTS)
+  return out.length > 0 ? out : null
 }
 
 export const MAX_PREVIEW = 4_000

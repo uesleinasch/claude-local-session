@@ -98,12 +98,16 @@ olhar); **escrever no celular é caro**; e o feed é **plano**, sem colapso nem 
   *permitir* / *negar* e a decisão sai da tela de bloqueio. A ação **não pode carregar o
   token do hub** (quem tem o tópico teria a chave da máquina) — nonce por pedido, preso ao
   `requestId` e com validade curta.
-- **"O que mudou"** — `git -C <cwd> diff --stat` (e o diff sob demanda) mostrado com a UI de
-  diff que o card de permissão já tem. Leitura pura, o hub já sabe o `cwd`.
-- **Prompts de um toque** — chips acima do composer (`continuar`, `rodar os testes`,
-  `commitar`, `resuma o diff`) e reenvio de um prompt anterior. Corta a digitação no celular.
-- **Mandar foto** — fotografar um erro na tela e mandar. O canal só aceita texto, então o
-  hub grava o arquivo e o prompt referencia o caminho; o Claude abre com `Read`.
+- ~~**"O que mudou"**~~ — feito: o botão `⑂ mudanças` abre `git status --short` (com
+  não rastreados, que não aparecem no `git diff` — sem eles "criei o arquivo X" se lê como
+  "nada mudou"), o `--stat` e o diff colorido, cortado em 40 mil caracteres.
+- ~~**Prompts de um toque**~~ — feito: chips vindos do hub (`quickPrompts` no config, com
+  padrões embutidos) enviam com um toque só, e cada prompt do feed ganha `↻ reenviar`.
+  Nenhum padrão tem efeito colateral, porque um toque acidental manda de verdade.
+- ~~**Mandar foto**~~ — feito: `POST /_upload` grava em `~/.claude/local-session/uploads/` e
+  o prompt sai com o caminho. O tipo é decidido pelos **bytes** (PNG/JPEG/GIF/WebP), nunca
+  pelo nome ou content-type, e o nome do arquivo é derivado da sessão — o original vem de
+  fora. Teto de 8 MB. Falta: limpeza dos uploads antigos, que hoje ficam para sempre.
 - **Colapsar rajadas no feed** — "12 leituras de arquivo" numa linha expansível, com busca
   dentro da sessão. Junto com o render incremental do item 4.
 - **Menores** — renomear e fixar sessões (o rótulo é só o nome da pasta), feed unificado de

@@ -13,6 +13,8 @@ export type Config = {
   projectsRoot?: string[]
   /** Tópico ntfy que recebe os avisos, ex.: https://ntfy.sh/meu-topico. */
   notifyUrl?: string
+  /** Atalhos do composer; ausente cai nos padrões do protocolo. */
+  quickPrompts?: string[]
 }
 
 export function configDir(): string {

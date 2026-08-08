@@ -1,25 +1,29 @@
 import type { Server, ServerWebSocket } from 'bun'
 import { execFile } from 'node:child_process'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
+import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { configDir, loadConfig, readCookie, saveProjects, tokenMatches } from './config'
+import { formatChanges } from './git-changes'
 import { HistoryStore } from './history'
 import { Registry, type Sink } from './hub-state'
 import { Notifier, postToNtfy } from './notify'
 import {
+  DEFAULT_QUICK_PROMPTS,
   IDLE_SHUTDOWN_MS,
   isPermissionBehavior,
   isModelAlias,
   MAX_QUESTIONS,
   parseActivityPost,
   parseContextPost,
+  parseQuickPrompts,
   type BrowserToHub,
   type HubToBrowser,
   type QuestionAnswer,
   type SessionToHub,
 } from './protocol'
 import { keySequenceFor, type KeyStep } from './question-keys'
+import { MAX_UPLOAD_BYTES, sniffImage, uploadName } from './upload'
 import { detectPluginIdentity, type PluginIdentity } from './setup-core'
 
 const cfg = loadConfig()
@@ -60,6 +64,7 @@ const HAS_TMUX = Bun.which('tmux') !== null
 const CAN_SPAWN = HAS_TMUX && Bun.which('claude') !== null && IDENTITY !== null
 const CAN_INTERRUPT = HAS_TMUX
 const MAX_DIRS = 400
+const QUICK_PROMPTS = parseQuickPrompts(cfg.quickPrompts) ?? DEFAULT_QUICK_PROMPTS
 
 // Favoritos: persistidos como `projects` no config.json, editáveis pela página.
 let favorites = (cfg.projects ?? []).filter(p => typeof p === 'string' && p.startsWith('/'))
@@ -116,6 +121,7 @@ function configMsg(): string {
     projects: favorites,
     canSpawn: CAN_SPAWN,
     canInterrupt: CAN_INTERRUPT,
+    quickPrompts: QUICK_PROMPTS,
     home: HOME,
   } satisfies HubToBrowser)
 }
@@ -135,6 +141,26 @@ function run(cmd: string, args: string[]): Promise<{ ok: boolean; out: string }>
       resolve({ ok: !err, out: `${stdout}${stderr}`.trim() }),
     )
   })
+}
+
+// Leitura pura do repositório da sessão: responde "o que ele mexeu?" sem exigir
+// que a pessoa entre no terminal. `--` fecha a linha de comando contra um cwd
+// que comece com hífen.
+async function gitChanges(cwd: string): Promise<{ ok: boolean; text: string }> {
+  const git = (...args: string[]) => run('git', ['-C', cwd, ...args])
+  const inside = await git('rev-parse', '--is-inside-work-tree')
+  if (!inside.ok || inside.out !== 'true') {
+    return { ok: false, text: 'esta sessão não está num repositório git' }
+  }
+  const [status, stat, diff] = await Promise.all([
+    git('status', '--short', '--untracked-files=all'),
+    git('diff', '--stat', 'HEAD', '--'),
+    git('diff', 'HEAD', '--'),
+  ])
+  return {
+    ok: true,
+    text: formatChanges({ status: status.out, stat: stat.out, diff: diff.out }),
+  }
 }
 
 /** Env sem as variáveis de sessão do Claude: o hub pode ter herdado CLAUDE_*
@@ -357,6 +383,25 @@ async function handleContext(req: Request): Promise<Response> {
   return new Response('ok')
 }
 
+// O canal só carrega texto, então a foto vira arquivo em disco e o prompt cita
+// o caminho — o Claude abre com Read como faria com qualquer arquivo do projeto.
+async function handleUpload(req: Request, url: URL): Promise<Response> {
+  if (req.method !== 'POST') return notFound()
+  const raw = await req.arrayBuffer()
+  if (raw.byteLength === 0 || raw.byteLength > MAX_UPLOAD_BYTES) {
+    return new Response('bad request', { status: 400 })
+  }
+  const bytes = new Uint8Array(raw)
+  const kind = sniffImage(bytes)
+  if (kind === null) return new Response('bad request', { status: 400 })
+
+  const dir = join(configDir(), 'uploads')
+  mkdirSync(dir, { recursive: true, mode: 0o700 })
+  const path = join(dir, uploadName(url.searchParams.get('session') ?? '', kind, Date.now()))
+  writeFileSync(path, bytes, { mode: 0o600 })
+  return Response.json({ path })
+}
+
 function onSessionMessage(ws: Ws, msg: SessionToHub): void {
   switch (msg.type) {
     case 'register': {
@@ -408,6 +453,21 @@ function onBrowserMessage(ws: Ws, msg: BrowserToHub): void {
       try {
         ws.send(JSON.stringify({ type: 'pong' } satisfies HubToBrowser))
       } catch {}
+      return
+    }
+    case 'changes': {
+      if (typeof msg.sessionId !== 'string') return
+      const sessionId = msg.sessionId
+      const s = registry.summaries().find(x => x.id === sessionId)
+      if (!s || s.cwd === '') {
+        toast(ws, 'não sei em que diretório essa sessão roda')
+        return
+      }
+      void gitChanges(s.cwd).then(res => {
+        try {
+          ws.send(JSON.stringify({ type: 'changes', sessionId, ...res } satisfies HubToBrowser))
+        } catch {}
+      })
       return
     }
     case 'subscribe': {
@@ -608,6 +668,7 @@ try {
         const role = url.searchParams.get('role') === 'session' ? 'session' : 'browser'
         return srv.upgrade(req, { data: { role } }) ? undefined : notFound()
       }
+      if (url.pathname === '/_upload') return handleUpload(req, url)
       if (url.pathname === '/_activity') return handleActivity(req)
       if (url.pathname === '/_context') return handleContext(req)
 
