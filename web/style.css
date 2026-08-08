@@ -114,7 +114,7 @@ body {
 }
 
 #state[data-alive="true"]::before {
-  content: "● ociosa";
+  content: "○ ociosa";
   color: var(--green);
 }
 
@@ -175,21 +175,28 @@ body {
   font-weight: 700;
 }
 
+/* ● âmbar = trabalhando · ○ verde = ociosa (viva) · ○ cinza = encerrada */
 .session-name::before {
-  content: "●";
+  content: "○";
   color: var(--green);
   font-size: var(--step--2);
 }
 
+.session[data-alive="true"] .session-name::after {
+  content: "ociosa";
+  color: var(--ink-dim);
+  font-weight: 400;
+  font-size: var(--step--2);
+}
+
 .session[data-alive="true"][data-busy="true"] .session-name::before {
+  content: "●";
   color: var(--amber);
 }
 
 .session[data-alive="true"][data-busy="true"] .session-name::after {
   content: "trabalhando…";
   color: var(--amber);
-  font-weight: 400;
-  font-size: var(--step--2);
 }
 
 .session[data-alive="false"] {
