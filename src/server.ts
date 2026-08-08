@@ -16,10 +16,13 @@ const cfg = loadConfig()
 
 const SESSION_ID = process.env.CLAUDE_CODE_SESSION_ID ?? `pid-${process.pid}`
 const CWD = process.env.CLAUDE_PROJECT_DIR ?? process.cwd()
-const PID = Number(process.env.CLAUDE_PID ?? process.ppid)
+// Sempre o ppid real, nunca env: CLAUDE_PID herdado de outra sessão (via tmux,
+// hub, shells aninhados) apontaria o interrupt para o claude ERRADO. A cadeia
+// de ancestrais do ppid alcança o claude certo de qualquer forma.
+const PID = process.ppid
 
 const mcp = new Server(
-  { name: 'local-session', version: '0.2.0' },
+  { name: 'local-session', version: '0.2.1' },
   {
     capabilities: {
       tools: {},

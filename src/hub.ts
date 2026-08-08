@@ -90,12 +90,20 @@ function run(cmd: string, args: string[]): Promise<{ ok: boolean; out: string }>
   })
 }
 
+/** Env sem as variáveis de sessão do Claude: o hub pode ter herdado CLAUDE_*
+ * de quem o spawnou, e elas contaminariam a sessão nova via ambiente do tmux. */
+function cleanEnv(): Record<string, string | undefined> {
+  return Object.fromEntries(
+    Object.entries(process.env).filter(([k]) => !k.startsWith('CLAUDE') && k !== 'AI_AGENT'),
+  )
+}
+
 // O claude é um app de TTY: sem terminal não há sessão interativa. O tmux dá o
 // TTY e a sobrevivência — a sessão continua viva se o hub ou o navegador caírem.
 async function spawnSession(dir: string): Promise<string | null> {
   if (!IDENTITY) return 'identidade do plugin desconhecida'
   const name = `ls-${basename(dir).replace(/[^\w-]/g, '_')}-${Date.now().toString(36)}`
-  const res = await run('tmux', [
+  const args = [
     'new-session',
     '-d',
     '-s',
@@ -105,7 +113,12 @@ async function spawnSession(dir: string): Promise<string | null> {
     'claude',
     '--channels',
     `plugin:${IDENTITY.plugin}@${IDENTITY.marketplace}`,
-  ])
+  ]
+  const res = await new Promise<{ ok: boolean; out: string }>(resolve => {
+    execFile('tmux', args, { env: cleanEnv() }, (err, stdout, stderr) =>
+      resolve({ ok: !err, out: `${stdout}${stderr}`.trim() }),
+    )
+  })
   return res.ok ? null : `tmux falhou: ${res.out}`
 }
 

@@ -1,6 +1,6 @@
 {
   "name": "local-session",
   "description": "Expõe cada sessão do Claude Code numa página web da rede local — chat, linha de atividade e aprovação de permissão pelo navegador.",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "keywords": ["session", "lan", "web", "channel", "mcp"]
 }
