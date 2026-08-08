@@ -66,8 +66,22 @@ describe('nada pode empurrar a largura da página', () => {
     expect(semTeto).toEqual([])
   })
 
+  /**
+   * O nome da ferramenta chega cru do hook e uma tool MCP passa de 45 caracteres
+   * (`mcp__plugin_context-mode_context-mode__ctx_execute`). Sem teto ela não
+   * encolhe, empurra a caixa da atividade e a página inteira rola na horizontal.
+   */
+  test('os campos que mostram nome de ferramenta têm teto e truncam', () => {
+    for (const selector of ['.act-tool', '.perm-tool', '.session-ask-tool']) {
+      const regra = rules().find(r => r.selector.split(',').some(s => s.trim() === selector))
+      expect(regra, `${selector} precisa existir`).toBeDefined()
+      expect(regra!.body, `${selector} precisa de max-width`).toMatch(/max-width\s*:/)
+      expect(regra!.body, `${selector} precisa truncar`).toMatch(/text-overflow\s*:\s*ellipsis/)
+    }
+  })
+
   test('as áreas do grid raiz podem encolher', () => {
-    const alvos = ['#app > *', '#composer > *', '#composer-row > *']
+    const alvos = ['#app > *', '#feed > *', '#composer > *', '#composer-row > *']
     for (const alvo of alvos) {
       const regra = rules().find(
         r => r.selector.split(',').some(s => s.trim() === alvo) && /min-width\s*:\s*0/.test(r.body),
@@ -79,10 +93,23 @@ describe('nada pode empurrar a largura da página', () => {
 
 describe('alvos de toque', () => {
   /** Fitts: no celular o dedo precisa de área; 44px é o mínimo confortável. */
-  test('os controles do rodapé têm altura de toque no modo sem hover', () => {
+  test('os controles pequenos crescem no modo sem hover', () => {
     const touchBlock = css.match(/@media \(hover: none\)[^{]*\{([\s\S]*?)\n\}/)?.[1] ?? ''
-    for (const selector of ['.quick-chip', '#model', '#changes']) {
+    for (const selector of ['.quick-chip', '#stop', '.term-key', '.dir-spawn']) {
       expect(touchBlock).toContain(selector)
+    }
+  })
+
+  /**
+   * Botão que só existe como ícone não tem rótulo para o leitor de tela ler —
+   * e no toque é justamente o alvo menor.
+   */
+  test('os botões só-ícone da barra declaram tamanho de toque', () => {
+    for (const id of ['#back', '#more', '#attach', '#send']) {
+      const regra = rules().find(r =>
+        r.selector.split(',').some(s => s.trim() === id) && /width|height/.test(r.body),
+      )
+      expect(regra, `${id} precisa de área de toque declarada`).toBeDefined()
     }
   })
 })

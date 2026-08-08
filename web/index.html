@@ -4,26 +4,35 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="dark" />
-    <meta name="theme-color" content="#0b0c0e" />
+    <meta name="theme-color" content="#0e0f11" />
     <title>local-session</title>
     <link rel="stylesheet" href="/vendor/xterm.css" />
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <div id="app" data-view="sessions">
+    <div id="app" data-view="sessions" data-pane="active">
       <header id="bar">
         <button id="back" type="button" aria-label="Voltar para a lista de sessões">
           <span aria-hidden="true">←</span>
         </button>
-        <h1 id="title">sessões</h1>
-        <button id="automode" type="button" hidden data-on="false">auto</button>
-        <button id="stop" type="button" hidden>■ parar</button>
-        <span id="state" data-alive="false"></span>
+        <h1 id="home-title">sessões</h1>
+        <div id="ident">
+          <span id="title"></span>
+          <span id="state"></span>
+        </div>
+        <button id="stop" type="button" hidden>parar</button>
+        <button id="more" type="button" hidden aria-haspopup="menu" aria-expanded="false" aria-label="Mais ações desta sessão">
+          <span aria-hidden="true">⋯</span>
+        </button>
       </header>
 
+      <div id="tabs" role="tablist" aria-label="Sessões e projetos">
+        <button id="tab-active" type="button" role="tab" aria-selected="true">ativas</button>
+        <button id="tab-browse" type="button" role="tab" aria-selected="false" hidden>abrir projeto</button>
+      </div>
+
       <div id="context" hidden aria-label="Uso da janela de contexto">
-        <div id="context-track"><div id="context-fill"></div></div>
-        <span id="context-pct"></span>
+        <div id="context-fill"></div>
       </div>
 
       <section id="sessions" aria-label="Sessões ativas">
@@ -32,14 +41,31 @@
           nenhuma sessão registrada.<br />
           abra o Claude Code num projeto e ela aparece aqui.
         </p>
-        <div id="spawn" hidden>
-          <p class="spawn-title">nova sessão · favoritos</p>
-          <ul id="spawn-list"></ul>
-          <p id="spawn-empty" hidden>nenhum favorito — marque um diretório com ★ abaixo.</p>
-          <p class="spawn-title">procurar</p>
-          <p id="browse-path"></p>
-          <ul id="browse-list"></ul>
+      </section>
+
+      <section id="spawn" hidden aria-label="Abrir projeto">
+        <div id="dir-search-row">
+          <label class="sr-only" for="dir-search">Filtrar pastas</label>
+          <input
+            id="dir-search"
+            type="search"
+            placeholder="buscar pasta"
+            autocomplete="off"
+            autocapitalize="off"
+            spellcheck="false"
+          />
         </div>
+
+        <p class="group-title">favoritos</p>
+        <ul id="spawn-list"></ul>
+        <p id="spawn-empty" hidden>nenhum favorito — marque uma pasta com ☆ abaixo.</p>
+
+        <div id="browse-head">
+          <p class="group-title">procurar</p>
+          <p id="browse-path"></p>
+        </div>
+        <ul id="browse-list"></ul>
+        <p id="browse-empty" hidden>nada aqui com esse nome.</p>
       </section>
 
       <main id="feed" aria-label="Conversa e atividade" aria-live="polite" aria-relevant="additions">
@@ -47,17 +73,6 @@
       </main>
 
       <footer id="composer">
-        <div id="modelbar">
-          <div id="model-wrap">
-            <button id="model" type="button" hidden aria-haspopup="menu" aria-expanded="false">
-              <span id="model-name">modelo</span>
-              <span aria-hidden="true">▲</span>
-            </button>
-            <div id="model-menu" role="menu" hidden></div>
-          </div>
-          <button id="changes" type="button" hidden>⑂ mudanças</button>
-          <button id="terminal" type="button" hidden>▮ terminal</button>
-        </div>
         <div id="quick" hidden aria-label="Atalhos de prompt"></div>
         <p id="attach-state" hidden></p>
         <div id="composer-row">
@@ -67,21 +82,39 @@
           <textarea
             id="input"
             rows="1"
-            placeholder="prompt para esta sessão…"
+            placeholder="mensagem"
             autocomplete="off"
             autocapitalize="sentences"
             enterkeyhint="send"
           ></textarea>
-          <button id="send" type="button">enviar</button>
+          <button id="send" type="button" aria-label="Enviar">
+            <span aria-hidden="true">↑</span>
+          </button>
         </div>
       </footer>
 
+      <div id="menu" hidden>
+        <div id="menu-panel" role="menu" aria-label="Ações da sessão">
+          <div id="menu-main"></div>
+          <div id="menu-models" hidden></div>
+        </div>
+      </div>
+
       <div id="sheet" hidden role="dialog" aria-modal="true" aria-labelledby="sheet-title">
-        <header id="sheet-bar">
-          <h2 id="sheet-title">mudanças</h2>
-          <button id="sheet-close" type="button" aria-label="Fechar">✕</button>
-        </header>
-        <pre id="sheet-body"></pre>
+        <div id="sheet-panel">
+          <div id="sheet-grip" aria-hidden="true"></div>
+          <header id="sheet-bar">
+            <h2 id="sheet-title">mudanças</h2>
+            <span id="sheet-branch"></span>
+            <span id="sheet-total"></span>
+            <button id="sheet-close" type="button" aria-label="Fechar">✕</button>
+          </header>
+          <div id="sheet-ratio" hidden aria-hidden="true">
+            <div id="sheet-ratio-add"></div>
+            <div id="sheet-ratio-del"></div>
+          </div>
+          <div id="sheet-body"></div>
+        </div>
       </div>
 
       <div id="term" hidden role="dialog" aria-modal="true" aria-labelledby="term-title">

@@ -170,20 +170,22 @@ function run(cmd: string, args: string[]): Promise<{ ok: boolean; out: string }>
 // Leitura pura do repositório da sessão: responde "o que ele mexeu?" sem exigir
 // que a pessoa entre no terminal. `--` fecha a linha de comando contra um cwd
 // que comece com hífen.
-async function gitChanges(cwd: string): Promise<{ ok: boolean; text: string }> {
+async function gitChanges(cwd: string): Promise<{ ok: boolean; text: string; branch?: string }> {
   const git = (...args: string[]) => run('git', ['-C', cwd, ...args])
   const inside = await git('rev-parse', '--is-inside-work-tree')
   if (!inside.ok || inside.out !== 'true') {
     return { ok: false, text: 'esta sessão não está num repositório git' }
   }
-  const [status, stat, diff] = await Promise.all([
+  const [status, stat, diff, branch] = await Promise.all([
     git('status', '--short', '--untracked-files=all'),
     git('diff', '--stat', 'HEAD', '--'),
     git('diff', 'HEAD', '--'),
+    git('rev-parse', '--abbrev-ref', 'HEAD'),
   ])
   return {
     ok: true,
     text: formatChanges({ status: status.out, stat: stat.out, diff: diff.out }),
+    ...(branch.ok && branch.out !== '' ? { branch: branch.out } : {}),
   }
 }
 

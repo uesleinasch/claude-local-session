@@ -10,7 +10,8 @@ import { sessionStatus } from './session-status.js'
 import { createTerminalPanel } from './terminal-panel.js'
 
 const app = document.getElementById('app')
-const bar = { title: document.getElementById('title'), state: document.getElementById('state') }
+const titleEl = document.getElementById('title')
+const stateEl = document.getElementById('state')
 const list = document.getElementById('session-list')
 const sessionsEmpty = document.getElementById('sessions-empty')
 const feed = document.getElementById('feed')
@@ -18,18 +19,23 @@ const feedEmpty = document.getElementById('feed-empty')
 const input = document.getElementById('input')
 const sendBtn = document.getElementById('send')
 const stopBtn = document.getElementById('stop')
-const autoBtn = document.getElementById('automode')
+const moreBtn = document.getElementById('more')
 const ctxBox = document.getElementById('context')
 const ctxFill = document.getElementById('context-fill')
-const ctxPct = document.getElementById('context-pct')
-const modelBtn = document.getElementById('model')
-const modelName = document.getElementById('model-name')
-const modelMenu = document.getElementById('model-menu')
 const quickBar = document.getElementById('quick')
-const changesBtn = document.getElementById('changes')
-const terminalBtn = document.getElementById('terminal')
+const tabs = document.getElementById('tabs')
+const tabActive = document.getElementById('tab-active')
+const tabBrowse = document.getElementById('tab-browse')
+const menu = document.getElementById('menu')
+const menuMain = document.getElementById('menu-main')
+const menuModels = document.getElementById('menu-models')
 const sheet = document.getElementById('sheet')
 const sheetTitle = document.getElementById('sheet-title')
+const sheetBranch = document.getElementById('sheet-branch')
+const sheetTotal = document.getElementById('sheet-total')
+const sheetRatio = document.getElementById('sheet-ratio')
+const sheetRatioAdd = document.getElementById('sheet-ratio-add')
+const sheetRatioDel = document.getElementById('sheet-ratio-del')
 const sheetBody = document.getElementById('sheet-body')
 const sheetClose = document.getElementById('sheet-close')
 const attachBtn = document.getElementById('attach')
@@ -50,11 +56,15 @@ const spawnList = document.getElementById('spawn-list')
 const spawnEmpty = document.getElementById('spawn-empty')
 const browsePathEl = document.getElementById('browse-path')
 const browseList = document.getElementById('browse-list')
+const browseEmpty = document.getElementById('browse-empty')
+const dirSearch = document.getElementById('dir-search')
 
 const token = new URLSearchParams(location.search).get('t')
 const LAST_KEY = 'local-session.last'
 const OUTBOX_KEY = 'local-session.outbox'
 const MAX_EVENTS = 200
+/** Acima disso a rajada nasce recolhida: o resumo diz o que houve numa linha. */
+const ACTS_FOLD_AT = 3
 
 // O cookie definido pelo hub já autentica as próximas visitas — o token não
 // precisa ficar exposto na barra de endereço nem no histórico do navegador.
@@ -82,6 +92,7 @@ let hubConfig = {
 }
 let browse = null
 let toastTimer = null
+let dirFilter = ''
 
 let outbox = []
 try {
@@ -230,7 +241,7 @@ function send(msg) {
 function handle(msg) {
   if (msg.type === 'changes') {
     if (msg.sessionId !== currentId) return
-    openSheet(msg.ok ? 'mudanças' : 'sem git', String(msg.text ?? ''))
+    openSheet(String(msg.text ?? ''), msg.ok === true, msg.branch)
     return
   }
   if (msg.type === 'term_data') {
@@ -339,6 +350,7 @@ function open(id) {
   localStorage.setItem(LAST_KEY, id)
   events = []
   app.dataset.view = 'feed'
+  closeMenu()
   send({ type: 'subscribe', sessionId: id })
   flushOutbox()
   renderSessions()
@@ -348,10 +360,19 @@ function open(id) {
 
 function showSessions() {
   app.dataset.view = 'sessions'
+  closeMenu()
   renderBar()
 }
 
+function showPane(pane) {
+  app.dataset.pane = pane
+  tabActive.setAttribute('aria-selected', String(pane === 'active'))
+  tabBrowse.setAttribute('aria-selected', String(pane === 'browse'))
+}
+
 document.getElementById('back').addEventListener('click', showSessions)
+tabActive.addEventListener('click', () => showPane('active'))
+tabBrowse.addEventListener('click', () => showPane('browse'))
 
 /* ---------- render ---------- */
 
@@ -363,78 +384,431 @@ function ctxLevel(pct) {
   return pct < 50 ? 'ok' : pct < 80 ? 'warn' : 'high'
 }
 
-function fmtTokens(n) {
-  return n >= 1000 ? `${Math.round(n / 1000)}k` : String(n)
+function clock(ts) {
+  if (typeof ts !== 'number') return ''
+  return new Date(ts).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+}
+
+/**
+ * `mcp__plugin_context-mode_context-mode__ctx_execute` tem 49 caracteres e o que
+ * identifica está no fim: cortado pela esquerda ele vira ruído, e inteiro ele
+ * empurra a largura da página.
+ */
+function toolLabel(tool) {
+  return tool.startsWith('mcp__') ? tool.split('__').filter(Boolean).at(-1) : tool
 }
 
 function renderContext(s) {
   const ctx = s?.context
   ctxBox.hidden = app.dataset.view !== 'feed' || !ctx
   if (ctxBox.hidden) return
-  const pct = Math.round(ctx.pct)
   ctxFill.style.width = `${Math.min(100, Math.max(0, ctx.pct))}%`
-  ctxBox.dataset.level = ctxLevel(pct)
-  ctxPct.textContent =
-    ctx.usedTokens !== undefined && ctx.maxTokens !== undefined
-      ? `${pct}% · ${fmtTokens(ctx.usedTokens)}/${fmtTokens(ctx.maxTokens)}`
-      : `${pct}%`
-  ctxBox.title = `janela de contexto: ${ctxPct.textContent}`
+  ctxBox.dataset.level = ctxLevel(Math.round(ctx.pct))
 }
 
-function closeModelMenu() {
-  modelMenu.hidden = true
-  modelBtn.setAttribute('aria-expanded', 'false')
+/* ---------- menu de ações ---------- */
+
+function closeMenu() {
+  menu.hidden = true
+  menuModels.hidden = true
+  menuMain.hidden = false
+  moreBtn.setAttribute('aria-expanded', 'false')
 }
 
-function renderModel(s) {
-  const canPick = Boolean(s?.alive) && hubConfig.canInterrupt
-  modelBtn.hidden = app.dataset.view !== 'feed' || !canPick
-  if (modelBtn.hidden) {
-    closeModelMenu()
+function menuItem({ icon, label, value, accent, danger, onClick }) {
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = danger ? 'menu-item menu-danger' : 'menu-item'
+  btn.setAttribute('role', 'menuitem')
+  if (accent) btn.dataset.accent = 'true'
+
+  const ico = document.createElement('span')
+  ico.className = 'menu-icon'
+  ico.setAttribute('aria-hidden', 'true')
+  ico.textContent = icon
+
+  const text = document.createElement('span')
+  text.className = 'menu-label'
+  text.textContent = label
+
+  btn.append(ico, text)
+  if (value !== undefined) {
+    const val = document.createElement('span')
+    val.className = 'menu-value'
+    val.textContent = value
+    btn.append(val)
+  }
+  btn.addEventListener('click', onClick)
+  return btn
+}
+
+function buildMenu(s) {
+  menuMain.replaceChildren()
+  menuModels.replaceChildren()
+  menuMain.hidden = false
+  menuModels.hidden = true
+
+  if (s.alive && hubConfig.canInterrupt) {
+    menuMain.append(
+      menuItem({
+        icon: '◈',
+        label: 'modelo',
+        value: s.model?.name ?? '—',
+        accent: true,
+        onClick: () => {
+          menuMain.hidden = true
+          menuModels.hidden = false
+        },
+      }),
+    )
+  }
+
+  menuMain.append(
+    menuItem({
+      icon: '⑂',
+      label: 'mudanças',
+      onClick: () => {
+        closeMenu()
+        if (send({ type: 'changes', sessionId: s.id })) {
+          openSheet('lendo o repositório…', true)
+        } else {
+          showToast('sem conexão com o hub')
+        }
+      },
+    }),
+  )
+
+  if (hubConfig.canTerminal && s.cwd !== '') {
+    menuMain.append(
+      menuItem({
+        icon: '▮',
+        label: 'terminal',
+        onClick: () => {
+          closeMenu()
+          if (ws?.readyState !== WebSocket.OPEN) {
+            showToast('sem conexão com o hub')
+            return
+          }
+          terminalPanel.open(s.cwd, s.label)
+        },
+      }),
+    )
+  }
+
+  const sep = document.createElement('div')
+  sep.className = 'menu-sep'
+  menuMain.append(sep)
+
+  if (s.alive) {
+    const on = s.auto === true
+    const auto = menuItem({
+      icon: '⚡',
+      label: 'auto mode',
+      onClick: () => {
+        closeMenu()
+        if (
+          !on &&
+          !confirm(
+            `Ligar o auto para ${s.label}? TODOS os pedidos de permissão desta sessão serão aprovados sem confirmação — inclusive comandos destrutivos.`,
+          )
+        ) {
+          return
+        }
+        // O hub confirma com toast e a lista de sessões volta com o estado novo.
+        if (!send({ type: 'automode', sessionId: s.id, on: !on })) {
+          showToast('sem conexão com o hub')
+        }
+      },
+    })
+    auto.setAttribute('role', 'menuitemcheckbox')
+    auto.setAttribute('aria-checked', String(on))
+    const knob = document.createElement('span')
+    knob.className = 'menu-switch'
+    knob.setAttribute('aria-hidden', 'true')
+    auto.append(knob)
+    menuMain.append(auto)
+  }
+
+  menuMain.append(
+    menuItem({
+      icon: '✕',
+      label: s.alive ? 'encerrar sessão' : 'remover da lista',
+      danger: true,
+      onClick: () => {
+        closeMenu()
+        if (!confirmKill(s)) return
+        if (!send({ type: 'kill', sessionId: s.id })) showToast('sem conexão com o hub')
+      },
+    }),
+  )
+
+  const note = document.createElement('p')
+  note.className = 'menu-note'
+  note.textContent = 'também vira o padrão de novas sessões'
+  menuModels.append(note)
+  for (const m of MODELS) {
+    const item = menuItem({
+      icon: s.model?.name === m.name ? '✓' : '',
+      label: m.name,
+      accent: s.model?.name === m.name,
+      onClick: () => {
+        closeMenu()
+        if (s.model?.name === m.name) return
+        if (!send({ type: 'setmodel', sessionId: s.id, model: m.alias })) {
+          showToast('sem conexão com o hub')
+        } else {
+          showToast(`trocando para ${m.name}…`)
+        }
+      },
+    })
+    item.classList.add('model-item')
+    item.dataset.on = String(s.model?.name === m.name)
+    menuModels.append(item)
+  }
+}
+
+function confirmKill(s) {
+  return confirm(
+    s.alive
+      ? `Encerrar a sessão ${s.label}? O claude dela será finalizado.`
+      : `Remover ${s.label} da lista? O histórico dela será apagado.`,
+  )
+}
+
+moreBtn.addEventListener('click', ev => {
+  ev.stopPropagation()
+  const s = current()
+  if (!s) return
+  if (menu.hidden) {
+    buildMenu(s)
+    // Ancorado na barra medida, não num número mágico: o topo cresce com a
+    // safe area do aparelho.
+    document.getElementById('menu-panel').style.top =
+      `${document.getElementById('bar').getBoundingClientRect().bottom + 6}px`
+    menu.hidden = false
+    moreBtn.setAttribute('aria-expanded', 'true')
+  } else {
+    closeMenu()
+  }
+})
+
+menu.addEventListener('click', ev => {
+  if (ev.target === menu) closeMenu()
+})
+
+/* ---------- folha de mudanças ---------- */
+
+/**
+ * Reconstrói a estrutura por arquivo a partir do texto do hub (status --short +
+ * --stat + diff). O texto cru é o fallback: formato inesperado vira nota, nunca
+ * tela vazia.
+ */
+function parseChanges(text) {
+  const files = new Map()
+  const get = path => {
+    let f = files.get(path)
+    if (!f) {
+      f = { path, mark: 'mod', add: 0, del: 0, hunks: [] }
+      files.set(path, f)
+    }
+    return f
+  }
+
+  const statusBlock = text.match(/^arquivos\n([\s\S]*?)(?:\n\n|$)/m)?.[1]
+  if (statusBlock) {
+    for (const line of statusBlock.split('\n')) {
+      const m = line.match(/^(..)\s+(.+)$/)
+      if (!m) continue
+      const code = m[1]
+      // O caminho de um rename vem como "antigo -> novo"; interessa o destino.
+      const path = m[2].split(' -> ').at(-1).trim()
+      const f = get(path)
+      if (code.includes('?')) f.mark = 'new'
+      else if (code.includes('D')) f.mark = 'del'
+      else if (code.includes('A')) f.mark = 'new'
+    }
+  }
+
+  const statBlock = text.match(/^resumo\n([\s\S]*?)(?:\n\n|$)/m)?.[1]
+  let total = null
+  if (statBlock) {
+    for (const line of statBlock.split('\n')) {
+      const totals = line.match(/(\d+) insertions?\(\+\)|(\d+) deletions?\(-\)/g)
+      if (line.includes('changed') && totals) {
+        total = { add: 0, del: 0 }
+        for (const t of totals) {
+          const n = Number.parseInt(t, 10)
+          if (t.includes('+')) total.add = n
+          else total.del = n
+        }
+        continue
+      }
+      const m = line.match(/^\s*(.+?)\s+\|\s+\d+\s*([+-]*)\s*$/)
+      if (!m) continue
+      const f = get(m[1].trim())
+      f.add = (m[2].match(/\+/g) ?? []).length
+      f.del = (m[2].match(/-/g) ?? []).length
+    }
+  }
+
+  // O --stat só dá a proporção de +/- (barra de no máximo ~80 colunas); as
+  // contagens reais saem do próprio diff.
+  for (const chunk of text.split(/^diff --git /m).slice(1)) {
+    const path = chunk.match(/^a\/(.+?) b\//)?.[1]
+    if (!path) continue
+    const f = get(path)
+    f.add = 0
+    f.del = 0
+    let hunk = null
+    for (const line of chunk.split('\n')) {
+      if (line.startsWith('@@')) {
+        hunk = { head: line, lines: [] }
+        f.hunks.push(hunk)
+        continue
+      }
+      if (!hunk) continue
+      if (line.startsWith('+')) {
+        f.add += 1
+        hunk.lines.push({ sign: 'add', text: line })
+      } else if (line.startsWith('-')) {
+        f.del += 1
+        hunk.lines.push({ sign: 'del', text: line })
+      } else if (line.startsWith('\\')) {
+        continue
+      } else {
+        hunk.lines.push({ sign: 'ctx', text: line })
+      }
+    }
+  }
+
+  const out = [...files.values()]
+  if (total === null && out.length > 0) {
+    total = out.reduce((acc, f) => ({ add: acc.add + f.add, del: acc.del + f.del }), {
+      add: 0,
+      del: 0,
+    })
+  }
+  return { files: out, total }
+}
+
+function fileRow(f, onToggle) {
+  const row = document.createElement('button')
+  row.type = 'button'
+  row.className = 'file-row'
+
+  const mark = document.createElement('span')
+  mark.className = 'file-mark'
+  mark.dataset.kind = f.mark
+  mark.textContent = f.mark === 'new' ? '?' : f.mark === 'del' ? 'D' : 'M'
+
+  const path = document.createElement('span')
+  path.className = 'file-path'
+  path.textContent = f.path
+
+  const chev = document.createElement('span')
+  chev.className = 'file-chev'
+  chev.setAttribute('aria-hidden', 'true')
+  chev.textContent = f.open ? '▾' : '▸'
+
+  row.append(mark, path)
+  if (f.add > 0) {
+    const add = document.createElement('span')
+    add.className = 'file-add'
+    add.textContent = `+${f.add}`
+    row.append(add)
+  }
+  if (f.del > 0) {
+    const del = document.createElement('span')
+    del.className = 'file-del'
+    del.textContent = `−${f.del}`
+    row.append(del)
+  }
+  row.append(chev)
+  row.setAttribute('aria-expanded', String(f.open === true))
+  row.addEventListener('click', () => onToggle(f))
+  return row
+}
+
+function hunkNode(hunk) {
+  const head = document.createElement('div')
+  head.className = 'hunk-head'
+  head.textContent = hunk.head
+
+  const lines = document.createElement('div')
+  lines.className = 'hunk-lines'
+  for (const l of hunk.lines) {
+    const row = document.createElement('div')
+    row.className = 'diff-line'
+    if (l.sign !== 'ctx') row.dataset.sign = l.sign
+    row.textContent = l.text === '' ? ' ' : l.text
+    lines.append(row)
+  }
+  return [head, lines]
+}
+
+let changesModel = null
+
+function renderSheetBody() {
+  sheetBody.replaceChildren()
+  if (!changesModel) return
+
+  if (changesModel.files.length === 0) {
+    const note = document.createElement('p')
+    note.className = 'sheet-note'
+    note.textContent = changesModel.raw
+    sheetBody.append(note)
     return
   }
-  modelName.textContent = s.model?.name ?? 'modelo'
-}
 
-function buildModelMenu(s) {
-  modelMenu.replaceChildren()
-  const note = document.createElement('p')
-  note.className = 'model-note'
-  note.textContent = 'também vira o padrão de novas sessões'
-  modelMenu.append(note)
-  for (const m of MODELS) {
-    const item = document.createElement('button')
-    item.type = 'button'
-    item.className = 'model-item'
-    item.setAttribute('role', 'menuitem')
-    item.dataset.on = String(s.model?.name === m.name)
-    item.textContent = m.name
-    item.addEventListener('click', () => {
-      closeModelMenu()
-      if (s.model?.name === m.name) return
-      if (!send({ type: 'setmodel', sessionId: s.id, model: m.alias })) {
-        showToast('sem conexão com o hub')
-      } else {
-        showToast(`trocando para ${m.name}…`)
-      }
-    })
-    modelMenu.append(item)
+  for (const f of changesModel.files) {
+    sheetBody.append(
+      fileRow(f, target => {
+        target.open = !target.open
+        renderSheetBody()
+      }),
+    )
+    if (!f.open) continue
+    const body = document.createElement('div')
+    body.className = 'file-body'
+    if (f.hunks.length === 0) {
+      const note = document.createElement('div')
+      note.className = 'hunk-head'
+      note.textContent = f.mark === 'new' ? 'arquivo novo — sem diff contra HEAD' : 'sem diff'
+      body.append(note)
+    } else {
+      for (const h of f.hunks) body.append(...hunkNode(h))
+    }
+    sheetBody.append(body)
   }
 }
 
-function openSheet(title, text) {
-  sheetTitle.textContent = title
-  sheetBody.replaceChildren()
-  // Colore o diff sem interpretar nada: cada linha é texto puro num span.
-  for (const line of text.split('\n')) {
-    const row = document.createElement('span')
-    row.className = 'sheet-line'
-    if (line.startsWith('+') && !line.startsWith('+++')) row.dataset.sign = 'add'
-    else if (line.startsWith('-') && !line.startsWith('---')) row.dataset.sign = 'del'
-    else if (line.startsWith('@@')) row.dataset.sign = 'hunk'
-    row.textContent = `${line}\n`
-    sheetBody.append(row)
+function openSheet(text, ok, branch) {
+  const parsed = ok ? parseChanges(text) : { files: [], total: null }
+  changesModel = { files: parsed.files, total: parsed.total, raw: text }
+  // Um arquivo só: abrir de cara poupa um toque sem esconder os outros.
+  if (changesModel.files.length === 1) changesModel.files[0].open = true
+
+  sheetTitle.textContent = ok ? 'mudanças' : 'sem git'
+  sheetBranch.textContent = branch ?? ''
+
+  const total = changesModel.total
+  sheetTotal.replaceChildren()
+  if (total && (total.add > 0 || total.del > 0)) {
+    const add = document.createElement('span')
+    add.className = 'total-add'
+    add.textContent = `+${total.add}`
+    const del = document.createElement('span')
+    del.className = 'total-del'
+    del.textContent = `−${total.del}`
+    sheetTotal.append(add, document.createTextNode(' '), del)
+    sheetRatio.hidden = false
+    sheetRatioAdd.style.flex = String(Math.max(total.add, 1))
+    sheetRatioDel.style.flex = String(Math.max(total.del, 1))
+  } else {
+    sheetRatio.hidden = true
   }
+
+  renderSheetBody()
   sheet.hidden = false
 }
 
@@ -470,29 +844,29 @@ function renderQuick() {
 function renderBar() {
   const s = current()
   renderContext(s)
-  renderModel(s)
   renderQuick()
-  changesBtn.hidden = app.dataset.view !== 'feed' || !s
-  terminalBtn.hidden = changesBtn.hidden || !hubConfig.canTerminal || !s?.cwd
+  tabs.hidden = !hubConfig.canSpawn
+  tabBrowse.hidden = !hubConfig.canSpawn
+  if (!hubConfig.canSpawn) showPane('active')
+
   if (app.dataset.view === 'sessions' || !s) {
-    bar.title.textContent = 'sessões'
-    bar.state.dataset.alive = 'false'
+    stateEl.dataset.alive = 'false'
     stopBtn.hidden = true
-    autoBtn.hidden = true
+    moreBtn.hidden = true
+    closeMenu()
     return
   }
-  bar.title.textContent = s.label
-  bar.state.dataset.alive = String(s.alive)
-  bar.state.dataset.busy = String(s.busy === true)
+
+  titleEl.textContent = s.label
+  const status = sessionStatus(s, Date.now())
+  const bits = [status.label]
+  if (s.model?.name) bits.push(s.model.name)
+  if (s.context) bits.push(`${Math.round(s.context.pct)}%`)
+  stateEl.textContent = bits.join(' · ')
+  stateEl.dataset.alive = String(s.alive)
+  stateEl.dataset.busy = String(s.busy === true)
   stopBtn.hidden = !(s.alive && s.busy === true && hubConfig.canInterrupt)
-  autoBtn.hidden = !s.alive
-  autoBtn.dataset.on = String(s.auto === true)
-  autoBtn.setAttribute(
-    'aria-label',
-    s.auto === true
-      ? 'Auto ligado — desligar aprovação automática de permissões'
-      : 'Ligar aprovação automática de permissões desta sessão',
-  )
+  moreBtn.hidden = false
 }
 
 function tilde(path) {
@@ -508,20 +882,8 @@ function confirmSpawn(dir) {
   else showToast('sem conexão com o hub')
 }
 
-function starBtn(dir, isFav) {
-  const star = document.createElement('button')
-  star.type = 'button'
-  star.className = 'dir-action dir-star'
-  star.dataset.on = String(isFav)
-  star.setAttribute(
-    'aria-label',
-    isFav ? `Remover ${tilde(dir)} dos favoritos` : `Marcar ${tilde(dir)} como favorito`,
-  )
-  star.textContent = isFav ? '★' : '☆'
-  star.addEventListener('click', () => {
-    if (!send({ type: 'favorite', path: dir, on: !isFav })) showToast('sem conexão com o hub')
-  })
-  return star
+function toggleFavorite(dir, isFav) {
+  if (!send({ type: 'favorite', path: dir, on: !isFav })) showToast('sem conexão com o hub')
 }
 
 function renderSpawn() {
@@ -530,55 +892,93 @@ function renderSpawn() {
   browseList.replaceChildren()
   if (!hubConfig.canSpawn) return
 
-  // Favoritos: um toque abre sessão, a estrela desfaz a marcação.
-  spawnEmpty.hidden = hubConfig.projects.length > 0
-  for (const dir of hubConfig.projects) {
+  const needle = dirFilter.trim().toLowerCase()
+  const favs = hubConfig.projects.filter(
+    d => needle === '' || d.toLowerCase().includes(needle),
+  )
+  spawnEmpty.hidden = favs.length > 0
+  if (favs.length === 0 && needle !== '') {
+    spawnEmpty.textContent = 'nenhum favorito com esse nome.'
+  } else {
+    spawnEmpty.textContent = 'nenhum favorito — marque uma pasta com ☆ abaixo.'
+  }
+
+  for (const dir of favs) {
     const li = document.createElement('li')
-    li.className = 'dir-item'
+    li.className = 'fav-item'
 
-    const btn = document.createElement('button')
-    btn.type = 'button'
-    btn.className = 'spawn-btn'
+    const mark = document.createElement('button')
+    mark.type = 'button'
+    mark.className = 'fav-mark'
+    mark.setAttribute('aria-label', `Remover ${tilde(dir)} dos favoritos`)
+    mark.textContent = '★'
+    mark.addEventListener('click', () => toggleFavorite(dir, true))
 
+    const id = document.createElement('div')
+    id.className = 'fav-id'
     const name = document.createElement('span')
-    name.className = 'session-name'
+    name.className = 'fav-name'
     name.textContent = dir.split('/').filter(Boolean).pop() ?? dir
-
     const path = document.createElement('span')
-    path.className = 'session-path'
+    path.className = 'fav-path'
     path.textContent = tilde(dir)
+    id.append(name, path)
 
-    btn.append(name, path)
-    btn.addEventListener('click', () => confirmSpawn(dir))
-    li.append(btn, starBtn(dir, true))
+    const openBtn = document.createElement('button')
+    openBtn.type = 'button'
+    openBtn.className = 'fav-open'
+    openBtn.textContent = 'abrir'
+    openBtn.addEventListener('click', () => confirmSpawn(dir))
+
+    li.append(mark, id, openBtn)
     spawnList.append(li)
   }
 
-  // Navegador: nome navega, ★ favorita, + abre sessão ali.
   browsePathEl.textContent = browse ? tilde(browse.path) : '…'
   if (!browse) return
 
-  if (browse.parent) {
+  if (browse.parent && needle === '') {
     const li = document.createElement('li')
     li.className = 'dir-item'
     const up = document.createElement('button')
     up.type = 'button'
-    up.className = 'dir-name'
-    up.textContent = '‹ voltar'
+    up.className = 'dir-name dir-up'
+    const label = document.createElement('span')
+    label.className = 'dir-label'
+    label.textContent = 'voltar'
+    up.append(label)
     up.addEventListener('click', () => send({ type: 'browse', path: browse.parent }))
     li.append(up)
     browseList.append(li)
   }
 
-  for (const d of browse.dirs) {
+  const dirs = browse.dirs.filter(d => needle === '' || d.name.toLowerCase().includes(needle))
+  browseEmpty.hidden = dirs.length > 0
+
+  for (const d of dirs) {
     const li = document.createElement('li')
     li.className = 'dir-item'
 
     const name = document.createElement('button')
     name.type = 'button'
     name.className = 'dir-name'
-    name.textContent = `${d.name}/`
+    const label = document.createElement('span')
+    label.className = 'dir-label'
+    label.textContent = d.name
+    name.append(label)
     name.addEventListener('click', () => send({ type: 'browse', path: d.path }))
+
+    const isFav = hubConfig.projects.includes(d.path)
+    const star = document.createElement('button')
+    star.type = 'button'
+    star.className = 'dir-action dir-star'
+    star.dataset.on = String(isFav)
+    star.setAttribute(
+      'aria-label',
+      isFav ? `Remover ${tilde(d.path)} dos favoritos` : `Marcar ${tilde(d.path)} como favorito`,
+    )
+    star.textContent = isFav ? '★' : '☆'
+    star.addEventListener('click', () => toggleFavorite(d.path, isFav))
 
     const plus = document.createElement('button')
     plus.type = 'button'
@@ -587,70 +987,155 @@ function renderSpawn() {
     plus.textContent = '+'
     plus.addEventListener('click', () => confirmSpawn(d.path))
 
-    li.append(name, starBtn(d.path, hubConfig.projects.includes(d.path)), plus)
+    li.append(name, star, plus)
     browseList.append(li)
   }
+}
+
+dirSearch.addEventListener('input', () => {
+  dirFilter = dirSearch.value
+  renderSpawn()
+})
+
+function decide(sessionId, requestId, behavior, buttons) {
+  const sent = send({ type: 'permission_decision', sessionId, requestId, behavior })
+  if (!sent) {
+    showToast('sem conexão com o hub')
+    return
+  }
+  for (const b of buttons) b.disabled = true
+}
+
+function permButtons(sessionId, requestId) {
+  const wrap = document.createElement('div')
+  wrap.className = 'perm-actions'
+  const deny = document.createElement('button')
+  deny.type = 'button'
+  deny.className = 'perm-deny'
+  deny.textContent = 'negar'
+  const allow = document.createElement('button')
+  allow.type = 'button'
+  allow.className = 'perm-allow'
+  allow.textContent = 'permitir'
+  const both = [deny, allow]
+  deny.addEventListener('click', ev => {
+    ev.stopPropagation()
+    decide(sessionId, requestId, 'deny', both)
+  })
+  allow.addEventListener('click', ev => {
+    ev.stopPropagation()
+    decide(sessionId, requestId, 'allow', both)
+  })
+  wrap.append(deny, allow)
+  return wrap
 }
 
 function renderSessions() {
   list.replaceChildren()
   sessionsEmpty.hidden = sessions.length > 0
+  const live = sessions.filter(s => s.alive).length
+  tabActive.textContent = live > 0 ? `ativas · ${live}` : 'ativas'
 
   for (const s of sessions) {
+    const status = sessionStatus(s, Date.now())
     const li = document.createElement('li')
     li.className = 'session-item'
+    li.dataset.tone = status.tone
 
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className = 'session'
-    btn.dataset.alive = String(s.alive)
-    btn.dataset.busy = String(s.busy === true)
+    btn.addEventListener('click', () => open(s.id))
 
-    const name = document.createElement('span')
-    name.className = 'session-name'
-    name.textContent = s.label
-    if (s.auto === true) {
+    const top = document.createElement('div')
+    top.className = 'session-top'
+    if (status.tone === 'waiting') {
       const badge = document.createElement('span')
-      badge.className = 'session-auto'
-      badge.textContent = 'auto'
-      name.append(badge)
+      badge.className = 'session-badge'
+      badge.textContent = status.label
+      top.append(badge)
+    } else {
+      const dot = document.createElement('span')
+      dot.className = 'session-dot'
+      const state = document.createElement('span')
+      state.className = 'session-state'
+      state.textContent = status.label
+      top.append(dot, state)
+    }
+    if (s.auto === true) {
+      const auto = document.createElement('span')
+      auto.className = 'session-auto'
+      auto.textContent = 'auto'
+      top.append(auto)
     }
     if (s.context) {
       const ctx = document.createElement('span')
       ctx.className = 'session-ctx'
-      ctx.dataset.level = ctxLevel(Math.round(s.context.pct))
       ctx.textContent = `${Math.round(s.context.pct)}%`
-      name.append(ctx)
+      top.append(ctx)
     }
 
+    const id = document.createElement('div')
+    id.className = 'session-id'
+    const name = document.createElement('span')
+    name.className = 'session-name'
+    name.textContent = s.label
     const path = document.createElement('span')
     path.className = 'session-path'
-    path.textContent = s.cwd
+    path.textContent = tilde(s.cwd)
+    id.append(name, path)
 
-    const status = sessionStatus(s, Date.now())
-    const state = document.createElement('span')
-    state.className = 'session-state'
-    state.dataset.tone = status.tone
-    state.textContent = status.label
+    btn.append(top, id)
 
-    btn.dataset.tone = status.tone
-    btn.append(name, state, path)
-    btn.addEventListener('click', () => open(s.id))
+    // O que a sessão pede fica legível na própria lista — decidir daqui não
+    // exige abrir o feed.
+    if (s.pending) {
+      const ask = document.createElement('div')
+      ask.className = 'session-ask'
+      const tool = document.createElement('span')
+      tool.className = 'session-ask-tool'
+      tool.textContent = toolLabel(s.pending.toolName)
+      const detail = document.createElement('span')
+      detail.className = 'session-ask-detail'
+      detail.textContent = s.pending.description
+      ask.append(tool, detail)
+      btn.append(ask)
+    } else if (status.tone === 'busy' && s.context) {
+      const meter = document.createElement('div')
+      meter.className = 'session-meter'
+      const track = document.createElement('div')
+      track.className = 'session-track'
+      track.dataset.level = ctxLevel(Math.round(s.context.pct))
+      const fill = document.createElement('div')
+      fill.className = 'session-fill'
+      fill.style.width = `${Math.min(100, Math.max(0, s.context.pct))}%`
+      track.append(fill)
+      const label = document.createElement('span')
+      label.className = 'session-meter-label'
+      label.textContent = `${Math.round(s.context.pct)}% ctx`
+      meter.append(track, label)
+      btn.append(meter)
+    }
 
-    const kill = document.createElement('button')
-    kill.type = 'button'
-    kill.className = 'session-kill'
-    kill.setAttribute('aria-label', `Encerrar a sessão ${s.label}`)
-    kill.textContent = '✕'
-    kill.addEventListener('click', () => {
-      const question = s.alive
-        ? `Encerrar a sessão ${s.label}? O claude dela será finalizado.`
-        : `Remover ${s.label} da lista? O histórico dela será apagado.`
-      if (!confirm(question)) return
-      if (!send({ type: 'kill', sessionId: s.id })) showToast('sem conexão com o hub')
-    })
+    li.append(btn)
+    if (s.pending) li.append(permButtons(s.id, s.pending.requestId))
 
-    li.append(btn, kill)
+    // Sessão viva se encerra pelo menu de dentro dela; da lista só se remove o
+    // que já morreu.
+    if (!s.alive) {
+      const drop = document.createElement('button')
+      drop.type = 'button'
+      drop.className = 'session-drop'
+      drop.setAttribute('aria-label', `Remover ${s.label} da lista`)
+      drop.textContent = '✕'
+      drop.addEventListener('click', ev => {
+        ev.stopPropagation()
+        if (!confirmKill(s)) return
+        if (!send({ type: 'kill', sessionId: s.id })) showToast('sem conexão com o hub')
+      })
+      li.append(drop)
+    }
+
     list.append(li)
   }
 }
@@ -681,7 +1166,9 @@ function group(all) {
     if (e.kind === 'activity') {
       const last = out[out.length - 1]
       if (last?.type === 'acts') foldActivity(last.items, e)
-      else out.push({ type: 'acts', items: foldActivity([], e) })
+      // O ts do primeiro evento identifica a rajada entre renders — é o que
+      // mantém aberto o grupo que você abriu.
+      else out.push({ type: 'acts', key: e.ts, items: foldActivity([], e) })
       continue
     }
     out.push({ type: e.kind, event: e })
@@ -689,26 +1176,24 @@ function group(all) {
   return out
 }
 
-function turnNode(who, text, kind) {
+function turnNode(who, text, kind, ts) {
   const wrap = document.createElement('div')
   wrap.className = 'turn'
   wrap.dataset.kind = kind
 
-  const label = document.createElement('p')
-  label.className = 'who'
-  label.textContent = who
-
-  // Respostas do Claude chegam em markdown; prompts ficam literais.
-  const body = document.createElement(kind === 'reply' ? 'div' : 'p')
-  body.className = 'text'
-  if (kind === 'reply') body.append(renderMarkdown(text))
-  else body.textContent = text
-
-  wrap.append(label, body)
-
-  // Reaproveitar o que você já escreveu é o histórico de prompts mais barato:
-  // um toque devolve o texto ao composer, pronto para editar e reenviar.
   if (kind === 'prompt') {
+    const bubble = document.createElement('div')
+    bubble.className = 'bubble'
+    bubble.textContent = text
+    wrap.append(bubble)
+
+    const meta = document.createElement('div')
+    meta.className = 'turn-meta'
+    const time = document.createElement('span')
+    time.className = 'turn-time'
+    time.textContent = who === 'você' ? clock(ts) : who
+    // Reaproveitar o que você já escreveu é o histórico de prompts mais barato:
+    // um toque devolve o texto ao composer, pronto para editar e reenviar.
     const again = document.createElement('button')
     again.type = 'button'
     again.className = 'turn-again'
@@ -718,31 +1203,88 @@ function turnNode(who, text, kind) {
       resize()
       input.focus()
     })
-    wrap.append(again)
+    meta.append(time, again)
+    wrap.append(meta)
+    return wrap
   }
+
+  const head = document.createElement('div')
+  head.className = 'who'
+  const avatar = document.createElement('span')
+  avatar.className = 'avatar'
+  avatar.setAttribute('aria-hidden', 'true')
+  avatar.textContent = 'C'
+  const label = document.createElement('span')
+  label.className = 'who-name'
+  label.textContent = who
+  head.append(avatar, label)
+
+  const body = document.createElement('div')
+  body.className = 'text'
+  body.append(renderMarkdown(text))
+
+  wrap.append(head, body)
   return wrap
 }
 
-function actsNode(items) {
+/* Quais rajadas o usuário abriu ou fechou na mão — o padrão depende do tamanho. */
+const actsOpened = new Set()
+const actsClosed = new Set()
+
+function actsNode(key, items) {
+  const box = document.createElement('details')
+  box.className = 'acts'
+  const many = items.length > ACTS_FOLD_AT
+  box.open = actsOpened.has(key) || (!actsClosed.has(key) && !many)
+  box.addEventListener('toggle', () => {
+    if (box.open) {
+      actsOpened.add(key)
+      actsClosed.delete(key)
+    } else {
+      actsClosed.add(key)
+      actsOpened.delete(key)
+    }
+  })
+
+  const sum = document.createElement('summary')
+  sum.className = 'acts-sum'
+  const count = document.createElement('span')
+  count.className = 'acts-count'
+  count.textContent = items.length === 1 ? '1 ação' : `${items.length} ações`
+  const tools = document.createElement('span')
+  tools.className = 'acts-tools'
+  const names = [...new Set(items.map(i => toolLabel(i.tool)).filter(Boolean))]
+  tools.textContent = names.length > 0 ? `· ${names.join(', ')}` : ''
+  sum.append(count, tools)
+
   const ul = document.createElement('ul')
-  ul.className = 'acts'
+  ul.className = 'acts-list'
   for (const item of items) {
     const li = document.createElement('li')
     li.className = 'act'
     li.dataset.status = item.status
 
+    const mark = document.createElement('span')
+    mark.className = 'act-mark'
+    mark.setAttribute('aria-hidden', 'true')
+    mark.textContent = item.status === 'end' ? '✓' : item.status === 'start' ? '…' : '·'
+
     const tool = document.createElement('span')
     tool.className = 'act-tool'
-    tool.textContent = item.tool
+    tool.textContent = toolLabel(item.tool)
+    if (tool.textContent !== item.tool) tool.title = item.tool
 
     const detail = document.createElement('span')
     detail.className = 'act-detail'
     detail.textContent = item.detail
+    detail.title = item.detail
 
-    li.append(tool, detail)
+    li.append(mark, tool, detail)
     ul.append(li)
   }
-  return ul
+
+  box.append(sum, ul)
+  return box
 }
 
 function permNode(e) {
@@ -750,34 +1292,35 @@ function permNode(e) {
   box.className = 'perm'
   if (e.resolved) box.dataset.resolved = e.resolved
 
+  const inner = document.createElement('div')
+  inner.className = 'perm-in'
+
+  const head = document.createElement('div')
+  head.className = 'perm-head'
   const tool = document.createElement('p')
   tool.className = 'perm-tool'
-  tool.textContent = e.toolName
-
-  const desc = document.createElement('p')
-  desc.className = 'perm-desc'
-  desc.textContent = e.description
-
-  box.append(tool, desc)
+  tool.textContent = `permissão · ${toolLabel(e.toolName)}`
+  tool.title = e.toolName
+  const target = document.createElement('p')
+  target.className = 'perm-target'
+  target.textContent = e.description
+  head.append(tool, target)
+  inner.append(head)
 
   // O preview do hook mostra a operação inteira (diff, conteúdo, comando);
   // o inputPreview do protocolo é o fallback resumido.
-  if (e.preview) {
+  const preview = e.preview ?? e.inputPreview
+  if (preview) {
     const pre = document.createElement('pre')
-    pre.className = 'perm-preview perm-preview-rich'
-    for (const line of e.preview.split('\n')) {
+    pre.className = 'perm-preview'
+    for (const line of preview.split('\n')) {
       const span = document.createElement('span')
-      if (line.startsWith('+ ')) span.className = 'diff-add'
-      else if (line.startsWith('- ')) span.className = 'diff-del'
+      if (line.startsWith('+ ') || line.startsWith('+')) span.className = 'diff-add'
+      else if (line.startsWith('- ') || line.startsWith('-')) span.className = 'diff-del'
       span.textContent = `${line}\n`
       pre.append(span)
     }
-    box.append(pre)
-  } else if (e.inputPreview) {
-    const pre = document.createElement('pre')
-    pre.className = 'perm-preview'
-    pre.textContent = e.inputPreview
-    box.append(pre)
+    inner.append(pre)
   }
 
   if (e.resolved) {
@@ -785,32 +1328,13 @@ function permNode(e) {
     verdict.className = 'perm-verdict'
     const label = e.resolved === 'allow' ? '✓ permitido' : '✕ negado'
     verdict.textContent = e.auto === true ? `${label} (auto)` : label
-    box.append(verdict)
+    inner.append(verdict)
+    box.append(inner)
     return box
   }
 
-  const actions = document.createElement('div')
-  actions.className = 'perm-actions'
-  for (const [behavior, cls, text] of [
-    ['allow', 'perm-allow', 'permitir'],
-    ['deny', 'perm-deny', 'negar'],
-  ]) {
-    const btn = document.createElement('button')
-    btn.type = 'button'
-    btn.className = cls
-    btn.textContent = text
-    btn.addEventListener('click', () => {
-      const sent = send({
-        type: 'permission_decision',
-        sessionId: currentId,
-        requestId: e.requestId,
-        behavior,
-      })
-      if (sent) actions.querySelectorAll('button').forEach(b => (b.disabled = true))
-    })
-    actions.append(btn)
-  }
-  box.append(actions)
+  inner.append(permButtons(currentId, e.requestId))
+  box.append(inner)
   return box
 }
 
@@ -952,8 +1476,6 @@ function askNode(e) {
     return box
   }
 
-  const actions = document.createElement('div')
-  actions.className = 'ask-actions'
   const sendAnswer = document.createElement('button')
   sendAnswer.type = 'button'
   sendAnswer.className = 'ask-send'
@@ -975,8 +1497,7 @@ function askNode(e) {
     draft.sent = true
     renderFeed()
   })
-  actions.append(sendAnswer)
-  box.append(actions)
+  box.append(sendAnswer)
   return box
 }
 
@@ -991,15 +1512,15 @@ function renderFeed() {
   }
 
   for (const g of group(events)) {
-    if (g.type === 'acts') feed.append(actsNode(g.items))
-    else if (g.type === 'prompt') feed.append(turnNode('você', g.event.text, 'prompt'))
-    else if (g.type === 'reply') feed.append(turnNode('claude', g.event.text, 'reply'))
+    if (g.type === 'acts') feed.append(actsNode(g.key, g.items))
+    else if (g.type === 'prompt') feed.append(turnNode('você', g.event.text, 'prompt', g.event.ts))
+    else if (g.type === 'reply') feed.append(turnNode('claude', g.event.text, 'reply', g.event.ts))
     else if (g.type === 'permission') feed.append(permNode(g.event))
     else if (g.type === 'question') feed.append(askNode(g.event))
   }
 
   for (const o of pending) {
-    const node = turnNode('você · na fila', o.text, 'prompt')
+    const node = turnNode('na fila', o.text, 'prompt', o.ts)
     node.dataset.pending = 'true'
     feed.append(node)
   }
@@ -1008,7 +1529,7 @@ function renderFeed() {
   const alive = Boolean(s?.alive)
   input.disabled = !alive
   sendBtn.disabled = !alive
-  input.placeholder = alive ? 'prompt para esta sessão…' : 'sessão encerrada'
+  input.placeholder = alive ? 'mensagem' : 'sessão encerrada'
 
   if (atBottom) feed.scrollTop = feed.scrollHeight
 }
@@ -1091,22 +1612,6 @@ input.addEventListener('keydown', ev => {
 })
 sendBtn.addEventListener('click', submit)
 
-autoBtn.addEventListener('click', () => {
-  const s = current()
-  if (!s) return
-  const on = !(s.auto === true)
-  if (
-    on &&
-    !confirm(
-      `Ligar o auto para ${s.label}? TODOS os pedidos de permissão desta sessão serão aprovados sem confirmação — inclusive comandos destrutivos.`,
-    )
-  ) {
-    return
-  }
-  // O hub confirma com toast e a lista de sessões volta com o estado novo.
-  if (!send({ type: 'automode', sessionId: s.id, on })) showToast('sem conexão com o hub')
-})
-
 attachBtn.addEventListener('click', () => attachInput.click())
 attachInput.addEventListener('change', () => {
   const file = attachInput.files?.[0]
@@ -1114,49 +1619,16 @@ attachInput.addEventListener('change', () => {
 })
 attachState.addEventListener('click', clearAttach)
 
-changesBtn.addEventListener('click', () => {
-  if (!currentId) return
-  if (send({ type: 'changes', sessionId: currentId })) openSheet('mudanças', 'lendo o repositório…')
-  else showToast('sem conexão com o hub')
-})
-
-terminalBtn.addEventListener('click', () => {
-  const s = current()
-  if (!s || s.cwd === '') {
-    showToast('não sei em que diretório essa sessão roda')
-    return
-  }
-  if (ws?.readyState !== WebSocket.OPEN) {
-    showToast('sem conexão com o hub')
-    return
-  }
-  terminalPanel.open(s.cwd, s.label)
-})
-
 sheetClose.addEventListener('click', closeSheet)
+sheet.addEventListener('click', ev => {
+  if (ev.target === sheet) closeSheet()
+})
+
 document.addEventListener('keydown', ev => {
   if (ev.key !== 'Escape') return
-  if (!sheet.hidden) closeSheet()
+  if (!menu.hidden) closeMenu()
+  else if (!sheet.hidden) closeSheet()
   else terminalPanel.close()
-})
-
-modelBtn.addEventListener('click', ev => {
-  ev.stopPropagation()
-  const s = current()
-  if (!s) return
-  if (modelMenu.hidden) {
-    buildModelMenu(s)
-    modelMenu.hidden = false
-    modelBtn.setAttribute('aria-expanded', 'true')
-  } else {
-    closeModelMenu()
-  }
-})
-
-document.addEventListener('click', ev => {
-  if (!modelMenu.hidden && !modelMenu.contains(ev.target) && ev.target !== modelBtn) {
-    closeModelMenu()
-  }
 })
 
 stopBtn.addEventListener('click', () => {

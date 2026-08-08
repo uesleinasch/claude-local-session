@@ -44,6 +44,8 @@ export type SessionSummary = {
   auto?: boolean
   /** Há permissão ou pergunta esperando resposta humana. */
   waiting?: boolean
+  /** Permissão parada esperando decisão — a lista resolve sem abrir o feed. */
+  pending?: PendingPermission
   /** Instante do último evento do feed — insumo do "ociosa há N min". */
   lastEventAt?: number
   /** Uso da janela de contexto, reportado pelo statusline. */
@@ -55,6 +57,7 @@ export type SessionSummary = {
 
 export type SessionContext = { pct: number; usedTokens?: number; maxTokens?: number }
 export type SessionModel = { id: string; name: string }
+export type PendingPermission = { requestId: string; toolName: string; description: string }
 
 export type ContextPost = {
   sessionId: string
@@ -156,7 +159,7 @@ export type HubToBrowser =
       home?: string
     }
   | { type: 'dir'; path: string; parent: string | null; dirs: { name: string; path: string }[] }
-  | { type: 'changes'; sessionId: string; ok: boolean; text: string }
+  | { type: 'changes'; sessionId: string; ok: boolean; text: string; branch?: string }
   | { type: 'toast'; text: string }
   | { type: 'term_ready'; dir: string; seed: string; cols: number; rows: number }
   | { type: 'term_data'; data: string }

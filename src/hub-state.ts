@@ -5,6 +5,7 @@ import {
   type FeedEvent,
   type HubToBrowser,
   type HubToSession,
+  type PendingPermission,
   type PermissionBehavior,
   type QuestionSpec,
   type SessionSummary,
@@ -27,6 +28,23 @@ export type RegisterInfo = {
 
 /** Janela em que um preview de PreToolUse ainda descreve o pedido de permissão da mesma tool. */
 const PREVIEW_FRESH_MS = 15_000
+
+/** O mais antigo, não o último: é ele que está travando a TUI da sessão. */
+function firstOpenPermission(events: FeedEvent[]): PendingPermission | null {
+  for (const e of events) {
+    if (e.kind !== 'permission' || e.resolved !== undefined) continue
+    return { requestId: e.requestId, toolName: e.toolName, description: e.description }
+  }
+  return null
+}
+
+/** Quem espera você vem primeiro; encerradas afundam. */
+function urgency(s: SessionSummary): number {
+  if (!s.alive) return 3
+  if (s.waiting === true) return 0
+  if (s.busy === true) return 1
+  return 2
+}
 
 export class Registry {
   private readonly sessions = new Map<string, SessionEntry>()
@@ -98,6 +116,7 @@ export class Registry {
     entry.summary.alive = false
     entry.summary.busy = false
     entry.summary.waiting = false
+    delete entry.summary.pending
     entry.summary.endedAt = now
     this.broadcastSessions()
   }
@@ -175,7 +194,15 @@ export class Registry {
       e =>
         (e.kind === 'permission' || e.kind === 'question') && e.resolved === undefined,
     )
-    if ((entry.summary.busy === true) !== wasBusy || entry.summary.waiting !== wasWaiting) {
+    const wasPending = entry.summary.pending?.requestId
+    const pending = firstOpenPermission(entry.events)
+    if (pending) entry.summary.pending = pending
+    else delete entry.summary.pending
+    if (
+      (entry.summary.busy === true) !== wasBusy ||
+      entry.summary.waiting !== wasWaiting ||
+      entry.summary.pending?.requestId !== wasPending
+    ) {
       this.broadcastSessions()
     }
 
@@ -303,9 +330,11 @@ export class Registry {
   summaries(): SessionSummary[] {
     return [...this.sessions.values()]
       .map(e => ({ ...e.summary }))
-      .sort((a, b) =>
-        a.alive === b.alive ? a.label.localeCompare(b.label) : a.alive ? -1 : 1,
-      )
+      .sort((a, b) => {
+        const ua = urgency(a)
+        const ub = urgency(b)
+        return ua === ub ? a.label.localeCompare(b.label) : ua - ub
+      })
   }
 
   hasAlive(): boolean {
