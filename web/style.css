@@ -62,6 +62,17 @@ body {
   margin: 0 auto;
 }
 
+/*
+ * Filho de grid/flex nasce com `min-width: auto` e se recusa a encolher abaixo do
+ * próprio conteúdo: um bloco de código, um caminho longo ou a fila de chips vira
+ * scroll horizontal na página toda em vez de rolar dentro da própria caixa.
+ */
+#app > *,
+#composer > *,
+#composer-row > * {
+  min-width: 0;
+}
+
 /* ---------- janela de contexto ---------- */
 
 #context {
@@ -216,6 +227,7 @@ body {
 #sessions,
 #feed {
   grid-area: body;
+  min-width: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
 }
@@ -437,6 +449,7 @@ body {
   padding: 10px 12px;
   background: var(--bg-raise);
   border: 1px solid var(--rule);
+  min-width: 0;
   overflow-x: auto;
   font-size: var(--step--1);
 }
@@ -516,6 +529,7 @@ body {
 .perm-preview {
   margin: 8px 0 0;
   max-height: 8lh;
+  min-width: 0;
   overflow: auto;
   font-size: var(--step--1);
   white-space: pre-wrap;
@@ -788,7 +802,7 @@ body {
 }
 
 #attach-state {
-  margin: 0 0 8px;
+  margin: 0;
   padding: 6px 10px;
   border: 1px solid var(--rule);
   border-radius: 8px;
@@ -801,9 +815,11 @@ body {
 #quick {
   display: flex;
   gap: 6px;
-  margin-bottom: 8px;
+  min-width: 0;
   overflow-x: auto;
   scrollbar-width: none;
+  scroll-snap-type: x proximity;
+  -webkit-overflow-scrolling: touch;
 }
 
 #quick::-webkit-scrollbar {
@@ -825,6 +841,7 @@ body {
   font: inherit;
   font-size: var(--step--1);
   white-space: nowrap;
+  scroll-snap-align: start;
   cursor: pointer;
 }
 
@@ -836,6 +853,7 @@ body {
 #modelbar {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 #changes {
@@ -873,6 +891,9 @@ body {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
+  max-width: 100ch;
+  margin: 0 auto;
   padding: 12px 16px;
   padding-top: max(12px, env(safe-area-inset-top));
   border-bottom: 1px solid var(--rule);
@@ -880,11 +901,19 @@ body {
 
 #sheet-title {
   flex: 1;
+  min-width: 0;
   margin: 0;
   font-size: var(--step-0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #sheet-close {
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  margin: -10px -12px -10px 0;
   border: 0;
   background: none;
   color: var(--ink-dim);
@@ -895,7 +924,10 @@ body {
 
 #sheet-body {
   flex: 1;
-  margin: 0;
+  width: 100%;
+  min-width: 0;
+  max-width: 100ch;
+  margin: 0 auto;
   padding: 12px 16px calc(16px + env(safe-area-inset-bottom));
   overflow: auto;
   font-size: var(--step--1);
@@ -1039,11 +1071,12 @@ body {
   transform: translateX(-50%);
   margin: 0;
   padding: 8px 14px;
+  max-width: min(90vw, 60ch);
   background: var(--red);
   color: #0b0c0e;
   font-size: var(--step--1);
   font-weight: 700;
-  white-space: nowrap;
+  text-align: center;
 }
 
 #toast {
@@ -1051,9 +1084,6 @@ body {
   background: var(--bg-raise);
   color: var(--ink);
   border: 1px solid var(--rule);
-  max-width: min(90vw, 60ch);
-  white-space: normal;
-  text-align: center;
 }
 
 /* ---------- interromper turno ---------- */
@@ -1236,5 +1266,43 @@ body {
 
   #app[data-view="feed"] #back {
     display: none;
+  }
+}
+
+/*
+ * Sem hover é dedo, não ponteiro: os controles do rodapé sobem para a área de
+ * toque confortável (Fitts) e o rodapé ganha respiro para não virar um campo
+ * minado de botões colados.
+ */
+@media (hover: none) {
+  .quick-chip,
+  #model,
+  #changes {
+    min-height: 40px;
+    padding: 0 14px;
+  }
+
+  #composer {
+    gap: 10px;
+  }
+}
+
+/* Telas muito estreitas: menos moldura, mesma informação. */
+@media (max-width: 380px) {
+  #bar,
+  #composer,
+  #context,
+  .session,
+  #sheet-bar,
+  #sheet-body {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .turn,
+  .acts,
+  .perm,
+  .ask {
+    margin-bottom: 18px;
   }
 }
