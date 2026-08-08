@@ -3,7 +3,9 @@ description: Instala o hub como serviço de usuário do systemd — de pé desde
 allowed-tools: Bash(bun:*)
 ---
 
-Instale (ou reconfirme) o serviço:
+O `/local-session:setup` (e o `install.sh`) já instalam o serviço — este comando existe para
+reconfigurar depois, por exemplo quando a unit ficou apontando para uma versão que saiu do
+cache.
 
 ```
 bun "${CLAUDE_PLUGIN_ROOT}/scripts/service.ts"

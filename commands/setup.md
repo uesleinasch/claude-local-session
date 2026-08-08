@@ -1,5 +1,5 @@
 ---
-description: Configura o canal desta máquina — managed settings, permissão da tool reply e alias
+description: Configura o canal desta máquina — managed settings, permissão da tool reply, alias e serviço
 allowed-tools: Bash(bun:*)
 ---
 
@@ -16,11 +16,16 @@ Escrever em `/etc/claude-code/managed-settings.json` exige privilégio. Como nã
 dentro, o script usa `pkexec` e um diálogo de senha aparece na tela do usuário — avise que isso
 vai acontecer antes de rodar, para o diálogo não surgir sem contexto.
 
+O setup também instala o hub como serviço de usuário do systemd, para ele estar de pé desde
+o boot em vez de esperar a primeira sessão do Claude Code. Passe `--no-service` para pular.
+
 Depois de apresentar o resultado, lembre o usuário de que:
 
 - alterações no `.zshrc` só valem em terminais abertos depois, ou após um `source`;
 - o `managed-settings.json` só é lido quando a sessão do Claude Code inicia, então a
-  configuração nova vale a partir da próxima sessão.
+  configuração nova vale a partir da próxima sessão;
+- se o *linger* não pôde ser ligado sem privilégio, mostre o comando com `sudo` que ficou
+  pendente — sem ele o serviço não sobrevive ao logout.
 
 Se o usuário cancelar o diálogo de senha, o script segue e aplica o resto — diga quais camadas
 ficaram pendentes em vez de tratar como falha total.

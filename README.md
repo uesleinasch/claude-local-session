@@ -266,9 +266,11 @@ caminho. Sem a chave, o hub não notifica nada.
 > conteúdo do seu trabalho. Para algo mais forte, use um servidor ntfy próprio com
 > autenticação.
 
-**Hub de pé desde o boot.** Por padrão o hub sobe junto com a primeira sessão do Claude
-Code — depois de um reboot, a página não responde até alguém abrir um terminal na máquina.
-O comando `/local-session:service` instala uma unit de usuário do systemd que resolve isso:
+**Hub de pé desde o boot.** Sem serviço, o hub só sobe junto com a primeira sessão do
+Claude Code — depois de um reboot, a página fica muda até alguém abrir um terminal na
+máquina. **O instalador já resolve isso**: `install.sh` e `/local-session:setup` instalam a
+unit de usuário do systemd como parte da configuração, sem passo extra (use
+`--no-service` para pular). O comando abaixo existe para reconfigurar depois:
 
 ```
 /local-session:service            # instala, habilita e inicia

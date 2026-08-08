@@ -16,6 +16,7 @@ import {
   type ManagedSettings,
   type PluginIdentity,
 } from '../src/setup-core'
+import { runService } from './service'
 
 const ROOT = process.env.CLAUDE_PLUGIN_ROOT ?? join(import.meta.dir, '..')
 const APPLY = !process.argv.includes('--check')
@@ -133,7 +134,15 @@ if (!alias.changed) {
   did(`alias gravado em ${rcPath}`)
 }
 
-// 4. diagnóstico do hub
+// 4. hub como serviço de usuário: sem isto ele só sobe na primeira sessão do
+// Claude Code, e depois de um reboot a página fica muda até alguém abrir um terminal.
+if (process.argv.includes('--no-service')) {
+  ok('serviço do systemd pulado (--no-service)')
+} else {
+  runService(APPLY ? 'apply' : 'check', ROOT, false)
+}
+
+// 5. diagnóstico do hub
 const cfg = readConfig()
 if (!cfg) {
   ok('hub ainda não iniciado (sobe sozinho na primeira sessão)')

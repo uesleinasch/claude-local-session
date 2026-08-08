@@ -61,11 +61,13 @@ pedido de permissão e decisão allow/deny
   cada 45s segura a conexão, `visibilitychange`/`pageshow`/`online` reconectam na hora, e a
   ausência de `pong` denuncia o socket que voltou do sono como aberto mas morto.
 
-- ~~**systemd user unit para o hub**~~ — feito: `/local-session:service` grava a unit de
-  usuário, habilita, inicia e liga o *linger* (sem ele o serviço de usuário morre com o
-  logout, que é exatamente o caso do reboot sem login). `Restart=on-failure` porque sair de
-  porta ocupada é saída normal, não erro. A unit aponta para um diretório de versão, então
-  `/local-session:update` avisa quando ela fica órfã.
+- ~~**systemd user unit para o hub**~~ — feito: o `setup` (e portanto o `install.sh`) já
+  grava a unit de usuário, habilita, inicia e liga o *linger* — instalar não tem passo
+  extra; `--no-service` pula. `/local-session:service` existe para reconfigurar depois.
+  Sem linger o serviço de usuário morre com o logout, que é exatamente o caso do reboot sem
+  login. `Restart=on-failure` porque sair de porta ocupada é saída normal, não erro. A unit
+  aponta para um diretório de versão, então `/local-session:update` avisa quando ela fica
+  órfã.
 - ~~**`/local-session:update`**~~ — feito: espelha `src/web/hooks/commands` + `plugin.json`
   em todos os diretórios do cache, mata o hub pelo PID vindo do `ss` (nunca por padrão de
   texto — `pkill -f` com o caminho no padrão mata o próprio shell) e espera o novo subir.
