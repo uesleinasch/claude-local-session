@@ -238,17 +238,26 @@ export class Registry {
     this.push(sessionId, { ...found, resolved: behavior, ...(auto ? { auto: true } : {}) })
   }
 
-  /** Broadcast só quando o ponto inteiro muda: o statusline reporta a cada refresh. */
+  /** Broadcast só quando algo visível muda: o statusline reporta a cada refresh. */
   noteContext(post: ContextPost): void {
     const entry = this.sessions.get(post.sessionId)
     if (!entry) return
-    const prev = entry.summary.context
-    entry.summary.context = { pct: post.pct }
-    if (post.usedTokens !== undefined) entry.summary.context.usedTokens = post.usedTokens
-    if (post.maxTokens !== undefined) entry.summary.context.maxTokens = post.maxTokens
-    if (prev === undefined || Math.round(prev.pct) !== Math.round(post.pct)) {
-      this.broadcastSessions()
+    let changed = false
+
+    if (post.pct !== undefined) {
+      const prev = entry.summary.context
+      entry.summary.context = { pct: post.pct }
+      if (post.usedTokens !== undefined) entry.summary.context.usedTokens = post.usedTokens
+      if (post.maxTokens !== undefined) entry.summary.context.maxTokens = post.maxTokens
+      if (prev === undefined || Math.round(prev.pct) !== Math.round(post.pct)) changed = true
     }
+
+    if (post.model !== undefined && entry.summary.model?.id !== post.model.id) {
+      entry.summary.model = post.model
+      changed = true
+    }
+
+    if (changed) this.broadcastSessions()
   }
 
   setAuto(sessionId: string, on: boolean): boolean {

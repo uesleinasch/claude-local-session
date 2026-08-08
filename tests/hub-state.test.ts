@@ -359,6 +359,39 @@ describe('contexto da sessão', () => {
     reg.noteContext({ sessionId: 'fantasma', pct: 50 })
     expect(browser.sent.length).toBe(before)
   })
+
+  test('modelo do statusline aparece na lista', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    const browser = spy()
+    reg.addBrowser(browser)
+
+    reg.noteContext({ sessionId: 's1', model: { id: 'claude-opus-5', name: 'Opus 5' } })
+    expect(browser.sent.at(-1).sessions[0].model).toEqual({ id: 'claude-opus-5', name: 'Opus 5' })
+  })
+
+  test('mudança de modelo rebroadcasta mesmo sem mudar o percentual', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    const browser = spy()
+    reg.addBrowser(browser)
+
+    reg.noteContext({ sessionId: 's1', pct: 30, model: { id: 'claude-fable-5', name: 'Fable 5' } })
+    const count = browser.sent.length
+    // mesmo pct, modelo novo → tem que reemitir
+    reg.noteContext({ sessionId: 's1', pct: 30, model: { id: 'claude-opus-5', name: 'Opus 5' } })
+    expect(browser.sent.length).toBe(count + 1)
+    expect(browser.sent.at(-1).sessions[0].model.name).toBe('Opus 5')
+  })
+
+  test('post sem modelo preserva o modelo já conhecido', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.noteContext({ sessionId: 's1', model: { id: 'claude-fable-5', name: 'Fable 5' } })
+    reg.noteContext({ sessionId: 's1', pct: 42 })
+    expect(reg.summaries()[0]!.model).toEqual({ id: 'claude-fable-5', name: 'Fable 5' })
+    expect(reg.summaries()[0]!.context).toEqual({ pct: 42 })
+  })
 })
 
 describe('pergunta (AskUserQuestion)', () => {

@@ -44,21 +44,55 @@ export type SessionSummary = {
   auto?: boolean
   /** Uso da janela de contexto, reportado pelo statusline. */
   context?: SessionContext
+  /** Modelo ativo, reportado pelo statusline. */
+  model?: SessionModel
   endedAt?: number
 }
 
 export type SessionContext = { pct: number; usedTokens?: number; maxTokens?: number }
+export type SessionModel = { id: string; name: string }
 
-export type ContextPost = SessionContext & { sessionId: string }
+export type ContextPost = {
+  sessionId: string
+  pct?: number
+  usedTokens?: number
+  maxTokens?: number
+  model?: SessionModel
+}
+
+export const MODELS: { alias: string; name: string }[] = [
+  { alias: 'fable', name: 'Fable 5' },
+  { alias: 'opus', name: 'Opus 5' },
+  { alias: 'sonnet', name: 'Sonnet 5' },
+  { alias: 'haiku', name: 'Haiku 4.5' },
+]
+
+export function isModelAlias(v: unknown): boolean {
+  return typeof v === 'string' && MODELS.some(m => m.alias === v)
+}
+
+function parseModel(raw: unknown): SessionModel | undefined {
+  if (typeof raw !== 'object' || raw === null) return undefined
+  const o = raw as Record<string, unknown>
+  if (typeof o.id !== 'string' || o.id === '' || typeof o.name !== 'string' || o.name === '') {
+    return undefined
+  }
+  return { id: o.id.slice(0, 60), name: o.name.slice(0, 40) }
+}
 
 export function parseContextPost(raw: unknown): ContextPost | null {
   if (typeof raw !== 'object' || raw === null) return null
   const o = raw as Record<string, unknown>
   if (typeof o.sessionId !== 'string' || o.sessionId === '') return null
-  if (typeof o.pct !== 'number' || Number.isNaN(o.pct)) return null
-  const post: ContextPost = { sessionId: o.sessionId, pct: Math.min(100, Math.max(0, o.pct)) }
-  if (typeof o.usedTokens === 'number' && o.usedTokens >= 0) post.usedTokens = o.usedTokens
-  if (typeof o.maxTokens === 'number' && o.maxTokens > 0) post.maxTokens = o.maxTokens
+  const post: ContextPost = { sessionId: o.sessionId }
+  if (typeof o.pct === 'number' && !Number.isNaN(o.pct)) {
+    post.pct = Math.min(100, Math.max(0, o.pct))
+    if (typeof o.usedTokens === 'number' && o.usedTokens >= 0) post.usedTokens = o.usedTokens
+    if (typeof o.maxTokens === 'number' && o.maxTokens > 0) post.maxTokens = o.maxTokens
+  }
+  const model = parseModel(o.model)
+  if (model) post.model = model
+  if (post.pct === undefined && post.model === undefined) return null
   return post
 }
 
@@ -88,6 +122,7 @@ export type BrowserToHub =
     }
   | { type: 'answer'; sessionId: string; questionId: string; answers: QuestionAnswer[] }
   | { type: 'automode'; sessionId: string; on: boolean }
+  | { type: 'setmodel'; sessionId: string; model: string }
   | { type: 'spawn'; dir: string }
   | { type: 'interrupt'; sessionId: string }
   | { type: 'kill'; sessionId: string }

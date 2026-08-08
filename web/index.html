@@ -46,16 +46,27 @@
       </main>
 
       <footer id="composer">
-        <label class="sr-only" for="input">Prompt para a sessão</label>
-        <textarea
-          id="input"
-          rows="1"
-          placeholder="prompt para esta sessão…"
-          autocomplete="off"
-          autocapitalize="sentences"
-          enterkeyhint="send"
-        ></textarea>
-        <button id="send" type="button">enviar</button>
+        <div id="modelbar">
+          <div id="model-wrap">
+            <button id="model" type="button" hidden aria-haspopup="menu" aria-expanded="false">
+              <span id="model-name">modelo</span>
+              <span aria-hidden="true">▲</span>
+            </button>
+            <div id="model-menu" role="menu" hidden></div>
+          </div>
+        </div>
+        <div id="composer-row">
+          <label class="sr-only" for="input">Prompt para a sessão</label>
+          <textarea
+            id="input"
+            rows="1"
+            placeholder="prompt para esta sessão…"
+            autocomplete="off"
+            autocapitalize="sentences"
+            enterkeyhint="send"
+          ></textarea>
+          <button id="send" type="button">enviar</button>
+        </div>
       </footer>
 
       <p id="offline" role="status" hidden>sem conexão com o hub — tentando de novo…</p>

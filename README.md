@@ -163,6 +163,12 @@ na lista, cada sessão exibe o percentual. A fonte é o statusline do Claude Cod
 statusline repassa o JSON que já recebe para `hooks/context-report.ts`, que faz um POST
 autenticado ao hub. Sem statusline configurado, a barra simplesmente não aparece.
 
+**Trocar o modelo.** O botão de modelo no rodapé (ao lado de `enviar`) mostra o modelo
+ativo e abre um dropup com Fable 5, Opus 5, Sonnet 5 e Haiku 4.5. Escolher envia
+`/model <alias>` ao pane do tmux; em ~1-2s o statusline reporta o novo modelo e o botão
+se atualiza. Como no terminal, `/model` **também salva o modelo como default das próximas
+sessões** — o dropup avisa isso. Fora do tmux o botão não aparece.
+
 **Auto mode.** O botão `auto` no topo do feed liga a aprovação automática de permissões
 daquela sessão: cada pedido que chegar é aprovado pelo hub na hora e o card entra no feed
 já resolvido como `✓ permitido (auto)` — rastro completo, zero toque. Ligar o auto também

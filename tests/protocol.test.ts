@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { parseActivityPost, parseContextPost } from '../src/protocol'
+import { isModelAlias, MODELS, parseActivityPost, parseContextPost } from '../src/protocol'
 
 const spec = {
   question: 'Qual fruta você prefere?',
@@ -139,6 +139,26 @@ describe('parseActivityPost com pergunta', () => {
       pct: 10,
     })
     expect(parseContextPost(null)).toBeNull()
+  })
+
+  test('parseContextPost aceita post só com modelo (sem pct)', () => {
+    expect(parseContextPost({ sessionId: 's1', model: { id: 'claude-opus-5', name: 'Opus 5' } }))
+      .toEqual({ sessionId: 's1', model: { id: 'claude-opus-5', name: 'Opus 5' } })
+    // sem pct nem modelo não há o que reportar
+    expect(parseContextPost({ sessionId: 's1' })).toBeNull()
+    // modelo malformado é descartado, mas o pct sobrevive
+    expect(parseContextPost({ sessionId: 's1', pct: 5, model: { id: 5 } })).toEqual({
+      sessionId: 's1',
+      pct: 5,
+    })
+  })
+
+  test('isModelAlias reconhece só os aliases suportados', () => {
+    expect(MODELS.map(m => m.alias)).toEqual(['fable', 'opus', 'sonnet', 'haiku'])
+    for (const m of MODELS) expect(isModelAlias(m.alias)).toBe(true)
+    expect(isModelAlias('gpt')).toBe(false)
+    expect(isModelAlias('')).toBe(false)
+    expect(isModelAlias(42)).toBe(false)
   })
 
   test('post sem question continua funcionando como antes', () => {

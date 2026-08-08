@@ -15,28 +15,37 @@ const payload = {
 }
 
 describe('toContextPost', () => {
-  test('extrai sessão, percentual e tokens do payload do statusline', () => {
+  test('extrai sessão, modelo, percentual e tokens do payload do statusline', () => {
     expect(toContextPost(payload)).toEqual({
       sessionId: 'sess-1',
+      model: { id: 'claude-fable-5', name: 'Fable 5' },
       pct: 25.3,
       usedTokens: 253_000,
       maxTokens: 1_000_000,
     })
   })
 
-  test('sem used_percentage (sessão recém-aberta) não há post', () => {
+  test('sem used_percentage (sessão recém-aberta) ainda reporta o modelo', () => {
     const empty = {
       ...payload,
       context_window: { ...payload.context_window, current_usage: null, used_percentage: null },
     }
-    expect(toContextPost(empty)).toBeNull()
+    expect(toContextPost(empty)).toEqual({
+      sessionId: 'sess-1',
+      model: { id: 'claude-fable-5', name: 'Fable 5' },
+    })
   })
 
-  test('sem session_id ou context_window não há post', () => {
+  test('sem session_id não há post', () => {
     expect(toContextPost({ context_window: payload.context_window })).toBeNull()
-    expect(toContextPost({ session_id: 'x' })).toBeNull()
     expect(toContextPost('lixo')).toBeNull()
     expect(toContextPost(null)).toBeNull()
+  })
+
+  test('sem modelo nem contexto útil não há post', () => {
+    expect(toContextPost({ session_id: 'x' })).toBeNull()
+    expect(toContextPost({ session_id: 'x', model: {} })).toBeNull()
+    expect(toContextPost({ session_id: 'x', context_window: {} })).toBeNull()
   })
 
   test('percentual é confinado a 0..100', () => {

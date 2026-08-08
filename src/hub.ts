@@ -9,6 +9,7 @@ import { Registry, type Sink } from './hub-state'
 import {
   IDLE_SHUTDOWN_MS,
   isPermissionBehavior,
+  isModelAlias,
   MAX_QUESTIONS,
   parseActivityPost,
   parseContextPost,
@@ -218,6 +219,19 @@ async function answerQuestion(pid: number, steps: KeyStep[]): Promise<string | n
   return null
 }
 
+// Digita `/model <alias>` no pane e confirma — o mesmo braço remoto do "parar".
+// O Claude Code troca o modelo na hora (e o salva como default de novas sessões).
+async function setSessionModel(pid: number, alias: string): Promise<string | null> {
+  const pane = await findPane(pid)
+  if (pane === 'no-tmux') return 'tmux indisponível para trocar o modelo'
+  if (pane === 'not-found') return 'esta sessão não roda dentro de tmux — troque pelo terminal'
+  const typed = await run('tmux', ['send-keys', '-t', pane.paneId, '-l', '--', `/model ${alias}`])
+  if (!typed.ok) return 'falha ao enviar o comando para o tmux'
+  await Bun.sleep(ANSWER_STEP_DELAY_MS)
+  const sent = await run('tmux', ['send-keys', '-t', pane.paneId, 'Enter'])
+  return sent.ok ? null : 'falha ao confirmar a troca de modelo'
+}
+
 function parseAnswers(raw: unknown): QuestionAnswer[] | null {
   if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_QUESTIONS) return null
   const out: QuestionAnswer[] = []
@@ -421,6 +435,18 @@ function onBrowserMessage(ws: Ws, msg: BrowserToHub): void {
         }
       }
       toast(ws, msg.on ? 'auto ligado — permissões desta sessão serão aprovadas' : 'auto desligado')
+      return
+    }
+    case 'setmodel': {
+      if (typeof msg.sessionId !== 'string' || !isModelAlias(msg.model)) return
+      const s = registry.summaries().find(x => x.id === msg.sessionId)
+      if (!s || !s.alive || s.pid <= 0) {
+        toast(ws, 'sessão sem processo conhecido')
+        return
+      }
+      void setSessionModel(s.pid, msg.model).then(err => {
+        if (err) toast(ws, err)
+      })
       return
     }
     case 'answer': {

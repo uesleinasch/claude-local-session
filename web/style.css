@@ -148,6 +148,14 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   flex: 1;
+  /* sem isto o flex não encolhe o título abaixo do conteúdo e a barra estoura a tela */
+  min-width: 0;
+}
+
+#bar > button,
+#state {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 #back {
@@ -186,6 +194,21 @@ body {
 
 #app[data-view="sessions"] #state {
   display: none;
+}
+
+/* tela estreita: o estado vira só o ponto colorido — a cor já diz tudo */
+@media (max-width: 430px) {
+  #state::before {
+    content: "○";
+  }
+
+  #state[data-alive="true"]::before {
+    content: "○";
+  }
+
+  #state[data-alive="true"][data-busy="true"]::before {
+    content: "●";
+  }
 }
 
 /* ---------- alternância de telas ---------- */
@@ -708,11 +731,101 @@ body {
 #composer {
   grid-area: composer;
   display: flex;
+  flex-direction: column;
   gap: 8px;
-  align-items: flex-end;
   padding: 12px 16px;
   padding-bottom: max(12px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--rule);
+  background: var(--bg);
+}
+
+#composer-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+}
+
+#modelbar {
+  display: flex;
+}
+
+#model-wrap {
+  position: relative;
+}
+
+#model {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--rule);
+  background: none;
+  color: var(--ink-dim);
+  font: inherit;
+  font-size: var(--step--2);
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+#model[hidden] {
+  display: none;
+}
+
+#model-menu {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  min-width: 180px;
+  z-index: 5;
+  background: var(--bg-raise);
+  border: 1px solid var(--rule);
+  box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.5);
+}
+
+#model-menu[hidden] {
+  display: none;
+}
+
+.model-note {
+  margin: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink-dim);
+  font-size: var(--step--2);
+  font-style: italic;
+}
+
+.model-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.model-item[data-on="true"] {
+  color: var(--amber);
+  font-weight: 700;
+}
+
+.model-item[data-on="true"]::before {
+  content: "✓ ";
+}
+
+.model-item:not([data-on="true"])::before {
+  content: "";
+  display: inline-block;
+  width: 1.2em;
+}
+
+.model-item:active {
   background: var(--bg);
 }
 

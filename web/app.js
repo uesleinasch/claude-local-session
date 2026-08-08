@@ -13,6 +13,17 @@ const autoBtn = document.getElementById('automode')
 const ctxBox = document.getElementById('context')
 const ctxFill = document.getElementById('context-fill')
 const ctxPct = document.getElementById('context-pct')
+const modelBtn = document.getElementById('model')
+const modelName = document.getElementById('model-name')
+const modelMenu = document.getElementById('model-menu')
+
+// Espelha protocol.MODELS — display_name do statusline casa com esses nomes.
+const MODELS = [
+  { alias: 'fable', name: 'Fable 5' },
+  { alias: 'opus', name: 'Opus 5' },
+  { alias: 'sonnet', name: 'Sonnet 5' },
+  { alias: 'haiku', name: 'Haiku 4.5' },
+]
 const offline = document.getElementById('offline')
 const toastEl = document.getElementById('toast')
 const spawnBox = document.getElementById('spawn')
@@ -244,9 +255,51 @@ function renderContext(s) {
   ctxBox.title = `janela de contexto: ${ctxPct.textContent}`
 }
 
+function closeModelMenu() {
+  modelMenu.hidden = true
+  modelBtn.setAttribute('aria-expanded', 'false')
+}
+
+function renderModel(s) {
+  const canPick = Boolean(s?.alive) && hubConfig.canInterrupt
+  modelBtn.hidden = app.dataset.view !== 'feed' || !canPick
+  if (modelBtn.hidden) {
+    closeModelMenu()
+    return
+  }
+  modelName.textContent = s.model?.name ?? 'modelo'
+}
+
+function buildModelMenu(s) {
+  modelMenu.replaceChildren()
+  const note = document.createElement('p')
+  note.className = 'model-note'
+  note.textContent = 'também vira o padrão de novas sessões'
+  modelMenu.append(note)
+  for (const m of MODELS) {
+    const item = document.createElement('button')
+    item.type = 'button'
+    item.className = 'model-item'
+    item.setAttribute('role', 'menuitem')
+    item.dataset.on = String(s.model?.name === m.name)
+    item.textContent = m.name
+    item.addEventListener('click', () => {
+      closeModelMenu()
+      if (s.model?.name === m.name) return
+      if (!send({ type: 'setmodel', sessionId: s.id, model: m.alias })) {
+        showToast('sem conexão com o hub')
+      } else {
+        showToast(`trocando para ${m.name}…`)
+      }
+    })
+    modelMenu.append(item)
+  }
+}
+
 function renderBar() {
   const s = current()
   renderContext(s)
+  renderModel(s)
   if (app.dataset.view === 'sessions' || !s) {
     bar.title.textContent = 'sessões'
     bar.state.dataset.alive = 'false'
@@ -808,6 +861,25 @@ autoBtn.addEventListener('click', () => {
   }
   // O hub confirma com toast e a lista de sessões volta com o estado novo.
   if (!send({ type: 'automode', sessionId: s.id, on })) showToast('sem conexão com o hub')
+})
+
+modelBtn.addEventListener('click', ev => {
+  ev.stopPropagation()
+  const s = current()
+  if (!s) return
+  if (modelMenu.hidden) {
+    buildModelMenu(s)
+    modelMenu.hidden = false
+    modelBtn.setAttribute('aria-expanded', 'true')
+  } else {
+    closeModelMenu()
+  }
+})
+
+document.addEventListener('click', ev => {
+  if (!modelMenu.hidden && !modelMenu.contains(ev.target) && ev.target !== modelBtn) {
+    closeModelMenu()
+  }
 })
 
 stopBtn.addEventListener('click', () => {
