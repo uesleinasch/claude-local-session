@@ -44,6 +44,12 @@ pedido de permissão e decisão allow/deny
 
 ## 4. Refinamentos do que já existe
 
+- **`/local-session:update`** — a atualização hoje exige bump de versão (sem ele o
+  `plugin install` mantém o snapshot), reinstalar, e trocar o hub vencendo a corrida
+  contra os respawners das sessões antigas (`hub-client` respawna do próprio root no
+  instante em que a porta vaga). Um comando que faça a dança inteira — e um hub que
+  se auto-encerre ao detectar versão mais nova no cache — eliminam o atrito.
+
 - **Diff real no card de permissão** — hoje o preview de `Edit` mostra os blocos antigo/novo
   prefixados com `-`/`+`; um diff de linhas (LCS) marcaria só o que mudou.
 - **Navegar histórico antigo** — os `.jsonl` de `~/.claude/local-session/history/` ficam em
