@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { loadConfig, readConfig, readCookie, tokenMatches } from '../src/config'
+import { loadConfig, readConfig, readCookie, tailscaleAddress, tokenMatches } from '../src/config'
 
 let dir: string
 
@@ -75,6 +75,35 @@ describe('tokenMatches', () => {
     expect(tokenMatches(token, null)).toBe(false)
     expect(tokenMatches(token, 42)).toBe(false)
     expect(tokenMatches(token, '')).toBe(false)
+  })
+})
+
+describe('tailscaleAddress', () => {
+  const iface = (address: string, family = 'IPv4', internal = false) => ({
+    address,
+    family,
+    internal,
+  })
+
+  test('encontra o IPv4 da faixa CGNAT em qualquer interface', () => {
+    const nets = {
+      wlp0s20f3: [iface('192.168.1.5')],
+      tailscale0: [iface('fe80::1', 'IPv6'), iface('100.113.47.75')],
+    }
+    expect(tailscaleAddress(nets)).toBe('100.113.47.75')
+  })
+
+  test('ignora 100.x fora da faixa CGNAT e interfaces internas', () => {
+    const nets = {
+      eth0: [iface('100.30.0.1')],
+      lo: [iface('100.64.0.9', 'IPv4', true)],
+    }
+    expect(tailscaleAddress(nets)).toBeNull()
+  })
+
+  test('devolve null sem tailnet', () => {
+    expect(tailscaleAddress({ eth0: [iface('192.168.1.5')] })).toBeNull()
+    expect(tailscaleAddress({})).toBeNull()
   })
 })
 

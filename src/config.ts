@@ -1,11 +1,11 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { createSocket } from 'node:dgram'
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { homedir, networkInterfaces } from 'node:os'
 import { join } from 'node:path'
 import { DEFAULT_PORT } from './protocol'
 
-export type Config = { token: string; port: number }
+export type Config = { token: string; port: number; projects?: string[] }
 
 export function configDir(): string {
   return process.env.LOCAL_SESSION_DIR ?? join(homedir(), '.claude', 'local-session')
@@ -72,6 +72,31 @@ export function readCookie(header: string | null, name: string): string | null {
     const eq = part.indexOf('=')
     if (eq === -1) continue
     if (part.slice(0, eq).trim() === name) return part.slice(eq + 1).trim()
+  }
+  return null
+}
+
+type Iface = { family: string; address: string; internal: boolean }
+
+/** 100.64.0.0/10 (CGNAT) — a faixa que o Tailscale usa nas tailnets. */
+function isCgnat(address: string): boolean {
+  const [a, b] = address.split('.').map(Number)
+  return a === 100 && b !== undefined && b >= 64 && b <= 127
+}
+
+/**
+ * IPv4 da tailnet, se houver. Identifica pela faixa CGNAT em vez do nome da
+ * interface, que varia por plataforma (tailscale0 no Linux, utun no macOS).
+ */
+export function tailscaleAddress(
+  nets: Record<string, Iface[] | undefined> = networkInterfaces(),
+): string | null {
+  for (const addrs of Object.values(nets)) {
+    for (const iface of addrs ?? []) {
+      if (iface.family === 'IPv4' && !iface.internal && isCgnat(iface.address)) {
+        return iface.address
+      }
+    }
   }
   return null
 }

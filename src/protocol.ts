@@ -18,6 +18,7 @@ export type FeedEvent =
       toolName: string
       description: string
       inputPreview: string
+      preview?: string
       resolved?: PermissionBehavior
     }
 
@@ -54,17 +55,22 @@ export type BrowserToHub =
       requestId: string
       behavior: PermissionBehavior
     }
+  | { type: 'spawn'; dir: string }
+  | { type: 'interrupt'; sessionId: string }
 
 export type HubToBrowser =
   | { type: 'sessions'; sessions: SessionSummary[] }
   | { type: 'history'; sessionId: string; events: FeedEvent[] }
   | { type: 'event'; sessionId: string; event: FeedEvent }
+  | { type: 'config'; projects: string[]; canSpawn: boolean; canInterrupt: boolean }
+  | { type: 'toast'; text: string }
 
 export type ActivityPost = {
   sessionId: string
   tool: string
   detail: string
   status: ActivityStatus
+  preview?: string
 }
 
 export function isPermissionBehavior(v: unknown): v is PermissionBehavior {
@@ -75,15 +81,21 @@ export function isActivityStatus(v: unknown): v is ActivityStatus {
   return v === 'start' || v === 'end' || v === 'idle'
 }
 
+export const MAX_PREVIEW = 4_000
+
 export function parseActivityPost(raw: unknown): ActivityPost | null {
   if (typeof raw !== 'object' || raw === null) return null
   const o = raw as Record<string, unknown>
   if (typeof o.sessionId !== 'string' || o.sessionId === '') return null
   if (!isActivityStatus(o.status)) return null
-  return {
+  const post: ActivityPost = {
     sessionId: o.sessionId,
     tool: typeof o.tool === 'string' ? o.tool : '',
     detail: typeof o.detail === 'string' ? o.detail : '',
     status: o.status,
   }
+  if (typeof o.preview === 'string' && o.preview !== '') {
+    post.preview = o.preview.slice(0, MAX_PREVIEW)
+  }
+  return post
 }

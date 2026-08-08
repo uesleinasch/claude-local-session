@@ -12,7 +12,13 @@ describe('toActivityPost', () => {
         tool_name: 'Bash',
         tool_input: { command: 'npm test' },
       }),
-    ).toEqual({ sessionId: 'sess-1', tool: 'Bash', detail: 'npm test', status: 'start' })
+    ).toEqual({
+      sessionId: 'sess-1',
+      tool: 'Bash',
+      detail: 'npm test',
+      status: 'start',
+      preview: 'npm test',
+    })
   })
 
   test('PostToolUse vira status end', () => {
@@ -98,5 +104,72 @@ describe('toActivityPost', () => {
   test('descarta entrada que não é objeto', () => {
     expect(toActivityPost('Stop')).toBeNull()
     expect(toActivityPost(null)).toBeNull()
+  })
+})
+
+describe('preview para o card de permissão', () => {
+  test('Bash leva o comando completo, além do detail truncado', () => {
+    const command = `echo ${'x'.repeat(200)}`
+    const post = toActivityPost({
+      ...base,
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Bash',
+      tool_input: { command },
+    })
+    expect(post?.preview).toBe(command)
+    expect(post?.detail.length).toBeLessThan(command.length)
+  })
+
+  test('Edit vira diff com arquivo, linhas antigas e novas', () => {
+    const post = toActivityPost({
+      ...base,
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Edit',
+      tool_input: {
+        file_path: '/home/u/proj/src/auth.ts',
+        old_string: 'const a = 1',
+        new_string: 'const a = 2',
+      },
+    })
+    expect(post?.preview).toBe('/home/u/proj/src/auth.ts\n- const a = 1\n+ const a = 2')
+  })
+
+  test('Write mostra o caminho e o conteúdo prefixado', () => {
+    const post = toActivityPost({
+      ...base,
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Write',
+      tool_input: { file_path: '/tmp/x.txt', content: 'linha 1\nlinha 2' },
+    })
+    expect(post?.preview).toBe('/tmp/x.txt\n+ linha 1\n+ linha 2')
+  })
+
+  test('conteúdo gigante é limitado com marcador de corte', () => {
+    const post = toActivityPost({
+      ...base,
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Write',
+      tool_input: { file_path: '/tmp/x.txt', content: 'y'.repeat(5_000) },
+    })
+    expect(post!.preview!.length).toBeLessThan(2_000)
+    expect(post!.preview!.endsWith('…')).toBe(true)
+  })
+
+  test('PostToolUse e tools sem preview não carregam o campo', () => {
+    const end = toActivityPost({
+      ...base,
+      hook_event_name: 'PostToolUse',
+      tool_name: 'Bash',
+      tool_input: { command: 'npm test' },
+    })
+    expect(end?.preview).toBeUndefined()
+
+    const read = toActivityPost({
+      ...base,
+      hook_event_name: 'PreToolUse',
+      tool_name: 'Read',
+      tool_input: { file_path: '/etc/hosts' },
+    })
+    expect(read?.preview).toBeUndefined()
   })
 })

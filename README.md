@@ -126,17 +126,58 @@ http://192.168.0.42:7777/?t=<token>
 Salve esse link no celular. Na primeira visita o hub devolve um cookie, então as visitas
 seguintes dispensam o token na URL.
 
+Se a máquina estiver numa tailnet ([Tailscale](https://tailscale.com)), a tool `link` também
+devolve o endereço `100.x.y.z` — com o app logado no celular, a página funciona de qualquer
+lugar (4G, outra rede), sem expor a porta 7777 à internet. É também a saída quando a própria
+LAN bloqueia tráfego entre clientes (firewall de endpoint corporativo, isolamento de mesh).
+
 ## Uso
 
 A página abre na lista de sessões vivas, cada uma rotulada pelo diretório do projeto. Ao
 entrar numa delas você vê:
 
-- **você / claude** — o que foi mandado e o que o Claude respondeu pela tool `reply`.
+- **você / claude** — o que foi mandado e o que o Claude respondeu pela tool `reply`,
+  renderizada como markdown (código, listas, links).
 - **régua de atividade** — a ferramenta e o alvo de cada passo, com `…` enquanto roda.
-- **card de permissão** — em fundo âmbar, com `permitir` e `negar`.
+- **card de permissão** — em fundo âmbar, com `permitir` e `negar`. Para `Edit`, `Write` e
+  `Bash` o card mostra a operação inteira: diff colorido, conteúdo do arquivo ou comando
+  completo, capturados pelo hook `PreToolUse`.
 
 O que o Claude escreve no terminal **não** chega na página: só o texto passado para `reply`.
 Isso é do protocolo de canal, e as instruções do MCP server já orientam o Claude a usá-lo.
+
+Prompt escrito sem conexão não se perde: entra numa fila local ("na fila", no feed) e é
+entregue quando a página reconecta. O histórico de cada sessão também sobrevive a restarts
+do hub — fica em `~/.claude/local-session/history/`, um `.jsonl` por sessão, e as sessões
+das últimas 48h reaparecem na lista após um reboot.
+
+## Trabalhar de longe
+
+Dois recursos dependem do `tmux` estar instalado:
+
+**Nova sessão pelo celular.** Declare os projetos permitidos em
+`~/.claude/local-session/config.json`:
+
+```json
+{
+  "token": "…",
+  "port": 7777,
+  "projects": ["/home/voce/repos/meu-projeto"]
+}
+```
+
+Reinicie o hub (ele morre sozinho 60s depois da última sessão sair, ou `pkill -f src/hub.ts`)
+e a lista de sessões ganha a seção **nova sessão**, com um botão por projeto. O hub roda
+`tmux new-session -d claude --channels …` no diretório escolhido — a sessão nasce dentro de
+um tmux seu, sobrevive ao hub e ao navegador, e você pode anexá-la depois no terminal com
+`tmux attach`. A allowlist é comparada por igualdade exata: o navegador nunca envia um
+caminho arbitrário. Sem `projects`, o recurso fica desligado.
+
+**Interromper o turno.** O botão `■ parar` no topo do feed envia `Escape` para o pane do
+tmux onde a sessão roda — o mesmo gesto que interromperia no terminal. Funciona para
+qualquer sessão dentro de tmux (não só as spawnadas pela página); para sessões fora de
+tmux o hub avisa que não há como interromper. O protocolo de canal do Claude Code não tem
+interrupção nativa (ver `ROADMAP.md`).
 
 ## Segurança
 
@@ -199,6 +240,9 @@ responder `200` da própria máquina.
 | `LOCAL_SESSION_DIR`   | Onde fica o `config.json` (padrão `~/.claude/local-session`) |
 | `LOCAL_SESSION_PORT`  | Porta do hub, sobrepondo a do arquivo (padrão 7777) |
 
+No `config.json`, além de `token` e `port`, a chave opcional `projects` (lista de caminhos
+absolutos) habilita a criação de sessões pela página — ver "Trabalhar de longe".
+
 ## Desenvolvimento
 
 ```
@@ -217,7 +261,8 @@ Estrutura:
 | `src/hub-state.ts`  | Registro de sessões e feed (sem I/O, testável)    |
 | `src/hub-client.ts` | Cliente WebSocket com backoff e spawn do daemon   |
 | `src/config.ts`     | Token, porta, IP da rota default                  |
-| `src/hook-event.ts` | Payload de hook → evento de atividade             |
+| `src/history.ts`    | Histórico em JSONL — persistência e hidratação    |
+| `src/hook-event.ts` | Payload de hook → evento de atividade + preview   |
 | `hooks/report.ts`   | Hook: lê stdin, faz POST, falha em silêncio       |
 | `web/`              | UI estática, sem framework nem build              |
 | `src/setup-core.ts` | Merges de configuração, sem I/O (testável)        |

@@ -1,0 +1,54 @@
+# Roadmap
+
+O que já existe cobre acompanhar, decidir com contexto e trabalhar de longe dentro da LAN
+(markdown, diff no card de permissão, histórico persistente, fila offline, nova sessão e
+interrupção via tmux). Este documento lista o que vem depois, em ordem de impacto.
+
+## 1. Sair da LAN
+
+- ~~**Tailscale na tool `link`**~~ — feito: a tool detecta o IPv4 da faixa CGNAT
+  (100.64/10) e oferece o endereço da tailnet junto com o da LAN. Acessa de qualquer
+  lugar sem expor a porta 7777 à internet; resolve inclusive LAN com bloqueio de
+  tráfego entre clientes (firewall de endpoint, isolamento de mesh).
+- **HTTPS opcional** — hoje o token viaja em texto claro; aceitável dentro de uma VPN,
+  não fora dela. Certificado autoassinado ou o TLS do próprio Tailscale (`tailscale cert`).
+  HTTPS também é pré-requisito de Web Push e de PWA instalável em iOS.
+
+## 2. Ser avisado em vez de vigiar
+
+- **Push via ntfy.sh / Gotify** — melhor relação custo/impacto: o hub faz um POST quando
+  surge pedido de permissão, quando a sessão fica ociosa (tarefa terminou) e quando chega
+  `reply`. Config: `notifyUrl` no `config.json`. Sem dependências novas no hub.
+- **Web Push nativo** — sem app de terceiros, mas exige HTTPS + service worker + VAPID.
+  Depois do item 1.
+- **PWA** — manifest + service worker: ícone na home do celular, tela cheia. Pré-requisito
+  do Web Push.
+- **Badges na lista de sessões** — "aguardando permissão", "ociosa há N min", última
+  atividade. O hub já tem os dados; falta expor no `SessionSummary` e renderizar.
+
+## 3. Limitações do protocolo de canal (verificado em 2026-08-07)
+
+O protocolo experimental documenta apenas prompt-in (`notifications/claude/channel`),
+pedido de permissão e decisão allow/deny
+([channels-reference](https://code.claude.com/docs/en/channels-reference)). Não existe hoje:
+
+- **Interrupção de turno via canal** — não documentado. Por isso o botão "parar" usa
+  `tmux send-keys Escape` no pane da sessão; funciona para qualquer sessão dentro de tmux
+  e para as spawnadas pela página. Se o protocolo ganhar um método nativo, migrar.
+- **AskUserQuestion via canal** — perguntas de múltipla escolha não chegam ao canal; a
+  sessão fica parada esperando o terminal. Reavaliar a cada release do Claude Code.
+- **Sessão interativa sem TTY** — `claude --channels` headless morre com erro de stdin
+  (issues [#30447](https://github.com/anthropics/claude-code/issues/30447) e
+  [#40726](https://github.com/anthropics/claude-code/issues/40726)); tmux é a solução
+  prática e é o que o spawn remoto usa.
+
+## 4. Refinamentos do que já existe
+
+- **Diff real no card de permissão** — hoje o preview de `Edit` mostra os blocos antigo/novo
+  prefixados com `-`/`+`; um diff de linhas (LCS) marcaria só o que mudou.
+- **Navegar histórico antigo** — os `.jsonl` de `~/.claude/local-session/history/` ficam em
+  disco, mas o hub só hidrata os das últimas 48h; falta UI para abrir sessões mais antigas.
+- **Render incremental do feed** — `renderFeed()` reconstrói o DOM a cada evento dentro de
+  um `aria-live`; leitores de tela reanunciam o feed inteiro.
+- **Limite de tamanho de mensagem no hub** — um portador do token pode mandar payloads
+  grandes; hoje coberto pelo modelo de ameaça (token = confiança total), mas vale um teto.

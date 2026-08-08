@@ -7,7 +7,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js'
 import { basename, join } from 'node:path'
 import { z } from 'zod'
-import { lanAddress, loadConfig } from './config'
+import { lanAddress, loadConfig, tailscaleAddress } from './config'
 import { HubClient } from './hub-client'
 import type { HubToSession } from './protocol'
 
@@ -143,14 +143,20 @@ mcp.setRequestHandler(CallToolRequestSchema, async req => {
       }
       case 'link': {
         const host = await lanAddress()
-        return {
-          content: [
-            {
-              type: 'text',
-              text: `http://${host}:${cfg.port}/?t=${cfg.token}\n\nAbre na rede local. Sessão: ${basename(CWD) || SESSION_ID}`,
-            },
-          ],
-        }
+        const tailnet = tailscaleAddress()
+        const lines = [
+          `Rede local: http://${host}:${cfg.port}/?t=${cfg.token}`,
+          ...(tailnet
+            ? [
+                '',
+                `Tailscale (funciona de qualquer lugar, com o app logado no celular):`,
+                `http://${tailnet}:${cfg.port}/?t=${cfg.token}`,
+              ]
+            : []),
+          '',
+          `Sessão: ${basename(CWD) || SESSION_ID}`,
+        ]
+        return { content: [{ type: 'text', text: lines.join('\n') }] }
       }
       default:
         return {

@@ -1,18 +1,48 @@
 import type { Server, ServerWebSocket } from 'bun'
-import { join } from 'node:path'
-import { loadConfig, readCookie, tokenMatches } from './config'
+import { execFile } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { basename, join } from 'node:path'
+import { configDir, loadConfig, readCookie, tokenMatches } from './config'
+import { HistoryStore } from './history'
 import { Registry, type Sink } from './hub-state'
 import {
   IDLE_SHUTDOWN_MS,
   isPermissionBehavior,
   parseActivityPost,
   type BrowserToHub,
+  type HubToBrowser,
   type SessionToHub,
 } from './protocol'
+import { detectPluginIdentity, type PluginIdentity } from './setup-core'
 
 const cfg = loadConfig()
-const registry = new Registry()
-const WEB_DIR = join(import.meta.dir, '..', 'web')
+const ROOT = join(import.meta.dir, '..')
+const WEB_DIR = join(ROOT, 'web')
+
+const store = new HistoryStore(join(configDir(), 'history'))
+const registry = new Registry((sessionId, event) => store.appendEvent(sessionId, event))
+for (const { info, events, endedAt } of store.loadRecent()) {
+  registry.hydrateSession(info, events, endedAt)
+}
+
+function pluginIdentity(root: string): PluginIdentity | null {
+  const fromPath = detectPluginIdentity(root)
+  if (fromPath) return fromPath
+  try {
+    const mkt = JSON.parse(readFileSync(join(root, '.claude-plugin/marketplace.json'), 'utf8'))
+    const plg = JSON.parse(readFileSync(join(root, '.claude-plugin/plugin.json'), 'utf8'))
+    if (typeof mkt?.name === 'string' && typeof plg?.name === 'string') {
+      return { plugin: plg.name, marketplace: mkt.name }
+    }
+  } catch {}
+  return null
+}
+
+const PROJECTS = (cfg.projects ?? []).filter(p => typeof p === 'string' && p.startsWith('/'))
+const IDENTITY = pluginIdentity(ROOT)
+const HAS_TMUX = Bun.which('tmux') !== null
+const CAN_SPAWN = HAS_TMUX && Bun.which('claude') !== null && IDENTITY !== null && PROJECTS.length > 0
+const CAN_INTERRUPT = HAS_TMUX
 
 type WsData = { role: 'session' | 'browser' }
 type Ws = ServerWebSocket<WsData>
@@ -20,7 +50,73 @@ type Ws = ServerWebSocket<WsData>
 const STATIC: Record<string, { file: string; type: string }> = {
   '/': { file: 'index.html', type: 'text/html; charset=utf-8' },
   '/app.js': { file: 'app.js', type: 'text/javascript; charset=utf-8' },
+  '/markdown.js': { file: 'markdown.js', type: 'text/javascript; charset=utf-8' },
   '/style.css': { file: 'style.css', type: 'text/css; charset=utf-8' },
+}
+
+function toast(ws: Ws, text: string): void {
+  try {
+    ws.send(JSON.stringify({ type: 'toast', text } satisfies HubToBrowser))
+  } catch {}
+}
+
+function run(cmd: string, args: string[]): Promise<{ ok: boolean; out: string }> {
+  return new Promise(resolve => {
+    execFile(cmd, args, (err, stdout, stderr) =>
+      resolve({ ok: !err, out: `${stdout}${stderr}`.trim() }),
+    )
+  })
+}
+
+// O claude é um app de TTY: sem terminal não há sessão interativa. O tmux dá o
+// TTY e a sobrevivência — a sessão continua viva se o hub ou o navegador caírem.
+async function spawnSession(dir: string): Promise<string | null> {
+  if (!IDENTITY) return 'identidade do plugin desconhecida'
+  const name = `ls-${basename(dir).replace(/[^\w-]/g, '_')}-${Date.now().toString(36)}`
+  const res = await run('tmux', [
+    'new-session',
+    '-d',
+    '-s',
+    name,
+    '-c',
+    dir,
+    'claude',
+    '--channels',
+    `plugin:${IDENTITY.plugin}@${IDENTITY.marketplace}`,
+  ])
+  return res.ok ? null : `tmux falhou: ${res.out}`
+}
+
+function ancestorsOf(pid: number): Set<number> {
+  const out = new Set<number>()
+  let cur = pid
+  for (let i = 0; i < 25 && cur > 1; i++) {
+    out.add(cur)
+    try {
+      // /proc/<pid>/stat: o ppid é o campo 4, contado após o ")" que fecha o comm.
+      const stat = readFileSync(`/proc/${cur}/stat`, 'utf8')
+      cur = Number(stat.slice(stat.lastIndexOf(')') + 2).split(' ')[1])
+    } catch {
+      break
+    }
+  }
+  return out
+}
+
+// Escape no pane onde o claude roda = o mesmo gesto que interrompe no terminal.
+// Vale para qualquer sessão dentro de tmux, não só as spawnadas por aqui.
+async function interruptSession(pid: number): Promise<string | null> {
+  const panes = await run('tmux', ['list-panes', '-a', '-F', '#{pane_pid} #{pane_id}'])
+  if (!panes.ok) return 'tmux indisponível para interromper'
+  const chain = ancestorsOf(pid)
+  for (const line of panes.out.split('\n')) {
+    const [panePid, paneId] = line.split(' ')
+    if (panePid && paneId && chain.has(Number(panePid))) {
+      const sent = await run('tmux', ['send-keys', '-t', paneId, 'Escape'])
+      return sent.ok ? null : 'falha ao enviar Escape para o tmux'
+    }
+  }
+  return 'esta sessão não roda dentro de tmux — interrupção indisponível'
 }
 
 // 404 em vez de 401: uma resposta de "não autorizado" confirmaria que o serviço existe.
@@ -46,6 +142,11 @@ async function handleActivity(req: Request): Promise<Response> {
   }
   const post = parseActivityPost(body)
   if (!post) return new Response('bad request', { status: 400 })
+  // O preview não entra na régua de atividade — ele existe para enriquecer o
+  // card de permissão da mesma tool, que chega pelo WebSocket da sessão.
+  if (post.status === 'start' && post.preview !== undefined) {
+    registry.notePreview(post.sessionId, post.tool, post.preview)
+  }
   registry.push(post.sessionId, {
     kind: 'activity',
     ts: Date.now(),
@@ -60,12 +161,14 @@ function onSessionMessage(ws: Ws, msg: SessionToHub): void {
   switch (msg.type) {
     case 'register': {
       if (typeof msg.sessionId !== 'string' || msg.sessionId === '') return
-      registry.registerSession(ws as Sink, {
+      const info = {
         sessionId: msg.sessionId,
         cwd: String(msg.cwd ?? ''),
         label: String(msg.label ?? msg.sessionId),
         pid: Number(msg.pid ?? 0),
-      })
+      }
+      registry.registerSession(ws as Sink, info)
+      store.appendMeta(info)
       return
     }
     case 'reply': {
@@ -116,6 +219,31 @@ function onBrowserMessage(ws: Ws, msg: BrowserToHub): void {
       registry.resolvePermission(msg.sessionId, msg.requestId, msg.behavior)
       return
     }
+    case 'spawn': {
+      if (typeof msg.dir !== 'string') return
+      // Allowlist por igualdade exata: o browser escolhe entre os projetos
+      // declarados em config.json, nunca envia um caminho arbitrário.
+      if (!CAN_SPAWN || !PROJECTS.includes(msg.dir)) {
+        toast(ws, 'diretório não autorizado para nova sessão')
+        return
+      }
+      void spawnSession(msg.dir).then(err => {
+        if (err) toast(ws, err)
+      })
+      return
+    }
+    case 'interrupt': {
+      if (typeof msg.sessionId !== 'string') return
+      const s = registry.summaries().find(x => x.id === msg.sessionId)
+      if (!s || !s.alive || s.pid <= 0) {
+        toast(ws, 'sessão sem processo conhecido')
+        return
+      }
+      void interruptSession(s.pid).then(err => {
+        if (err) toast(ws, err)
+      })
+      return
+    }
   }
 }
 
@@ -151,7 +279,19 @@ try {
 
     websocket: {
       open(ws: Ws) {
-        if (ws.data.role === 'browser') registry.addBrowser(ws as Sink)
+        if (ws.data.role === 'browser') {
+          registry.addBrowser(ws as Sink)
+          try {
+            ws.send(
+              JSON.stringify({
+                type: 'config',
+                projects: PROJECTS,
+                canSpawn: CAN_SPAWN,
+                canInterrupt: CAN_INTERRUPT,
+              } satisfies HubToBrowser),
+            )
+          } catch {}
+        }
       },
       message(ws: Ws, raw) {
         let msg: unknown

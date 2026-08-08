@@ -229,6 +229,74 @@ body {
   overflow-wrap: anywhere;
 }
 
+.turn[data-pending] {
+  opacity: 0.55;
+}
+
+.turn[data-pending] .who::after {
+  content: " ⏳";
+}
+
+/* ---------- markdown das respostas ---------- */
+
+.turn[data-kind="reply"] .text {
+  white-space: normal;
+}
+
+.text .md-p,
+.text .md-h,
+.text ul,
+.text ol {
+  margin: 0 0 12px;
+}
+
+.text > :last-child {
+  margin-bottom: 0;
+}
+
+.text .md-h {
+  font-weight: 700;
+}
+
+.text .md-h1 {
+  font-size: 1.1em;
+}
+
+.text ul,
+.text ol {
+  padding-left: 20px;
+}
+
+.text li {
+  margin: 2px 0;
+}
+
+.text code {
+  padding: 1px 5px;
+  background: var(--bg-raise);
+  border: 1px solid var(--rule);
+  font-size: 0.92em;
+}
+
+.text .md-code {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  background: var(--bg-raise);
+  border: 1px solid var(--rule);
+  overflow-x: auto;
+  font-size: var(--step--1);
+}
+
+.text .md-code code {
+  padding: 0;
+  background: none;
+  border: 0;
+}
+
+.text a {
+  color: var(--amber);
+}
+
 /* atividade — a régua vertical liga os passos de um mesmo bloco */
 .acts {
   margin: 0 0 24px;
@@ -299,6 +367,23 @@ body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
   opacity: 0.75;
+}
+
+/* preview rico (diff/conteúdo vindo do hook) merece mais altura e contraste */
+.perm-preview-rich {
+  max-height: 16lh;
+  padding: 8px 10px;
+  background: #0b0c0e;
+  color: var(--ink);
+  opacity: 1;
+}
+
+.diff-add {
+  color: var(--green);
+}
+
+.diff-del {
+  color: var(--red);
 }
 
 .perm-actions {
@@ -406,7 +491,8 @@ body {
   cursor: not-allowed;
 }
 
-#offline {
+#offline,
+#toast {
   position: fixed;
   left: 50%;
   bottom: calc(88px + env(safe-area-inset-bottom));
@@ -418,6 +504,76 @@ body {
   font-size: var(--step--1);
   font-weight: 700;
   white-space: nowrap;
+}
+
+#toast {
+  bottom: calc(132px + env(safe-area-inset-bottom));
+  background: var(--bg-raise);
+  color: var(--ink);
+  border: 1px solid var(--rule);
+  max-width: min(90vw, 60ch);
+  white-space: normal;
+  text-align: center;
+}
+
+/* ---------- interromper turno ---------- */
+
+#stop {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--red);
+  background: none;
+  color: var(--red);
+  font: inherit;
+  font-size: var(--step--2);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* ---------- nova sessão ---------- */
+
+#spawn {
+  border-top: 1px solid var(--rule);
+  margin-top: 16px;
+}
+
+.spawn-title {
+  margin: 0;
+  padding: 14px 16px 6px;
+  color: var(--ink-dim);
+  font-size: var(--step--2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#spawn-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.spawn-btn {
+  display: block;
+  width: 100%;
+  padding: 12px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--rule);
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.spawn-btn:hover {
+  background: var(--bg-raise);
+}
+
+.spawn-btn .session-name::before {
+  content: "+";
+  color: var(--amber);
 }
 
 @media (prefers-reduced-motion: reduce) {

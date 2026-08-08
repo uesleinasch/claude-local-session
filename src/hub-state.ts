@@ -23,10 +23,16 @@ export type RegisterInfo = {
   pid: number
 }
 
+/** Janela em que um preview de PreToolUse ainda descreve o pedido de permissão da mesma tool. */
+const PREVIEW_FRESH_MS = 15_000
+
 export class Registry {
   private readonly sessions = new Map<string, SessionEntry>()
   private readonly browsers = new Map<Sink, string | null>()
   private readonly sinkToSession = new Map<Sink, string>()
+  private readonly previews = new Map<string, { tool: string; preview: string; ts: number }>()
+
+  constructor(private readonly onEvent?: (sessionId: string, event: FeedEvent) => void) {}
 
   addBrowser(sink: Sink): void {
     this.browsers.set(sink, null)
@@ -61,6 +67,23 @@ export class Registry {
     this.broadcastSessions()
   }
 
+  /** Repovoa uma sessão persistida no boot do hub, já encerrada e sem sink. */
+  hydrateSession(info: RegisterInfo, events: FeedEvent[], endedAt: number): void {
+    if (this.sessions.has(info.sessionId)) return
+    this.sessions.set(info.sessionId, {
+      summary: {
+        id: info.sessionId,
+        label: info.label,
+        cwd: info.cwd,
+        pid: info.pid,
+        alive: false,
+        endedAt,
+      },
+      sink: null,
+      events: events.slice(-MAX_EVENTS),
+    })
+  }
+
   removeSession(sink: Sink, now = Date.now()): void {
     const sessionId = this.sinkToSession.get(sink)
     if (sessionId === undefined) return
@@ -84,11 +107,20 @@ export class Registry {
     if (!entry) return
 
     if (event.kind === 'permission') {
+      const requestId = event.requestId
+      if (event.preview === undefined && event.resolved === undefined) {
+        const p = this.previews.get(sessionId)
+        if (p && p.tool === event.toolName && event.ts - p.ts < PREVIEW_FRESH_MS) {
+          event = { ...event, preview: p.preview }
+          this.previews.delete(sessionId)
+        }
+      }
       const at = entry.events.findIndex(
-        e => e.kind === 'permission' && e.requestId === event.requestId,
+        e => e.kind === 'permission' && e.requestId === requestId,
       )
       if (at !== -1) {
         entry.events[at] = event
+        this.onEvent?.(sessionId, event)
         this.broadcastEvent(sessionId, event)
         return
       }
@@ -96,7 +128,33 @@ export class Registry {
 
     entry.events.push(event)
     if (entry.events.length > MAX_EVENTS) entry.events.splice(0, entry.events.length - MAX_EVENTS)
+    this.onEvent?.(sessionId, event)
     this.broadcastEvent(sessionId, event)
+  }
+
+  /**
+   * O hook PreToolUse chega por HTTP e o pedido de permissão pelo WebSocket da
+   * sessão — a ordem não é garantida. Guarda o preview para o pedido que vier,
+   * e completa retroativamente o card que chegou primeiro.
+   */
+  notePreview(sessionId: string, tool: string, preview: string, ts = Date.now()): void {
+    if (tool === '' || preview === '') return
+    this.previews.set(sessionId, { tool, preview, ts })
+
+    const entry = this.sessions.get(sessionId)
+    if (!entry) return
+    const last = [...entry.events]
+      .reverse()
+      .find(e => e.kind === 'permission' && e.resolved === undefined)
+    if (
+      last?.kind === 'permission' &&
+      last.toolName === tool &&
+      last.preview === undefined &&
+      ts - last.ts < PREVIEW_FRESH_MS
+    ) {
+      this.previews.delete(sessionId)
+      this.push(sessionId, { ...last, preview })
+    }
   }
 
   resolvePermission(sessionId: string, requestId: string, behavior: PermissionBehavior): void {

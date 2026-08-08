@@ -15,6 +15,7 @@
           <span aria-hidden="true">←</span>
         </button>
         <h1 id="title">sessões</h1>
+        <button id="stop" type="button" hidden>■ parar</button>
         <span id="state" data-alive="false"></span>
       </header>
 
@@ -24,6 +25,10 @@
           nenhuma sessão registrada.<br />
           abra o Claude Code num projeto e ela aparece aqui.
         </p>
+        <div id="spawn" hidden>
+          <p class="spawn-title">nova sessão</p>
+          <ul id="spawn-list"></ul>
+        </div>
       </section>
 
       <main id="feed" aria-label="Conversa e atividade" aria-live="polite" aria-relevant="additions">
@@ -44,6 +49,7 @@
       </footer>
 
       <p id="offline" role="status" hidden>sem conexão com o hub — tentando de novo…</p>
+      <p id="toast" role="status" hidden></p>
     </div>
 
     <script src="/app.js" type="module"></script>

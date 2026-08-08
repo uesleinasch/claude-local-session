@@ -1,3 +1,5 @@
+import { renderMarkdown } from './markdown.js'
+
 const app = document.getElementById('app')
 const bar = { title: document.getElementById('title'), state: document.getElementById('state') }
 const list = document.getElementById('session-list')
@@ -6,10 +8,15 @@ const feed = document.getElementById('feed')
 const feedEmpty = document.getElementById('feed-empty')
 const input = document.getElementById('input')
 const sendBtn = document.getElementById('send')
+const stopBtn = document.getElementById('stop')
 const offline = document.getElementById('offline')
+const toastEl = document.getElementById('toast')
+const spawnBox = document.getElementById('spawn')
+const spawnList = document.getElementById('spawn-list')
 
 const token = new URLSearchParams(location.search).get('t')
 const LAST_KEY = 'local-session.last'
+const OUTBOX_KEY = 'local-session.outbox'
 const MAX_EVENTS = 200
 
 // O cookie definido pelo hub já autentica as próximas visitas — o token não
@@ -25,6 +32,43 @@ let backoff = 1000
 let sessions = []
 let currentId = localStorage.getItem(LAST_KEY)
 let events = []
+let hubConfig = { projects: [], canSpawn: false, canInterrupt: false }
+let toastTimer = null
+
+let outbox = []
+try {
+  const stored = JSON.parse(localStorage.getItem(OUTBOX_KEY) ?? '[]')
+  if (Array.isArray(stored)) outbox = stored
+} catch {}
+
+function saveOutbox() {
+  localStorage.setItem(OUTBOX_KEY, JSON.stringify(outbox))
+}
+
+/* Prompts escritos sem conexão esperam aqui e saem na reconexão. */
+function flushOutbox() {
+  if (!currentId) return
+  const mine = outbox.filter(o => o.sessionId === currentId)
+  let flushed = false
+  for (const o of mine) {
+    if (!send({ type: 'prompt', sessionId: o.sessionId, text: o.text })) break
+    outbox.splice(outbox.indexOf(o), 1)
+    flushed = true
+  }
+  if (flushed) {
+    saveOutbox()
+    renderFeed()
+  }
+}
+
+function showToast(text) {
+  toastEl.textContent = text
+  toastEl.hidden = false
+  clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toastEl.hidden = true
+  }, 4000)
+}
 
 /* ---------- transporte ---------- */
 
@@ -36,7 +80,10 @@ function connect() {
   ws.onopen = () => {
     backoff = 1000
     offline.hidden = true
-    if (currentId) send({ type: 'subscribe', sessionId: currentId })
+    if (currentId) {
+      send({ type: 'subscribe', sessionId: currentId })
+      flushOutbox()
+    }
   }
   ws.onmessage = ev => {
     let msg
@@ -103,6 +150,20 @@ function handle(msg) {
     events.push(e)
     if (events.length > MAX_EVENTS) events.splice(0, events.length - MAX_EVENTS)
     renderFeed()
+    return
+  }
+  if (msg.type === 'config') {
+    hubConfig = {
+      projects: Array.isArray(msg.projects) ? msg.projects : [],
+      canSpawn: msg.canSpawn === true,
+      canInterrupt: msg.canInterrupt === true,
+    }
+    renderSpawn()
+    renderBar()
+    return
+  }
+  if (msg.type === 'toast') {
+    showToast(String(msg.text ?? ''))
   }
 }
 
@@ -114,6 +175,7 @@ function open(id) {
   events = []
   app.dataset.view = 'feed'
   send({ type: 'subscribe', sessionId: id })
+  flushOutbox()
   renderSessions()
   renderBar()
   renderFeed()
@@ -137,10 +199,43 @@ function renderBar() {
   if (app.dataset.view === 'sessions' || !s) {
     bar.title.textContent = 'sessões'
     bar.state.dataset.alive = 'false'
+    stopBtn.hidden = true
     return
   }
   bar.title.textContent = s.label
   bar.state.dataset.alive = String(s.alive)
+  stopBtn.hidden = !(s.alive && hubConfig.canInterrupt)
+}
+
+function renderSpawn() {
+  const usable = hubConfig.canSpawn && hubConfig.projects.length > 0
+  spawnBox.hidden = !usable
+  spawnList.replaceChildren()
+  if (!usable) return
+
+  for (const dir of hubConfig.projects) {
+    const li = document.createElement('li')
+    const btn = document.createElement('button')
+    btn.type = 'button'
+    btn.className = 'spawn-btn'
+
+    const name = document.createElement('span')
+    name.className = 'session-name'
+    name.textContent = dir.split('/').filter(Boolean).pop() ?? dir
+
+    const path = document.createElement('span')
+    path.className = 'session-path'
+    path.textContent = dir
+
+    btn.append(name, path)
+    btn.addEventListener('click', () => {
+      if (!confirm(`Iniciar uma nova sessão do claude em ${dir}?`)) return
+      if (send({ type: 'spawn', dir })) showToast('iniciando sessão — ela aparece na lista em instantes')
+      else showToast('sem conexão com o hub')
+    })
+    li.append(btn)
+    spawnList.append(li)
+  }
 }
 
 function renderSessions() {
@@ -212,9 +307,11 @@ function turnNode(who, text, kind) {
   label.className = 'who'
   label.textContent = who
 
-  const body = document.createElement('p')
+  // Respostas do Claude chegam em markdown; prompts ficam literais.
+  const body = document.createElement(kind === 'reply' ? 'div' : 'p')
   body.className = 'text'
-  body.textContent = text
+  if (kind === 'reply') body.append(renderMarkdown(text))
+  else body.textContent = text
 
   wrap.append(label, body)
   return wrap
@@ -257,7 +354,20 @@ function permNode(e) {
 
   box.append(tool, desc)
 
-  if (e.inputPreview) {
+  // O preview do hook mostra a operação inteira (diff, conteúdo, comando);
+  // o inputPreview do protocolo é o fallback resumido.
+  if (e.preview) {
+    const pre = document.createElement('pre')
+    pre.className = 'perm-preview perm-preview-rich'
+    for (const line of e.preview.split('\n')) {
+      const span = document.createElement('span')
+      if (line.startsWith('+ ')) span.className = 'diff-add'
+      else if (line.startsWith('- ')) span.className = 'diff-del'
+      span.textContent = `${line}\n`
+      pre.append(span)
+    }
+    box.append(pre)
+  } else if (e.inputPreview) {
     const pre = document.createElement('pre')
     pre.className = 'perm-preview'
     pre.textContent = e.inputPreview
@@ -299,9 +409,10 @@ function permNode(e) {
 
 function renderFeed() {
   const atBottom = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 80
+  const pending = outbox.filter(o => o.sessionId === currentId)
 
   feed.replaceChildren()
-  if (events.length === 0) {
+  if (events.length === 0 && pending.length === 0) {
     feed.append(feedEmpty)
     feedEmpty.hidden = false
   }
@@ -311,6 +422,12 @@ function renderFeed() {
     else if (g.type === 'prompt') feed.append(turnNode('você', g.event.text, 'prompt'))
     else if (g.type === 'reply') feed.append(turnNode('claude', g.event.text, 'reply'))
     else if (g.type === 'permission') feed.append(permNode(g.event))
+  }
+
+  for (const o of pending) {
+    const node = turnNode('você · na fila', o.text, 'prompt')
+    node.dataset.pending = 'true'
+    feed.append(node)
   }
 
   const s = current()
@@ -327,8 +444,13 @@ function renderFeed() {
 function submit() {
   const text = input.value.trim()
   if (text === '' || !currentId) return
-  // Só limpa depois de entregar: com a conexão caída, apagar seria perder o texto.
-  if (!send({ type: 'prompt', sessionId: currentId, text })) return
+  // Sem conexão o prompt não se perde: entra na outbox, aparece como "na fila"
+  // e é entregue na reconexão.
+  if (!send({ type: 'prompt', sessionId: currentId, text })) {
+    outbox.push({ sessionId: currentId, text, ts: Date.now() })
+    saveOutbox()
+    renderFeed()
+  }
   input.value = ''
   resize()
 }
@@ -346,6 +468,13 @@ input.addEventListener('keydown', ev => {
   }
 })
 sendBtn.addEventListener('click', submit)
+
+stopBtn.addEventListener('click', () => {
+  if (!currentId) return
+  if (!confirm('Interromper o turno atual desta sessão?')) return
+  if (send({ type: 'interrupt', sessionId: currentId })) showToast('interrupção enviada')
+  else showToast('sem conexão com o hub')
+})
 
 if (currentId) app.dataset.view = 'feed'
 renderBar()

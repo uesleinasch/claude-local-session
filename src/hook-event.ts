@@ -40,6 +40,41 @@ function describe(tool: string, input: Record<string, unknown>, cwd: string): st
   }
 }
 
+const PREVIEW_LINES = 40
+const PREVIEW_CHARS = 1_500
+
+function head(s: string, prefix = ''): string {
+  const lines = s.split('\n').slice(0, PREVIEW_LINES)
+  const text = lines.map(l => `${prefix}${l}`).join('\n')
+  const clipped = text.slice(0, PREVIEW_CHARS)
+  return clipped.length < text.length || s.split('\n').length > PREVIEW_LINES ? `${clipped}\n…` : clipped
+}
+
+/**
+ * Conteúdo integral (limitado) da operação que está pedindo permissão — o
+ * `detail` de 80 chars serve para a régua de atividade; aprovar exige ver mais.
+ */
+function previewFor(tool: string, input: Record<string, unknown>): string {
+  switch (tool) {
+    case 'Bash':
+      return str(input.command).slice(0, PREVIEW_CHARS * 2)
+    case 'Edit': {
+      const oldStr = str(input.old_string)
+      const newStr = str(input.new_string)
+      if (oldStr === '' && newStr === '') return ''
+      const all = input.replace_all === true ? ' (todas as ocorrências)' : ''
+      return `${str(input.file_path)}${all}\n${head(oldStr, '- ')}\n${head(newStr, '+ ')}`
+    }
+    case 'Write': {
+      const content = str(input.content)
+      if (content === '') return ''
+      return `${str(input.file_path)}\n${head(content, '+ ')}`
+    }
+    default:
+      return ''
+  }
+}
+
 export function toActivityPost(raw: unknown): ActivityPost | null {
   if (typeof raw !== 'object' || raw === null) return null
   const p = raw as Record<string, unknown>
@@ -54,8 +89,17 @@ export function toActivityPost(raw: unknown): ActivityPost | null {
       : {}
 
   switch (str(p.hook_event_name)) {
-    case 'PreToolUse':
-      return { sessionId, tool, detail: describe(tool, input, cwd), status: 'start' }
+    case 'PreToolUse': {
+      const post: ActivityPost = {
+        sessionId,
+        tool,
+        detail: describe(tool, input, cwd),
+        status: 'start',
+      }
+      const preview = previewFor(tool, input)
+      if (preview !== '') post.preview = preview
+      return post
+    }
     case 'PostToolUse':
       return { sessionId, tool, detail: describe(tool, input, cwd), status: 'end' }
     case 'Stop':

@@ -199,6 +199,112 @@ describe('permissão', () => {
     reg.subscribe(browser, 's1')
     expect(browser.sent.at(-1).events).toHaveLength(0)
   })
+
+  test('preview do hook enriquece o card da mesma tool', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.notePreview('s1', 'Bash', 'rm -rf node_modules && bun install', 1_000)
+    reg.push('s1', { ...perm, ts: 2_000 })
+
+    const browser = spy()
+    reg.addBrowser(browser)
+    reg.subscribe(browser, 's1')
+    expect(browser.sent.at(-1).events[0].preview).toBe('rm -rf node_modules && bun install')
+  })
+
+  test('preview que chega depois completa o card retroativamente', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', { ...perm, ts: 1_000 })
+    reg.notePreview('s1', 'Bash', 'comando completo', 2_000)
+
+    const browser = spy()
+    reg.addBrowser(browser)
+    reg.subscribe(browser, 's1')
+    const { events } = browser.sent.at(-1)
+    expect(events).toHaveLength(1)
+    expect(events[0].preview).toBe('comando completo')
+  })
+
+  test('preview velho ou de outra tool não contamina o card', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.notePreview('s1', 'Edit', 'diff de outra coisa', 1_000)
+    reg.push('s1', { ...perm, ts: 2_000 })
+
+    const reg2 = new Registry()
+    reg2.registerSession(spy(), INFO)
+    reg2.notePreview('s1', 'Bash', 'muito antigo', 1_000)
+    reg2.push('s1', { ...perm, ts: 60_000 })
+
+    for (const r of [reg, reg2]) {
+      const browser = spy()
+      r.addBrowser(browser)
+      r.subscribe(browser, 's1')
+      expect(browser.sent.at(-1).events[0].preview).toBeUndefined()
+    }
+  })
+
+  test('card resolvido não recebe preview atrasado', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', { ...perm, ts: 1_000 })
+    reg.resolvePermission('s1', 'req-1', 'deny')
+    reg.notePreview('s1', 'Bash', 'tarde demais', 2_000)
+
+    const browser = spy()
+    reg.addBrowser(browser)
+    reg.subscribe(browser, 's1')
+    expect(browser.sent.at(-1).events[0].preview).toBeUndefined()
+  })
+})
+
+describe('persistência', () => {
+  test('onEvent recebe cada evento aceito', () => {
+    const got: Array<[string, FeedEvent]> = []
+    const reg = new Registry((id, e) => got.push([id, e]))
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', activity('npm test'))
+    reg.push('fantasma', activity('descartado'))
+
+    expect(got).toHaveLength(1)
+    expect(got[0]![0]).toBe('s1')
+  })
+
+  test('hydrateSession repovoa uma sessão encerrada com histórico', () => {
+    const reg = new Registry()
+    reg.hydrateSession(INFO, [activity('do disco')], 5_000)
+
+    expect(reg.summaries()).toEqual([
+      { id: 's1', label: 'proj', cwd: '/home/u/proj', pid: 42, alive: false, endedAt: 5_000 },
+    ])
+
+    const browser = spy()
+    reg.addBrowser(browser)
+    reg.subscribe(browser, 's1')
+    expect(browser.sent.at(-1).events).toHaveLength(1)
+  })
+
+  test('hydrateSession não sobrescreve sessão já registrada', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.hydrateSession(INFO, [activity('velho')], 5_000)
+
+    expect(reg.summaries()[0]).toMatchObject({ alive: true })
+  })
+
+  test('register após hydrate revive a sessão preservando o histórico', () => {
+    const reg = new Registry()
+    reg.hydrateSession(INFO, [activity('do disco')], 5_000)
+    reg.registerSession(spy(), INFO)
+
+    const browser = spy()
+    reg.addBrowser(browser)
+    reg.subscribe(browser, 's1')
+    expect(reg.summaries()[0]).toMatchObject({ alive: true })
+    expect(reg.summaries()[0]!.endedAt).toBeUndefined()
+    expect(browser.sent.at(-1).events).toHaveLength(1)
+  })
 })
 
 describe('limpeza', () => {
