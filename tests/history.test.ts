@@ -102,6 +102,16 @@ describe('HistoryStore', () => {
     expect(recent).toHaveLength(0)
   })
 
+  test('remove apaga o arquivo e o hydrate não ressuscita a sessão', () => {
+    const store = new HistoryStore(dir)
+    store.appendMeta(INFO)
+    store.appendEvent('s1', reply('vou ser apagado'))
+    store.remove('s1')
+
+    expect(store.load('s1')).toEqual([])
+    expect(new HistoryStore(dir).loadRecent()).toHaveLength(0)
+  })
+
   test('loadRecent ignora arquivo sem meta', () => {
     const store = new HistoryStore(dir)
     store.appendEvent('s1', reply('sem meta'))

@@ -245,6 +245,8 @@ function renderSessions() {
 
   for (const s of sessions) {
     const li = document.createElement('li')
+    li.className = 'session-item'
+
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className = 'session'
@@ -261,7 +263,21 @@ function renderSessions() {
 
     btn.append(name, path)
     btn.addEventListener('click', () => open(s.id))
-    li.append(btn)
+
+    const kill = document.createElement('button')
+    kill.type = 'button'
+    kill.className = 'session-kill'
+    kill.setAttribute('aria-label', `Encerrar a sessão ${s.label}`)
+    kill.textContent = '✕'
+    kill.addEventListener('click', () => {
+      const question = s.alive
+        ? `Encerrar a sessão ${s.label}? O claude dela será finalizado.`
+        : `Remover ${s.label} da lista? O histórico dela será apagado.`
+      if (!confirm(question)) return
+      if (!send({ type: 'kill', sessionId: s.id })) showToast('sem conexão com o hub')
+    })
+
+    li.append(btn, kill)
     list.append(li)
   }
 }

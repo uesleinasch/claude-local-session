@@ -103,6 +103,18 @@ export class Registry {
     return this.sinkToSession.get(sink)
   }
 
+  /** Remoção deliberada (kill pelo navegador): some da lista na hora. */
+  dropSession(sessionId: string): void {
+    const entry = this.sessions.get(sessionId)
+    if (!entry) return
+    this.sessions.delete(sessionId)
+    this.previews.delete(sessionId)
+    for (const [sink, id] of this.sinkToSession) {
+      if (id === sessionId) this.sinkToSession.delete(sink)
+    }
+    this.broadcastSessions()
+  }
+
   push(sessionId: string, event: FeedEvent): void {
     const entry = this.sessions.get(sessionId)
     if (!entry) return

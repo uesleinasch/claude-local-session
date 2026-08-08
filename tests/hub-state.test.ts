@@ -260,6 +260,37 @@ describe('permissão', () => {
   })
 })
 
+describe('dropSession', () => {
+  test('remove da lista na hora e notifica os browsers', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    const browser = spy()
+    reg.addBrowser(browser)
+
+    reg.dropSession('s1')
+    expect(reg.summaries()).toHaveLength(0)
+    expect(browser.sent.at(-1)).toEqual({ type: 'sessions', sessions: [] })
+  })
+
+  test('close atrasado do sink da sessão removida não quebra nada', () => {
+    const reg = new Registry()
+    const sink = spy()
+    reg.registerSession(sink, INFO)
+    reg.dropSession('s1')
+    reg.removeSession(sink)
+    expect(reg.summaries()).toHaveLength(0)
+  })
+
+  test('id desconhecido é silencioso', () => {
+    const reg = new Registry()
+    const browser = spy()
+    reg.addBrowser(browser)
+    const before = browser.sent.length
+    reg.dropSession('fantasma')
+    expect(browser.sent).toHaveLength(before)
+  })
+})
+
 describe('estado ocupado', () => {
   test('prompt liga busy; idle desliga', () => {
     const reg = new Registry()

@@ -59,6 +59,7 @@ export type BrowserToHub =
     }
   | { type: 'spawn'; dir: string }
   | { type: 'interrupt'; sessionId: string }
+  | { type: 'kill'; sessionId: string }
 
 export type HubToBrowser =
   | { type: 'sessions'; sessions: SessionSummary[] }

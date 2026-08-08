@@ -138,20 +138,38 @@ function ancestorsOf(pid: number): Set<number> {
   return out
 }
 
+async function findPane(
+  pid: number,
+): Promise<{ paneId: string; sessionName: string } | 'no-tmux' | 'not-found'> {
+  const panes = await run('tmux', ['list-panes', '-a', '-F', '#{pane_pid} #{pane_id} #{session_name}'])
+  if (!panes.ok) return 'no-tmux'
+  const chain = ancestorsOf(pid)
+  for (const line of panes.out.split('\n')) {
+    const [panePid, paneId, sessionName] = line.split(' ')
+    if (panePid && paneId && sessionName && chain.has(Number(panePid))) {
+      return { paneId, sessionName }
+    }
+  }
+  return 'not-found'
+}
+
 // Escape no pane onde o claude roda = o mesmo gesto que interrompe no terminal.
 // Vale para qualquer sessão dentro de tmux, não só as spawnadas por aqui.
 async function interruptSession(pid: number): Promise<string | null> {
-  const panes = await run('tmux', ['list-panes', '-a', '-F', '#{pane_pid} #{pane_id}'])
-  if (!panes.ok) return 'tmux indisponível para interromper'
-  const chain = ancestorsOf(pid)
-  for (const line of panes.out.split('\n')) {
-    const [panePid, paneId] = line.split(' ')
-    if (panePid && paneId && chain.has(Number(panePid))) {
-      const sent = await run('tmux', ['send-keys', '-t', paneId, 'Escape'])
-      return sent.ok ? null : 'falha ao enviar Escape para o tmux'
-    }
-  }
-  return 'esta sessão não roda dentro de tmux — interrupção indisponível'
+  const pane = await findPane(pid)
+  if (pane === 'no-tmux') return 'tmux indisponível para interromper'
+  if (pane === 'not-found') return 'esta sessão não roda dentro de tmux — interrupção indisponível'
+  const sent = await run('tmux', ['send-keys', '-t', pane.paneId, 'Escape'])
+  return sent.ok ? null : 'falha ao enviar Escape para o tmux'
+}
+
+async function killSession(pid: number): Promise<string | null> {
+  const pane = await findPane(pid)
+  if (pane === 'no-tmux') return 'tmux indisponível'
+  if (pane === 'not-found') return 'esta sessão não roda dentro de tmux — encerre pelo terminal'
+  // '=' força match exato do nome: kill-session -t é prefix-match por padrão.
+  const res = await run('tmux', ['kill-session', '-t', `=${pane.sessionName}`])
+  return res.ok ? null : 'falha ao encerrar a sessão do tmux'
 }
 
 // 404 em vez de 401: uma resposta de "não autorizado" confirmaria que o serviço existe.
@@ -265,6 +283,28 @@ function onBrowserMessage(ws: Ws, msg: BrowserToHub): void {
       void spawnSession(msg.dir).then(err => {
         if (err) toast(ws, err)
       })
+      return
+    }
+    case 'kill': {
+      if (typeof msg.sessionId !== 'string') return
+      const s = registry.summaries().find(x => x.id === msg.sessionId)
+      if (!s) return
+      const drop = () => {
+        registry.dropSession(s.id)
+        store.remove(s.id)
+        toast(ws, `sessão ${s.label} encerrada`)
+      }
+      // Encerrada: só limpa da lista. Viva: mata o tmux antes; viva fora de
+      // tmux é o terminal do usuário — recusar em vez de sumir com sessão ativa.
+      if (!s.alive) {
+        drop()
+        return
+      }
+      if (s.pid <= 0) {
+        toast(ws, 'sessão sem processo conhecido')
+        return
+      }
+      void killSession(s.pid).then(err => (err ? toast(ws, err) : drop()))
       return
     }
     case 'interrupt': {

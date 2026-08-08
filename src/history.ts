@@ -1,4 +1,13 @@
-import { appendFileSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import {
+  appendFileSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { join } from 'node:path'
 import type { RegisterInfo } from './hub-state'
 import { MAX_EVENTS, type FeedEvent } from './protocol'
@@ -86,6 +95,14 @@ export class HistoryStore {
     try {
       appendFileSync(this.fileFor(info.sessionId), `${JSON.stringify(meta)}\n`, { mode: 0o600 })
     } catch {}
+  }
+
+  /** Kill deliberado: sem isto, o hydrate do próximo boot ressuscitaria a sessão. */
+  remove(sessionId: string): void {
+    try {
+      unlinkSync(this.fileFor(sessionId))
+    } catch {}
+    this.appends.delete(sessionId)
   }
 
   load(sessionId: string): FeedEvent[] {
