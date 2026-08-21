@@ -2,5 +2,7 @@ node_modules/
 *.log
 .DS_Store
 
-# O ~/.gitignore_global do autor ignora /docs/; aqui as specs são versionadas.
+# O ~/.gitignore_global do autor ignora /docs/ e CLAUDE.md; aqui as specs e as
+# instruções do repositório são versionadas.
 !/docs/
+!CLAUDE.md
