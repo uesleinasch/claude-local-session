@@ -10,9 +10,24 @@ interrupção via tmux). Este documento lista o que vem depois, em ordem de impa
   (100.64/10) e oferece o endereço da tailnet junto com o da LAN. Acessa de qualquer
   lugar sem expor a porta 7777 à internet; resolve inclusive LAN com bloqueio de
   tráfego entre clientes (firewall de endpoint, isolamento de mesh).
+- ~~**Estado do Tailscale na tool `link`**~~ — feito: `src/tailscale.ts` lê o
+  `tailscale status --json` (com timeout de 500ms, senão um `tailscaled` pendurado travaria
+  uma tool interativa) e separa "não instalado", "desligado" e "sem autenticação", cada um
+  com o comando que resolve. Antes os três eram o mesmo silêncio, porque a detecção por faixa
+  CGNAT só sabe dizer se existe um IP `100.x`. Conectado, a URL sai pelo nome do MagicDNS
+  (`Self.DNSName`, aparando o ponto final do FQDN) em vez do IP — mais fácil de digitar no
+  celular e estável. Binário fora do PATH com a tailnet de pé continua mostrando o endereço
+  pelo IP: interface de rede vale mais que ausência de binário, senão o mesmo tropeço que o
+  `bun` dos hooks dá viraria "instale o que já está instalado".
 - **HTTPS opcional** — hoje o token viaja em texto claro; aceitável dentro de uma VPN,
   não fora dela. Certificado autoassinado ou o TLS do próprio Tailscale (`tailscale cert`).
   HTTPS também é pré-requisito de Web Push e de PWA instalável em iOS.
+- **HTTPS pelo `tailscale serve`** — provavelmente o caminho mais curto para o item acima:
+  publica o `127.0.0.1:7777` como HTTPS com certificado **válido** dentro da tailnet, sem
+  autoassinado e sem o hub precisar escutar em `0.0.0.0`. O subcomando existe na 1.98.10
+  (verificado em 2026-08-21); falta confirmar se depende de "HTTPS Certificates" habilitado
+  no admin console da tailnet. Com ele, PWA, Web Push e ditado por voz saem do bloqueio de
+  uma vez.
 
 ## 2. Ser avisado em vez de vigiar
 
@@ -122,3 +137,58 @@ olhar); **escrever no celular é caro**; e o feed é **plano**, sem colapso nem 
 - **Menores** — renomear e fixar sessões (o rótulo é só o nome da pasta), feed unificado de
   todas as sessões, tempo do turno em andamento, e ditado por voz (a API do navegador exige
   contexto seguro, então depende do HTTPS do item 1).
+
+## 6. Instalar na máquina de outra pessoa (desenho de 2026-08-21, sem data de implantação)
+
+Hoje instalar exige `git clone` ou `curl | bash`, ter o `bun` no PATH e um `sudo` para o
+managed-settings. Serve para quem leu o README inteiro, não para quem só quer usar. A meta é
+`apt install` e pronto.
+
+Um teto que nenhum empacotamento dissolve: o valor depende do Claude Code rodando na máquina —
+`src/server.ts` só existe dentro de uma sessão (MCP stdio), o canal só liga pelo
+`managed-settings.json` do sistema e a flag `--channels` é por sessão. Um app autônomo, sem
+Claude Code, foi considerado e **descartado**: sobraria um servidor web sem nada para servir.
+
+Ordem: o binário é o conteúdo do pacote, e a bandeja só vale depois que o pacote existir.
+
+- **Binário único (`bun build --compile`)** — tira o `bun` do PATH da equação, e com ele uma
+  classe de falha silenciosa real: os hooks invocam `bun` pelo PATH e engolem o erro de
+  propósito, então `bun` ausente aparece como "a régua de atividade fica vazia" e mais nada.
+  Dois pontos de quebra a resolver antes: `src/hub.ts:38-39` acha o `web/` por
+  `import.meta.dir`, então os assets passariam a ser embutidos em vez de lidos do disco — o que
+  também derruba a conveniência de editar `web/` e ver na hora, hoje usada no desenvolvimento; e
+  `src/hub-client.ts:104` respawna o daemon com
+  `spawn(process.execPath, [join(root, 'src', 'hub.ts')])`, caminho que não existe dentro de um
+  binário, então o spawn viraria o próprio executável com um argv (`local-session hub`). Custo a
+  medir: o tamanho, com o `web/vendor/` (xterm.js) embutido.
+- **Pacote nativo (`.deb`/`.rpm`)** — o `postinst` roda com privilégio, então escreve o
+  `/etc/claude-code/managed-settings.json` sem diálogo de senha, instala a unit do systemd e
+  declara `tmux` como dependência de pacote em vez de descobri-lo em runtime (`Bun.which`, em
+  `src/hub.ts:71-74`), onde a ausência hoje só apaga botões da página sem dizer por quê. O que
+  ele **não** resolve, e é a incógnita que decide a viabilidade: o plugin é registrado por
+  usuário (`~/.claude/plugins/cache/<marketplace>/<plugin>/<versão>`) e o `marketplace.json` de
+  hoje aponta para o GitHub — falta verificar se o Claude Code aceita marketplace a partir de um
+  caminho de disco, que é o que permitiria ao pacote entregar o plugin de `/usr/lib` sem rede.
+  A função de shell do `--channels` também é por usuário: fica num passo pós-instalação (o
+  `/local-session:setup` de hoje), não no `postinst`.
+- **Flatpak, Snap e AppImage não servem** — o trabalho do hub é justamente rodar `tmux`, `git` e
+  `claude` do host, e o sandbox do Flatpak e do Snap existe para impedir exatamente isso. O
+  AppImage não tem `postinst`, então não escreve o managed-settings nem instala a unit; vale como
+  transporte do binário para quem não usa `apt`/`dnf`, nada além.
+- **Tailscale como opt-in detectado, nunca instalação automática** — decidido em 2026-08-21.
+  O `tailscale` não está nos repos do Ubuntu/Debian (vem de `pkgs.tailscale.com`), então
+  `Depends: tailscale` faria o **nosso** pacote falhar numa máquina limpa; o `postinst` teria
+  de adicionar um repositório de terceiros para contornar. E o passo que trava não é instalar,
+  é **logar**: `tailscale up` exige autenticação interativa e o celular precisa entrar na
+  mesma tailnet, trabalho em outro aparelho, fora do alcance de qualquer `postinst`. Somado ao
+  daemon de rede e ao DNS que o Tailscale reconfigura — conflito real com VPN corporativa —
+  a decisão é oferecer, não instalar. A tool `link` já detecta e ensina os passos; a bandeja
+  mostraria o mesmo estado com um botão.
+- **Bandeja com o estado do hub** — depois do pacote, é o que troca "leia o README e rode um
+  comando" por uma janela: hub de pé ou não, o link com QR code para o celular ler (hoje o
+  caminho é pedir o link ao Claude e digitar à mão), ligar e desligar o serviço, e as três
+  camadas do canal com ✓ ou ✗ em vez de um `grep` no log. Decisão de produto mais que de
+  engenharia: cria uma dependência de toolkit gráfico que o projeto hoje não tem.
+
+Nada disso foi sondado ainda — as duas medições que faltam são se o `--compile` sobe e serve a
+página de fato (e em quantos MB), e se o marketplace aceita caminho de disco.
