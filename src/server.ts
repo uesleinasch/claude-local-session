@@ -10,6 +10,7 @@ import { z } from 'zod'
 import { lanAddress, loadConfig, tailscaleAddress } from './config'
 import { HubClient } from './hub-client'
 import type { HubToSession } from './protocol'
+import { probeTailscale, resolveState, tailscaleLines } from './tailscale'
 
 const ROOT = join(import.meta.dir, '..')
 const cfg = loadConfig()
@@ -146,16 +147,10 @@ mcp.setRequestHandler(CallToolRequestSchema, async req => {
       }
       case 'link': {
         const host = await lanAddress()
-        const tailnet = tailscaleAddress()
+        const tailscale = resolveState(await probeTailscale(), tailscaleAddress())
         const lines = [
           `Rede local: http://${host}:${cfg.port}/?t=${cfg.token}`,
-          ...(tailnet
-            ? [
-                '',
-                `Tailscale (funciona de qualquer lugar, com o app logado no celular):`,
-                `http://${tailnet}:${cfg.port}/?t=${cfg.token}`,
-              ]
-            : []),
+          ...(tailscale ? tailscaleLines(tailscale, cfg.port, cfg.token) : []),
           '',
           `Sessão: ${basename(CWD) || SESSION_ID}`,
         ]

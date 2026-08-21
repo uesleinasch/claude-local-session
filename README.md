@@ -137,9 +137,23 @@ Salve esse link no celular. Na primeira visita o hub devolve um cookie, então a
 seguintes dispensam o token na URL.
 
 Se a máquina estiver numa tailnet ([Tailscale](https://tailscale.com)), a tool `link` também
-devolve o endereço `100.x.y.z` — com o app logado no celular, a página funciona de qualquer
+devolve o endereço da tailnet — com o app logado no celular, a página funciona de qualquer
 lugar (4G, outra rede), sem expor a porta 7777 à internet. É também a saída quando a própria
 LAN bloqueia tráfego entre clientes (firewall de endpoint corporativo, isolamento de mesh).
+
+O endereço vem pelo nome do MagicDNS quando ele está ligado — `jacpontnx23.tail95d3bd.ts.net`
+é bem mais fácil de digitar no celular que `100.113.47.75`, e não muda. E se o Tailscale não
+estiver ali, a tool não fica calada: ela diz em que pé está e o que fazer.
+
+| Estado                            | O que a `link` responde                           |
+| --------------------------------- | ------------------------------------------------- |
+| conectado                         | a URL, por nome MagicDNS (ou IP, se estiver desligado) |
+| instalado, desligado              | `sudo tailscale up`                               |
+| instalado, sem autenticação       | `sudo tailscale up` e entrar com a conta do celular |
+| não instalado                     | os três passos: `install.sh`, `tailscale up`, app no celular |
+
+Sem `tailscale` no `PATH` mas com a tailnet de pé, o endereço ainda aparece (pelo IP): a
+detecção lê as interfaces de rede, então o binário invisível não vira "não instalado".
 
 ## Uso
 
@@ -436,6 +450,7 @@ Estrutura:
 | `src/hub-state.ts`  | Registro de sessões e feed (sem I/O, testável)    |
 | `src/hub-client.ts` | Cliente WebSocket com backoff e spawn do daemon   |
 | `src/config.ts`     | Token, porta, IP da rota default                  |
+| `src/tailscale.ts`  | Estado da tailnet, host MagicDNS e os passos de configuração |
 | `src/notify.ts`     | Evento → aviso ntfy, com dedupe (sem I/O no core) |
 | `src/update-core.ts`| PID na porta e versões no cache — parsing testável |
 | `src/git-changes.ts`| Saídas do git → o texto do painel "mudanças"       |
