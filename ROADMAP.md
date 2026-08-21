@@ -4,6 +4,8 @@ O que já existe cobre acompanhar, decidir com contexto e trabalhar de longe den
 (markdown, diff no card de permissão, histórico persistente, fila offline, nova sessão e
 interrupção via tmux). Este documento lista o que vem depois, em ordem de impacto.
 
+**Próximo alvo: o navegador e visualizador de arquivos da seção 7.**
+
 ## 1. Sair da LAN
 
 - ~~**Tailscale na tool `link`**~~ — feito: a tool detecta o IPv4 da faixa CGNAT
@@ -192,3 +194,43 @@ Ordem: o binário é o conteúdo do pacote, e a bandeja só vale depois que o pa
 
 Nada disso foi sondado ainda — as duas medições que faltam são se o `--compile` sobe e serve a
 página de fato (e em quantos MB), e se o marketplace aceita caminho de disco.
+
+## 7. Editar e controlar de longe (avaliação de 2026-08-21)
+
+O terminal remoto é uma saída universal: `git commit`, `vim`, `sed`, o que faltar na UI se
+faz por `tmux`. Então nenhum item aqui é impossível hoje — todos são **caros**. O critério de
+prioridade passa a ser quantos toques no celular um gesto *frequente* custa, não o que está
+tecnicamente ausente.
+
+- **Navegador e visualizador de arquivos** — **prioridade**. Ler um arquivo pela página não
+  existe: hoje é gastar um turno do modelo (que ainda enche a janela de contexto medida pela
+  própria barra do header) ou abrir o terminal e usar `cat`. Read-only, confinado ao `cwd` que
+  a sessão declarou — fronteira mais estreita que a do spawn e a do terminal, e que o hub já
+  assume ao rodar `git` ali para o painel de mudanças. O ganho passa de conveniência: é o
+  recurso escasso que o projeto já instrumentou, porque a ausência de leitor é uma das causas
+  do consumo de contexto que a barra mede. Pontos de projeto: teto de tamanho no padrão do
+  diff (40 mil caracteres, `src/git-changes.ts`), binário recusado pelos **bytes** como o
+  upload já faz (`src/upload.ts`), e symlink que aponta para fora do `cwd` não seguido.
+- **Comandos de barra pela página, começando por `/compact`** — a via já existe e está
+  subutilizada: `setSessionModel` (`src/hub.ts:342`) digita `/model <alias>` no pane e dá
+  Enter, então qualquer comando de barra é o mesmo braço remoto. O caso agudo é o contexto —
+  a barra fica vermelha em ≥80% e quem está no celular vê o problema sem ter botão nenhum.
+  Generalizar para um `slashCommand(pid, cmd)` deve ser o melhor retorno por linha de código
+  do projeto, porque o mecanismo está pronto e provado. O comando precisa vir de **allowlist**,
+  nunca de texto livre: o navegador não escolhe o que entra na linha de comando, mesmo
+  princípio das teclas do terminal.
+- **Git de escrita no painel de mudanças** — hoje o painel é um beco sem saída: você revisa o
+  diff no celular, decide que está bom, e não pode commitar, descartar um arquivo, stashar nem
+  criar branch. O gesto que **fecha** o trabalho exige abrir o terminal e digitar a mensagem de
+  commit na fileira de teclas, justamente o gesto mais penoso no celular — o que liga este item
+  ao ditado por voz. Escrita no git é destrutiva (`checkout --` apaga trabalho), então pede
+  confirmação explícita como o `✕` já tem; não é fronteira de segurança nova, porque o token
+  já dá `Bash`.
+- **Ditado por voz subiu de prioridade** — continua listado nos "menores" do item 5, mas ele
+  ataca de frente a fraqueza que a avaliação de 2026-08-08 já nomeou ("escrever no celular é
+  caro") e agora tem caminho: o `tailscale serve` da seção 1 destrava HTTPS, e com ele ditado,
+  PWA e Web Push de uma vez. Aquele item deixou de ser refinamento de rede.
+- **Editor de arquivo pela página — descartado por ora** — é a lacuna mais custosa de fazer
+  bem, porque precisaria resolver escrita concorrente com o que o Claude está editando no mesmo
+  instante, e a menos necessária: corrigir um typo por prompt funciona, e o terminal cobre o
+  resto. O visualizador acima entrega a maior parte do valor sem o problema.
