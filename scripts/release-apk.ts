@@ -99,11 +99,25 @@ const notas = [
   '`/_endpoints`, por onde o app descobre o endereço sozinho.',
 ].join('\n')
 
+// `--latest=false` não é detalhe: o README manda baixar o `.deb` de
+// /releases/latest, e um release do app marcado como latest deixa esse comando
+// sem nenhum `.deb` para achar.
 try {
-  execFileSync('gh', ['release', 'create', tag, '--title', `App ${versao}`, '--notes', notas, apk], {
-    cwd: REPO,
-    stdio: 'inherit',
-  })
+  execFileSync(
+    'gh',
+    [
+      'release',
+      'create',
+      tag,
+      '--title',
+      `App ${versao}`,
+      '--notes',
+      notas,
+      '--latest=false',
+      apk,
+    ],
+    { cwd: REPO, stdio: 'inherit' },
+  )
 } catch {
   die('gh release create falhou — a saída acima diz por quê')
 }
