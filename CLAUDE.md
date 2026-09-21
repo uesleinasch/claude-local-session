@@ -18,17 +18,18 @@ bun test -t "auto mode"                 # um teste por nome
 bunx tsc --noEmit               # única checagem estática do repo — não há linter/formatter
 bun run hub                     # hub em primeiro plano, para depurar
 bun run build                   # dist/local-session, o executável único (~92 MB, ~0,2s)
+bun run package                 # dist/local-session_<versão>_amd64.deb (exige dpkg-deb)
 bun scripts/update.ts           # deploy local (ver "A dança do deploy")
 bun scripts/update.ts --check   # o que aconteceria, sem mexer
 bun scripts/setup.ts            # configura as 3 camadas de canal na máquina
 bun scripts/service.ts          # unit de usuário do systemd para o hub
 ```
 
-## Um ponto de entrada, seis subcomandos
+## Um ponto de entrada, sete subcomandos
 
 Hub, MCP server, os dois hooks e os scripts de configuração são **um programa só**:
 `src/cli.ts` despacha por `process.argv[2]` (`hub`, `mcp`, `hook`, `context-hook`, `setup`,
-`service`, em `src/cli-core.ts`). `bun build --compile` aceita um entrypoint só, e um executável
+`service`, `managed-settings`, em `src/cli-core.ts`). `bun build --compile` aceita um entrypoint só, e um executável
 por programa multiplicaria o runtime do Bun — 92 MB cada.
 
 Nada invoca `bun` nem um `.ts` diretamente: `hooks/hooks.json`, `.claude-plugin/mcp.json` e
@@ -91,6 +92,38 @@ navegador ──HTTP/WS :7777──► hub (daemon único, desanexado)
 Ambos os hooks engolem qualquer erro e saem com 0 sempre: hook barulhento ou lento trava a
 sessão do usuário, e hub fora do ar não pode derrubar o trabalho local.
 
+## O pacote `.deb`
+
+`bun run package` monta o `.deb` (26 MB comprimidos, 92 MB instalados). Três destinos, e a
+divisão entre eles tem um motivo medido:
+
+| caminho | o quê |
+| --- | --- |
+| `/usr/bin/local-session` | o executável |
+| `/usr/share/local-session/` | `.claude-plugin/`, `commands/`, `bin/`, e de `hooks/` **só** o `hooks.json` |
+| `/usr/lib/systemd/user/local-session-hub.service` | unit disponível a todo usuário, ativa só para quem der `enable` |
+
+**`claude plugin install` a partir de um caminho em disco copia a árvore** para
+`~/.claude/plugins/cache` de cada usuário (medido em 2026-09-21: plugin de 3 MB → 2,9 MB no
+cache, diretório real). Por isso o binário fica fora dela — seriam 92 MB por usuário — e por
+isso `src/` e `web/` não vão no pacote: estão dentro do binário. De `hooks/` vai só o manifesto,
+porque os `.ts` ao lado importam `../src`, que ali não existe.
+
+O `postinst` chama `/usr/bin/local-session managed-settings --apply`, e não um merge em shell:
+`mergeManagedSettings` preserva allowlist alheia e recusa arquivo corrompido, cuidado que se
+perderia na tradução. O `postrm` só remove a entrada no **purge** — num upgrade o `remove`
+acontece antes da instalação da versão nova, e tirar a entrada ali deixaria a máquina sem canal
+no meio do caminho. `channelsEnabled` nunca é desligado: é chave global de outros plugins.
+
+O que o pacote **não** faz, porque o registro do plugin é por usuário e o `postinst` roda antes
+de haver usuário na equação: registrar o marketplace, escrever o alias e ligar o serviço. Isso é
+o passo 0 do `local-session setup`, que a mensagem pós-instalação manda rodar.
+
+Como o cache de cada usuário é uma **cópia**, um `apt upgrade` deixa a árvore do plugin para
+trás enquanto só o binário muda. Quando um manifesto muda, o sintoma seria silencioso — daí o
+binário embutir o próprio `plugin.json` (`src/plugin-meta.ts`) e o hub comparar com o do `ROOT`:
+divergindo, a página mostra a tarja `#outdated` com o comando que resolve.
+
 ## `src/protocol.ts` é o contrato
 
 Todas as mensagens dos quatro lados vivem lá: `SessionToHub`, `HubToSession`, `BrowserToHub`,
@@ -110,7 +143,7 @@ default — `tailscaleAddress(nets = networkInterfaces())` em `src/config.ts` e
 
 | Núcleo (sem I/O, com teste unitário) | Casca (I/O, integração) |
 | --- | --- |
-| `hub-state.ts` (registro, feed, urgência), `notify.ts`, `hook-event.ts`, `context-report.ts`, `git-changes.ts`, `question-keys.ts`, `setup-core.ts`, `update-core.ts`, `upload.ts`, `tailscale.ts`, `trust.ts`, `cli-core.ts`, `web-assets.ts` | `hub.ts`, `server.ts`, `hub-client.ts`, `history.ts`, `terminal.ts`, `cli.ts`, `scripts/*.ts` |
+| `hub-state.ts` (registro, feed, urgência), `notify.ts`, `hook-event.ts`, `context-report.ts`, `git-changes.ts`, `question-keys.ts`, `setup-core.ts`, `update-core.ts`, `upload.ts`, `tailscale.ts`, `trust.ts`, `cli-core.ts`, `web-assets.ts`, `plugin-meta.ts`, `package-core.ts` | `hub.ts`, `server.ts`, `hub-client.ts`, `history.ts`, `terminal.ts`, `cli.ts`, `scripts/*.ts` |
 | `web/markdown.js`, `web/session-status.js`, `web/connection.js` | `web/app.js`, `web/terminal-panel.js` |
 
 ## As três camadas do canal (por que "o prompt não chega")

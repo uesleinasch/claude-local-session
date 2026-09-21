@@ -91,6 +91,31 @@ export async function main(): Promise<void> {
   const id = identity()
   console.log(`\nlocal-session setup — plugin:${id.plugin}@${id.marketplace}\n`)
 
+  // 0. plugin registrado no Claude Code. O pacote entrega a árvore em
+  // /usr/share, mas o registro é por usuário e o postinst roda antes de haver
+  // usuário na equação — daí este passo existir aqui e não lá.
+  const cachePath = join(HOME, '.claude/plugins/cache', id.marketplace, id.plugin)
+  if (existsSync(cachePath)) {
+    ok('plugin registrado no Claude Code')
+  } else if (!APPLY) {
+    miss(`plugin não registrado — falta \`claude plugin marketplace add ${ROOT}\``)
+  } else {
+    const claude = Bun.which('claude')
+    if (claude === null) {
+      miss('claude não encontrado no PATH — instale o Claude Code antes')
+    } else {
+      try {
+        execFileSync(claude, ['plugin', 'marketplace', 'add', ROOT], { stdio: 'inherit' })
+        execFileSync(claude, ['plugin', 'install', `${id.plugin}@${id.marketplace}`], {
+          stdio: 'inherit',
+        })
+        did('plugin registrado no Claude Code')
+      } catch {
+        miss(`não consegui registrar — rode \`claude plugin marketplace add ${ROOT}\` à mão`)
+      }
+    }
+  }
+
   // 1. canal habilitado e plugin na allowlist (exige root)
   const managed = readJson<ManagedSettings>(MANAGED_SETTINGS_PATH)
   const merged = mergeManagedSettings(managed, id)

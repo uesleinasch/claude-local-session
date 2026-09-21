@@ -1,14 +1,23 @@
 #!/bin/sh
 # Ponto de entrada único do plugin: hooks, MCP server e slash commands passam
-# por aqui. Prefere o executável compilado; sem ele, cai no fonte com o bun.
-# Enquanto as duas formas coexistirem, este arquivo é o que mantém uma
-# instalação sem binário funcionando igual à empacotada.
+# por aqui. Procura o executável compilado antes de cair no fonte com o bun.
+#
+# O binário do pacote fica em /usr/bin e NÃO dentro da árvore do plugin:
+# `claude plugin install` a partir de um marketplace em disco copia os arquivos
+# para ~/.claude/plugins/cache de cada usuário (verificado em 2026-09-21), e 92
+# MB por usuário é o que essa busca evita. Este shim tem 1 KB e pode ser copiado
+# à vontade.
 set -e
 
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 
 if [ -x "$root/dist/local-session" ]; then
   exec "$root/dist/local-session" "$@"
+fi
+
+sistema=$(command -v local-session 2>/dev/null || true)
+if [ -n "$sistema" ] && [ "$sistema" != "$0" ] && [ -x "$sistema" ]; then
+  exec "$sistema" "$@"
 fi
 
 # O MCP server depende de @modelcontextprotocol/sdk e zod. Instalar aqui, uma

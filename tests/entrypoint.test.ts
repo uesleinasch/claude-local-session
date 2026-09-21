@@ -13,10 +13,17 @@ describe('shim bin/local-session', () => {
     expect(statSync(SHIM).mode & 0o111).toBeGreaterThan(0)
   })
 
-  test('prefere o binário compilado e cai no fonte', () => {
+  test('procura o binário local, depois o do sistema, e só então o fonte', () => {
     const sh = readFileSync(SHIM, 'utf8')
-    expect(sh).toContain('dist/local-session')
-    expect(sh).toContain('src/cli.ts')
+    const ordem = ['dist/local-session', 'command -v local-session', 'src/cli.ts'].map(t =>
+      sh.indexOf(t),
+    )
+    expect(ordem.every(i => i >= 0)).toBe(true)
+    expect([...ordem].sort((a, b) => a - b)).toEqual(ordem)
+  })
+
+  test('não se chama a si mesmo — o shim pode estar no PATH como local-session', () => {
+    expect(readFileSync(SHIM, 'utf8')).toContain('"$sistema" != "$0"')
   })
 })
 

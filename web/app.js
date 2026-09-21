@@ -14,6 +14,7 @@ const titleEl = document.getElementById('title')
 const stateEl = document.getElementById('state')
 const list = document.getElementById('session-list')
 const sessionsEmpty = document.getElementById('sessions-empty')
+const outdatedEl = document.getElementById('outdated')
 const feed = document.getElementById('feed')
 const feedEmpty = document.getElementById('feed-empty')
 const input = document.getElementById('input')
@@ -323,6 +324,7 @@ function handle(msg) {
       quickPrompts: Array.isArray(msg.quickPrompts) ? msg.quickPrompts : [],
       home: typeof msg.home === 'string' ? msg.home : '',
     }
+    renderOutdated(msg.outdated)
     if (hubConfig.canSpawn && !browse) send({ type: 'browse', path: '' })
     renderSpawn()
     renderQuick()
@@ -828,6 +830,22 @@ const terminalPanel = createTerminalPanel({
 
 // Um toque manda o prompt: é o ponto do atalho. Por isso os padrões do hub não
 // têm efeito colateral — nada de commit/push por engano no bolso.
+// O binário do sistema é mais novo que a cópia do plugin no cache deste
+// usuário: os manifestos (hooks, mcp, commands) podem ter mudado e ninguém
+// perceberia — hook que não dispara não reclama.
+function renderOutdated(outdated) {
+  const show = Boolean(outdated) && typeof outdated.built === 'string'
+  outdatedEl.hidden = !show
+  if (!show) return
+  outdatedEl.replaceChildren()
+
+  const texto = document.createElement('span')
+  texto.textContent = `plugin ${outdated.installed} com binário ${outdated.built} — atualize:`
+  const cmd = document.createElement('code')
+  cmd.textContent = 'local-session setup'
+  outdatedEl.append(texto, cmd)
+}
+
 function renderQuick() {
   const s = current()
   const show = app.dataset.view === 'feed' && Boolean(s?.alive) && hubConfig.quickPrompts.length > 0

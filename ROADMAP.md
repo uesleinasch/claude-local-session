@@ -166,19 +166,17 @@ Ordem: o binário é o conteúdo do pacote, e a bandeja só vale depois que o pa
   o SDK do MCP; com as deps embutidas, some. Editar `web/` e ver na hora sobreviveu de graça —
   rodando do fonte, `with { type: 'file' }` devolve o caminho real no disco — e no binário volta
   com `LOCAL_SESSION_WEB_DIR`.
-- **Pacote nativo (`.deb`/`.rpm`)** — o `postinst` roda com privilégio, então escreve o
-  `/etc/claude-code/managed-settings.json` sem diálogo de senha, instala a unit do systemd e
-  declara `tmux` como dependência de pacote em vez de descobri-lo em runtime (`Bun.which`, em
-  `src/hub.ts:71-74`), onde a ausência hoje só apaga botões da página sem dizer por quê. **A
-  incógnita que decidia a viabilidade caiu** (verificado em 2026-09-21): `claude plugin
-  marketplace add <source>` aceita "a URL, path, or GitHub repo" e ainda tem
-  `--scope user|project|local`, então o pacote pode entregar o plugin em `/usr/lib` e registrá-lo
-  por caminho, sem rede. Falta desenhar: o registro é **por usuário**
-  (`~/.claude/plugins/cache/...`), então o `postinst` não consegue fazê-lo por quem ainda nem
-  logou — vai junto da função de shell do `--channels` num passo pós-instalação (o
-  `/local-session:setup` de hoje), não no `postinst`. Com o binário pronto, o conteúdo do pacote
-  passa a ser `dist/local-session` + `web/` opcional + a unit; `systemdUnit(..., standalone)` já
-  emite `ExecStart=<bin> hub` com `Environment=LOCAL_SESSION_ROOT`.
+- ~~**Pacote nativo (`.deb`)**~~ — feito: `bun run package` monta o pacote (26 MB comprimidos,
+  92 MB instalados) com `Depends: tmux`, a unit em `/usr/lib/systemd/user/` e um `postinst` que
+  chama `/usr/bin/local-session managed-settings --apply` — o merge fica no núcleo testado em
+  vez de virar shell que perderia o cuidado com allowlist alheia e arquivo corrompido. Duas
+  coisas mudaram em relação ao desenho de agosto, ambas por medição: `claude plugin install` a
+  partir de um caminho **copia** a árvore para o cache de cada usuário, então o binário mora em
+  `/usr/bin` e fora do plugin; e `web/` não é conteúdo do pacote, porque está dentro do binário.
+  O registro do plugin continua sendo por usuário — é o passo 0 do `setup`, e a mensagem
+  pós-instalação manda rodá-lo. Como o cache é cópia, o hub compara a versão embutida com a da
+  árvore instalada e a página avisa quando divergem. Falta: `.rpm`, assinatura e repositório
+  APT.
 - **Flatpak, Snap e AppImage não servem** — o trabalho do hub é justamente rodar `tmux`, `git` e
   `claude` do host, e o sandbox do Flatpak e do Snap existe para impedir exatamente isso. O
   AppImage não tem `postinst`, então não escreve o managed-settings nem instala a unit; vale como

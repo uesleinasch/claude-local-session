@@ -157,6 +157,8 @@ export type HubToBrowser =
       canTerminal: boolean
       quickPrompts: string[]
       home?: string
+      /** Binário mais novo que a cópia do plugin no cache do usuário. */
+      outdated?: { built: string; installed: string }
     }
   | { type: 'dir'; path: string; parent: string | null; dirs: { name: string; path: string }[] }
   | { type: 'changes'; sessionId: string; ok: boolean; text: string; branch?: string }

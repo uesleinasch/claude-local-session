@@ -5,7 +5,15 @@ import { dirname, join } from 'node:path'
  * um entrypoint só, e um executável por programa multiplicaria o runtime do Bun
  * (~90 MB) por quantos fossem.
  */
-export const COMMANDS = ['hub', 'mcp', 'hook', 'context-hook', 'setup', 'service'] as const
+export const COMMANDS = [
+  'hub',
+  'mcp',
+  'hook',
+  'context-hook',
+  'setup',
+  'service',
+  'managed-settings',
+] as const
 
 export type Command = (typeof COMMANDS)[number]
 
@@ -16,6 +24,7 @@ const DESCRIPTIONS: Record<Command, string> = {
   'context-hook': 'payload do statusline, lido do stdin',
   setup: 'configura as camadas do canal nesta máquina',
   service: 'instala o hub como serviço de usuário do systemd',
+  'managed-settings': 'habilita o canal em /etc (usado pelo postinst do pacote)',
 }
 
 export function parseCommand(argv: readonly string[]): Command | null {

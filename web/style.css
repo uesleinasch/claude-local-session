@@ -2065,6 +2065,43 @@ body {
 
 /* ---------- avisos flutuantes ---------- */
 
+/* Binário do sistema mais novo que a cópia do plugin no cache: fica no topo,
+   e não no rodapé como os outros avisos, porque não é transitório — some só
+   depois de rodar o setup. */
+#outdated {
+  position: fixed;
+  left: 50%;
+  top: calc(var(--sp-8) + env(safe-area-inset-top));
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-8);
+  margin: 0;
+  padding: var(--sp-8) var(--sp-14);
+  max-width: min(92vw, 60ch);
+  border-radius: var(--r-sm);
+  background: var(--amber);
+  color: #0a0b0c;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-align: center;
+}
+
+#outdated[hidden] {
+  display: none;
+}
+
+#outdated code {
+  padding: 2px var(--sp-4);
+  border-radius: var(--r-sm);
+  background: rgba(0, 0, 0, 0.22);
+  font-family: var(--mono);
+  font-weight: 700;
+}
+
 #offline,
 #toast {
   position: fixed;

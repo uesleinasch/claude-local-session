@@ -109,6 +109,27 @@ export function mergeManagedSettings(
   }
 }
 
+/**
+ * Desinstalação tira só a entrada deste plugin. `channelsEnabled` fica como
+ * está: é chave global, e desligá-la calaria o canal de qualquer outro plugin
+ * que a allowlist ainda autorize.
+ */
+export function removeManagedEntry(
+  current: ManagedSettings | null,
+  entry: PluginIdentity,
+): Merge<ManagedSettings> {
+  const base = current ?? {}
+  const list = Array.isArray(base.allowedChannelPlugins) ? base.allowedChannelPlugins : []
+  const next = list.filter(
+    e =>
+      typeof e !== 'object' ||
+      e === null ||
+      e.plugin !== entry.plugin ||
+      e.marketplace !== entry.marketplace,
+  )
+  return { next: { ...base, allowedChannelPlugins: next }, changed: next.length !== list.length }
+}
+
 export function mergeUserPermissions(
   current: Record<string, unknown> | null,
   tool: string,

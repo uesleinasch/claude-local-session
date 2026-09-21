@@ -6,6 +6,7 @@ import {
   mergeManagedSettings,
   mergeUserPermissions,
   rcPathFor,
+  removeManagedEntry,
   replyToolName,
   systemdUnit,
 } from '../src/setup-core'
@@ -211,5 +212,26 @@ describe('systemdUnit no executável compilado', () => {
 
   test('leva a raiz no ambiente: o binário do pacote vive longe dos metadados', () => {
     expect(unit).toContain('Environment=LOCAL_SESSION_ROOT=/usr/lib/local-session')
+  })
+})
+
+describe('removeManagedEntry', () => {
+  const outro = { plugin: 'outro', marketplace: 'terceiros' }
+
+  test('tira só a nossa entrada e deixa as alheias', () => {
+    const atual = { channelsEnabled: true, allowedChannelPlugins: [outro, ID] }
+    const { next, changed } = removeManagedEntry(atual, ID)
+    expect(changed).toBe(true)
+    expect(next.allowedChannelPlugins).toEqual([outro])
+  })
+
+  test('não desliga channelsEnabled — é chave global de outros plugins', () => {
+    const atual = { channelsEnabled: true, allowedChannelPlugins: [ID] }
+    expect(removeManagedEntry(atual, ID).next.channelsEnabled).toBe(true)
+  })
+
+  test('entrada ausente não conta como mudança', () => {
+    const atual = { channelsEnabled: true, allowedChannelPlugins: [outro] }
+    expect(removeManagedEntry(atual, ID).changed).toBe(false)
   })
 })

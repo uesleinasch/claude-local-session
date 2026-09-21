@@ -54,4 +54,8 @@ switch (cmd) {
     )
     break
   }
+  case 'managed-settings': {
+    const { managedMode, runManaged } = await import('../scripts/managed')
+    process.exit(runManaged(managedMode(process.argv.slice(3))))
+  }
 }

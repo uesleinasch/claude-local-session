@@ -34,6 +34,7 @@ import {
 } from './terminal'
 import { MAX_UPLOAD_BYTES, sniffImage, uploadName } from './upload'
 import { isStandalone, pluginRoot } from './cli-core'
+import { BUILT_VERSION, installedVersion, pluginMismatch } from './plugin-meta'
 import { detectPluginIdentity, type PluginIdentity } from './setup-core'
 import { assetPath } from './web-assets'
 
@@ -145,6 +146,8 @@ function toast(ws: Ws, text: string): void {
 
 const browserSockets = new Set<Ws>()
 
+const OUTDATED = pluginMismatch(BUILT_VERSION, installedVersion(ROOT))
+
 function configMsg(): string {
   return JSON.stringify({
     type: 'config',
@@ -154,6 +157,7 @@ function configMsg(): string {
     canTerminal: CAN_TERMINAL,
     quickPrompts: QUICK_PROMPTS,
     home: HOME,
+    ...(OUTDATED ? { outdated: OUTDATED } : {}),
   } satisfies HubToBrowser)
 }
 
