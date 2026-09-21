@@ -23,6 +23,7 @@ import {
   type SessionToHub,
 } from './protocol'
 import { keySequenceFor, type KeyStep } from './question-keys'
+import { dirIsTrusted, isTrustPrompt, TRUST_KEYS } from './trust'
 import {
   clampCols,
   clampRows,
@@ -256,8 +257,8 @@ function openTerminal(ws: Ws, dir: string, size: { cols: number; rows: number })
 
 // O claude é um app de TTY: sem terminal não há sessão interativa. O tmux dá o
 // TTY e a sobrevivência — a sessão continua viva se o hub ou o navegador caírem.
-async function spawnSession(dir: string): Promise<string | null> {
-  if (!IDENTITY) return 'identidade do plugin desconhecida'
+async function spawnSession(dir: string): Promise<{ name: string } | { error: string }> {
+  if (!IDENTITY) return { error: 'identidade do plugin desconhecida' }
   const name = `ls-${basename(dir).replace(/[^\w-]/g, '_')}-${Date.now().toString(36)}`
   const args = [
     'new-session',
@@ -275,7 +276,44 @@ async function spawnSession(dir: string): Promise<string | null> {
       resolve({ ok: !err, out: `${stdout}${stderr}`.trim() }),
     )
   })
-  return res.ok ? null : `tmux falhou: ${res.out}`
+  return res.ok ? { name } : { error: `tmux falhou: ${res.out}` }
+}
+
+const TRUST_WAIT_MS = 30_000
+const TRUST_POLL_MS = 500
+
+async function paneOfSession(name: string): Promise<string | null> {
+  const panes = await run('tmux', ['list-panes', '-a', '-F', '#{pane_id} #{session_name}'])
+  if (!panes.ok) return null
+  for (const line of panes.out.split('\n')) {
+    const [paneId, sessionName] = line.split(' ')
+    if (paneId !== undefined && sessionName === name) return paneId
+  }
+  return null
+}
+
+/**
+ * O diálogo de confiança leva alguns segundos para ser desenhado e some sozinho
+ * se a pasta já era confiada — por isso o laço espera a tela mostrar o diálogo
+ * em vez de mandar as teclas de uma vez. Sem essa checagem, um Enter às cegas
+ * cairia no prompt de uma sessão já pronta.
+ */
+async function acceptTrustPrompt(sessionName: string): Promise<void> {
+  const deadline = Date.now() + TRUST_WAIT_MS
+  while (Date.now() < deadline) {
+    const paneId = await paneOfSession(sessionName)
+    if (paneId !== null) {
+      const screen = await run('tmux', ['capture-pane', '-p', '-t', paneId])
+      if (screen.ok && isTrustPrompt(screen.out)) {
+        for (const key of TRUST_KEYS) {
+          await run('tmux', ['send-keys', '-t', paneId, key])
+          await Bun.sleep(ANSWER_STEP_DELAY_MS)
+        }
+        return
+      }
+    }
+    await Bun.sleep(TRUST_POLL_MS)
+  }
 }
 
 function ancestorsOf(pid: number): Set<number> {
@@ -639,8 +677,20 @@ function onBrowserMessage(ws: Ws, msg: BrowserToHub): void {
         toast(ws, 'diretório não autorizado para nova sessão')
         return
       }
-      void spawnSession(dir).then(err => {
-        if (err) toast(ws, err)
+      // Sessão nova nasce detached: se a pasta ainda não passou pelo diálogo de
+      // confiança, o claude para nele e ninguém responde — nada registra no hub
+      // e a página fica sem a sessão. Confirmar é decisão de quem está lá.
+      const trusted = dirIsTrusted(dir)
+      if (!trusted && msg.trust !== true) {
+        toBrowser(ws, { type: 'spawn_trust', dir })
+        return
+      }
+      void spawnSession(dir).then(res => {
+        if ('error' in res) {
+          toast(ws, res.error)
+          return
+        }
+        if (!trusted) void acceptTrustPrompt(res.name)
       })
       return
     }

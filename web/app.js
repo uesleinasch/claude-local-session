@@ -338,6 +338,10 @@ function handle(msg) {
     renderSpawn()
     return
   }
+  if (msg.type === 'spawn_trust') {
+    askTrust(String(msg.dir ?? ''))
+    return
+  }
   if (msg.type === 'toast') {
     showToast(String(msg.text ?? ''))
   }
@@ -880,6 +884,23 @@ function confirmSpawn(dir) {
   if (!confirm(`Iniciar uma nova sessão do claude em ${tilde(dir)}?`)) return
   if (send({ type: 'spawn', dir })) showToast('iniciando sessão — ela aparece na lista em instantes')
   else showToast('sem conexão com o hub')
+}
+
+function askTrust(dir) {
+  const ok = confirm(
+    `${tilde(dir)} ainda não foi confiada no Claude Code.\n\n` +
+      'Confiar nesta pasta e iniciar a sessão? O claude poderá ler, editar e ' +
+      'executar arquivos aqui.',
+  )
+  if (!ok) {
+    showToast('sessão não iniciada')
+    return
+  }
+  if (send({ type: 'spawn', dir, trust: true })) {
+    showToast('confiando na pasta e iniciando sessão')
+  } else {
+    showToast('sem conexão com o hub')
+  }
 }
 
 function toggleFavorite(dir, isFav) {

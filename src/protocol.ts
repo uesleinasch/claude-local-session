@@ -131,7 +131,7 @@ export type BrowserToHub =
   | { type: 'answer'; sessionId: string; questionId: string; answers: QuestionAnswer[] }
   | { type: 'automode'; sessionId: string; on: boolean }
   | { type: 'setmodel'; sessionId: string; model: string }
-  | { type: 'spawn'; dir: string }
+  | { type: 'spawn'; dir: string; trust?: boolean }
   | { type: 'interrupt'; sessionId: string }
   | { type: 'kill'; sessionId: string }
   | { type: 'changes'; sessionId: string }
@@ -161,6 +161,7 @@ export type HubToBrowser =
   | { type: 'dir'; path: string; parent: string | null; dirs: { name: string; path: string }[] }
   | { type: 'changes'; sessionId: string; ok: boolean; text: string; branch?: string }
   | { type: 'toast'; text: string }
+  | { type: 'spawn_trust'; dir: string }
   | { type: 'term_ready'; dir: string; seed: string; cols: number; rows: number }
   | { type: 'term_data'; data: string }
   | { type: 'term_exit'; reason: string }
