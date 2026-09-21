@@ -1677,6 +1677,22 @@ stopBtn.addEventListener('click', () => {
   if (!send({ type: 'interrupt', sessionId: currentId })) showToast('sem conexão com o hub')
 })
 
+// Ponte com o cliente Android (`mobile/`): é por aqui que o compartilhamento do
+// Android entrega texto e descobre para qual sessão subir a imagem. Renomear
+// qualquer um dos dois quebra o app sem que nada aqui acuse.
+window.localSession = {
+  inserirNoComposer(texto) {
+    if (typeof texto !== 'string' || texto.trim() === '') return false
+    input.value = input.value === '' ? texto : `${input.value}\n${texto}`
+    resize()
+    input.focus()
+    return true
+  },
+  sessaoAtual() {
+    return currentId ?? null
+  },
+}
+
 if (currentId) app.dataset.view = 'feed'
 renderBar()
 connect()

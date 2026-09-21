@@ -43,7 +43,15 @@ interrupção via tmux). Este documento lista o que vem depois, em ordem de impa
 - **Web Push nativo** — sem app de terceiros, mas exige HTTPS + service worker + VAPID.
   Depois do item 1.
 - **PWA** — manifest + service worker: ícone na home do celular, tela cheia. Pré-requisito
-  do Web Push.
+  do Web Push. **Perdeu urgência no Android** com o cliente nativo do item abaixo, que dá ícone,
+  tela cheia e notificação sem depender de HTTPS; continua sendo o caminho para iOS e desktop.
+- **Cliente Android (`mobile/`)** — em andamento: app Flutter que encapsula a própria página.
+  O token entra uma vez pelo QR que a janela Electron já gera, e o endereço é redescoberto a
+  cada abertura por uma corrida entre os candidatos que o hub declara em `/_endpoints` (LAN,
+  `<hostname>.local` e tailnet), com filtro de rede escolhido pelo usuário. Fase 1 (descoberta,
+  WebView, anexo) entregue; fase 2 (compartilhar de outro app e notificação por ntfy em
+  foreground service) na sequência. Descartados no caminho: FCM (projeto Firebase e os eventos
+  passando pelo Google) e UnifiedPush (empurra o problema para outro app instalado).
 - ~~**Badges na lista de sessões**~~ — feito: `waiting` e `lastEventAt` no `SessionSummary`
   viram "aguardando você", "trabalhando", "ociosa há N min" e "encerrada". O texto é uma
   função pura (`web/session-status.js`), e a lista se redesenha de minuto em minuto para o

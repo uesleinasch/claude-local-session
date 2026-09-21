@@ -1,0 +1,88 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:local_session/ponte/ponte_web.dart';
+import 'package:local_session/tela/navegacao.dart';
+
+class TelaSessao extends StatefulWidget {
+  const TelaSessao({
+    super.key,
+    required this.url,
+    required this.host,
+    required this.aoAbrirAjustes,
+    required this.aoPerderOHub,
+    required this.ponte,
+  });
+
+  final String url;
+  final String host;
+  final VoidCallback aoAbrirAjustes;
+  final VoidCallback aoPerderOHub;
+  final PonteWeb ponte;
+
+  @override
+  State<TelaSessao> createState() => _TelaSessaoState();
+}
+
+class _TelaSessaoState extends State<TelaSessao> {
+  InAppWebViewController? _controle;
+
+  @override
+  void dispose() {
+    widget.ponte.desligar();
+    super.dispose();
+  }
+
+  Future<void> _voltar(bool jaSaiu) async {
+    if (jaSaiu) return;
+    final controle = _controle;
+    if (controle != null && await controle.canGoBack()) {
+      await controle.goBack();
+      return;
+    }
+    if (mounted) Navigator.of(context).maybePop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (jaSaiu, _) => _voltar(jaSaiu),
+      child: Scaffold(
+        appBar: AppBar(
+          toolbarHeight: 38,
+          title: Text(widget.host, style: const TextStyle(fontSize: 13)),
+          actions: [
+            IconButton(
+              iconSize: 20,
+              onPressed: widget.aoAbrirAjustes,
+              icon: const Icon(Icons.settings_outlined),
+              tooltip: 'Ajustes',
+            ),
+          ],
+        ),
+        body: SafeArea(
+          child: InAppWebView(
+            initialUrlRequest: URLRequest(url: WebUri(widget.url)),
+            initialSettings: InAppWebViewSettings(
+              supportZoom: false,
+              useHybridComposition: true,
+              javaScriptCanOpenWindowsAutomatically: false,
+              mediaPlaybackRequiresUserGesture: false,
+            ),
+            shouldOverrideUrlLoading: (_, acao) async =>
+                podeNavegar(widget.host, acao.request.url)
+                    ? NavigationActionPolicy.ALLOW
+                    : NavigationActionPolicy.CANCEL,
+            onWebViewCreated: (controle) {
+              _controle = controle;
+              widget.ponte.ligar(controle);
+            },
+            onReceivedError: (_, requisicao, erro) {
+              if (requisicao.isForMainFrame ?? false) widget.aoPerderOHub();
+            },
+          ),
+        ),
+      ),
+    );
+  }
+}

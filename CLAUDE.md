@@ -27,6 +27,16 @@ bun scripts/setup.ts            # configura as 3 camadas de canal na máquina
 bun scripts/service.ts          # unit de usuário do systemd para o hub
 ```
 
+O cliente Android vive em `mobile/` e tem toolchain própria — nada aqui depende de o Flutter
+estar instalado:
+
+```bash
+cd mobile && flutter test       # núcleos puros do app
+cd mobile && flutter analyze    # checagem estática do Dart
+cd mobile && flutter build apk --debug
+adb install -r mobile/build/app/outputs/flutter-apk/app-debug.apk
+```
+
 ## Um ponto de entrada, oito subcomandos
 
 Hub, MCP server, os dois hooks e os scripts de configuração são **um programa só**:
@@ -176,6 +186,34 @@ O autostart da bandeja é um `.desktop` em `~/.config/autostart/`, escrito pela 
 `--tray`, sem abrir janela na cara de quem acabou de logar. O serviço do hub é outra coisa e
 continua sendo systemd.
 
+## O cliente Android (`mobile/`)
+
+App Flutter que **encapsula a mesma página** que o hub serve. Nativo é só o que a página não
+consegue fazer por si: achar o hub, guardar o token e falar com o Android. Reimplementar o feed
+em Dart daria a `src/protocol.ts` um terceiro cliente para esquecer de atualizar.
+
+O que decide o desenho é a fronteira de segurança: **toda requisição ao hub exige token, e sem
+ele a resposta é 404**. Então o endereço é descoberto sozinho, mas o token entra **uma vez**,
+pelo QR que a janela Electron já gera — `lerLink` (`lib/pareamento/link.dart`) lê exatamente a
+URL `http://host:7777/?t=…` que ela produz. Nem o Electron nem o hub mudaram para isso.
+
+- **A corrida** (`lib/descoberta/candidatos.dart`): o app tenta todos os endereços conhecidos em
+  paralelo e fica com o primeiro que responder o `/_endpoints`. A resposta do vencedor renova a
+  lista, então trocar de IP por DHCP se corrige sozinho enquanto **alguma** rota funcionar.
+- **`rotuloDoHost` existe por causa do filtro de rede**: o QR não diz se aquele endereço é LAN ou
+  tailnet, e sem classificar pela faixa CGNAT (a mesma de `isCgnat`, em `src/config.ts`) o modo
+  "só VPN" descartaria justamente o endereço pareado.
+- **Falhar é ambíguo de propósito**: token errado e "não é o hub" são o mesmo 404, então a tela de
+  erro cita as duas causas em vez de adivinhar uma.
+- **`network_security_config.xml`** libera texto claro. Sem ele o Android 9+ recusa HTTP e o erro
+  não explica nada. Some quando o hub tiver HTTPS.
+- **`flutter_inappwebview`, não `webview_flutter`**: só o primeiro implementa
+  `onShowFileChooser`, sem o qual o `<input type="file">` da página fica inerte e anexar imagem
+  não funciona dentro do app.
+- O núcleo puro leva a sonda como parâmetro (`correr(candidatos, sonda)`), igual a
+  `tailscaleAddress(nets = …)`. `flutter test` cobre os núcleos; `bun test` não depende do
+  Flutter estar instalado.
+
 ## `src/protocol.ts` é o contrato
 
 Todas as mensagens dos quatro lados vivem lá: `SessionToHub`, `HubToSession`, `BrowserToHub`,
@@ -246,6 +284,11 @@ e presas ao **diretório**, não à sessão do Claude: sobrevivem ao hub e ao na
 - Upload é reconhecido pelos **bytes**, não pelo nome nem pelo content-type.
 - `web/vendor/` é xterm.js/addon-fit de terceiros (MIT), servido com `cache-control: immutable`.
   Não editar.
+- No app Android a WebView só navega para o host pareado (`podeNavegar`, em
+  `mobile/lib/tela/navegacao.dart`): ali não existe barra de endereço, então um link do feed
+  levaria a pessoa para fora do hub sem nenhum sinal na tela. Texto vindo de outro aparelho pela
+  ponte entra como literal JSON (`chamadaInserir`), nunca concatenado no JS — a página roda
+  autenticada com o token.
 
 ## A dança do deploy local
 

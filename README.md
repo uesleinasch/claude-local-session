@@ -386,6 +386,34 @@ fica somente leitura.
 no processo do `claude` — o mesmo que fechá-lo no terminal. Em sessões já encerradas o
 `✕` apenas limpa o item da lista.
 
+## O app de Android
+
+`mobile/` é um cliente Flutter que abre direto na sessão: encapsula a mesma página, mas
+encontra o hub sozinho. Você não digita endereço nem token.
+
+**O pareamento é uma vez só.** Abra a janela do Local Session na máquina, vá em *acesso* e
+aponte o app para o QR code. Ele guarda o token no armazenamento cifrado do Android — e a
+partir daí só o endereço é redescoberto.
+
+**A cada abertura o app corre atrás do hub.** Ele pergunta ao `/_endpoints` por quais
+endereços o hub responde (IP da LAN, `<hostname>.local` e o nome da tailnet), tenta todos ao
+mesmo tempo e fica com o primeiro que responder. Trocar de Wi-Fi para 4G, ou o roteador mudar
+o IP por DHCP, não pede nenhuma ação sua. Em *ajustes* dá para limitar a busca a **só rede
+local** ou **só VPN** — útil em Wi-Fi que isola os aparelhos, ou quando a VPN está lenta.
+
+Se aparecer "não encontrei o hub", é uma destas três: a máquina está fora do ar, o celular não
+está em nenhuma das redes, ou o token mudou (o hub responde 404 nos três casos, de propósito —
+veja *Segurança*). Nesse último caso, escaneie o QR de novo.
+
+Para compilar e instalar, com o Flutter e o SDK do Android na máquina:
+
+```bash
+cd mobile
+flutter test                 # núcleos puros
+flutter build apk --debug
+adb install -r build/app/outputs/flutter-apk/app-debug.apk
+```
+
 ## Segurança
 
 O token é a única barreira, e essa página aprova `Bash`. Quem tiver o link executa código

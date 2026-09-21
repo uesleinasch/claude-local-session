@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  O hub serve HTTP puro e o Android 9+ recusa texto claro por padrão, sem erro que
+  explique a recusa. Liberado para todo destino porque o endereço do hub muda de
+  rede para rede e não é conhecido em tempo de build. Some quando o hub ganhar
+  HTTPS (item 1 do ROADMAP.md).
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
