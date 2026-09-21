@@ -1,6 +1,13 @@
 #!/usr/bin/env bun
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+} from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { readConfig } from '../src/config'
@@ -8,6 +15,7 @@ import { DEFAULT_PORT } from '../src/protocol'
 import { STALE_FILES, SYNC_DIRS, SYNC_FILES, pidsOnPort, versionDirs } from '../src/update-core'
 
 const REPO = process.cwd()
+const BINARIO_REPO = join(REPO, 'dist', 'local-session')
 const HOME = homedir()
 const DRY = process.argv.includes('--check')
 
@@ -72,8 +80,25 @@ if (DRY) {
       copyFileSync(join(REPO, file), join(dir, file))
     }
     for (const file of STALE_FILES) rmSync(join(dir, file), { force: true })
+
+    // Com o pacote instalado, `/usr/bin/local-session` entra no PATH e o shim
+    // do cache passa a preferi-lo ao fonte — hooks e MCP rodariam o binário do
+    // apt enquanto o hub vem do .ts recém-espelhado. O link devolve a
+    // precedência ao build do repo, que é o primeiro lugar onde o shim olha;
+    // sem repo no disco ele quebra e o shim cai no binário do sistema, que é o
+    // comportamento certo para quem só instalou.
+    const linkDist = join(dir, 'dist', 'local-session')
+    rmSync(linkDist, { force: true })
+    if (existsSync(BINARIO_REPO)) {
+      mkdirSync(dirname(linkDist), { recursive: true })
+      symlinkSync(BINARIO_REPO, linkDist)
+    }
   }
   did(`código espelhado em ${dirs.length} diretório(s) do cache`)
+  if (existsSync(BINARIO_REPO)) did('dist/local-session do repo tem precedência sobre o do apt')
+  else if (Bun.which('local-session')) {
+    miss('sem dist/local-session, os hooks usarão o binário do apt — rode `bun run build`')
+  }
 }
 
 // Trocar o hub é matar quem tem a porta: o respawner da primeira sessão que
