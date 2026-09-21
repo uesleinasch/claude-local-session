@@ -1,9 +1,18 @@
 import type { Server, ServerWebSocket } from 'bun'
 import { execFile } from 'node:child_process'
 import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { homedir, hostname } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
-import { configDir, loadConfig, readCookie, saveProjects, tokenMatches } from './config'
+import {
+  configDir,
+  lanAddress,
+  loadConfig,
+  readCookie,
+  saveProjects,
+  tailscaleAddress,
+  tokenMatches,
+} from './config'
+import { montarDescoberta } from './endpoints'
 import { formatChanges } from './git-changes'
 import { HistoryStore } from './history'
 import { Registry, type Sink } from './hub-state'
@@ -23,6 +32,7 @@ import {
   type SessionToHub,
 } from './protocol'
 import { keySequenceFor, type KeyStep } from './question-keys'
+import { probeTailscale, resolveState } from './tailscale'
 import { dirIsTrusted, isTrustPrompt, TRUST_KEYS } from './trust'
 import {
   clampCols,
@@ -460,6 +470,35 @@ function extractToken(req: Request, url: URL): string | null {
   )
 }
 
+const DESCOBERTA_TTL_MS = 30_000
+let descobertaCache: { ate: number; corpo: string } | null = null
+
+/**
+ * O app dispara esta rota em todos os candidatos de uma vez para ver quem
+ * responde primeiro, e cada resposta custa um `tailscale status` em subprocesso:
+ * sem o cache, uma abertura do celular spawna um processo por endereço.
+ */
+async function handleEndpoints(): Promise<Response> {
+  const agora = Date.now()
+  if (descobertaCache === null || agora > descobertaCache.ate) {
+    const tailscale = resolveState(await probeTailscale(), tailscaleAddress())
+    const corpo = JSON.stringify(
+      montarDescoberta({
+        versao: BUILT_VERSION,
+        porta: cfg.port,
+        lan: await lanAddress(),
+        tailscale: tailscale?.kind === 'running' ? tailscale.host : null,
+        hostname: hostname(),
+        ntfy: cfg.notifyUrl,
+      }),
+    )
+    descobertaCache = { ate: agora + DESCOBERTA_TTL_MS, corpo }
+  }
+  return new Response(descobertaCache.corpo, {
+    headers: { 'content-type': 'application/json', 'cache-control': 'no-store' },
+  })
+}
+
 async function handleActivity(req: Request): Promise<Response> {
   if (req.method !== 'POST') return notFound()
   let body: unknown
@@ -863,6 +902,7 @@ function startServer(): void {
           const role = url.searchParams.get('role') === 'session' ? 'session' : 'browser'
           return srv.upgrade(req, { data: { role } }) ? undefined : notFound()
         }
+        if (url.pathname === '/_endpoints') return handleEndpoints()
         if (url.pathname === '/_upload') return handleUpload(req, url)
         if (url.pathname === '/_activity') return handleActivity(req)
         if (url.pathname === '/_context') return handleContext(req)

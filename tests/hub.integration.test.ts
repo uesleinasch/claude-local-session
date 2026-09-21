@@ -5,6 +5,8 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'no
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { loadConfig } from '../src/config'
+import type { Descoberta } from '../src/endpoints'
+import { BUILT_VERSION } from '../src/plugin-meta'
 
 let dir: string
 let port: number
@@ -192,6 +194,31 @@ describe('gate de token', () => {
 
   test('rota desconhecida com token válido continua 404', async () => {
     const res = await fetch(`${base()}/../etc/passwd?t=${token}`)
+    expect(res.status).toBe(404)
+  })
+})
+
+describe('descoberta para o app', () => {
+  test('entrega versão, porta e candidatos rotulados', async () => {
+    const res = await fetch(`${base()}/_endpoints?t=${token}`)
+    expect(res.status).toBe(200)
+    const body = (await res.json()) as Descoberta
+    expect(body.versao).toBe(BUILT_VERSION)
+    expect(body.porta).toBe(port)
+    for (const candidato of body.candidatos) {
+      expect(['lan', 'vpn']).toContain(candidato.rotulo)
+      expect(candidato.host).not.toBe('127.0.0.1')
+    }
+  })
+
+  test('o tópico ntfy configurado vai junto, para o app não perguntar de novo', async () => {
+    const res = await fetch(`${base()}/_endpoints?t=${token}`)
+    const body = (await res.json()) as Descoberta
+    expect(body.ntfy).toBe(`http://127.0.0.1:${notifyServer.port}/avisos`)
+  })
+
+  test('sem token a descoberta não existe', async () => {
+    const res = await fetch(`${base()}/_endpoints`)
     expect(res.status).toBe(404)
   })
 })
