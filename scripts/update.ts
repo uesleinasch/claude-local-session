@@ -1,11 +1,11 @@
 #!/usr/bin/env bun
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { readConfig } from '../src/config'
 import { DEFAULT_PORT } from '../src/protocol'
-import { SYNC_DIRS, SYNC_FILES, pidsOnPort, versionDirs } from '../src/update-core'
+import { STALE_FILES, SYNC_DIRS, SYNC_FILES, pidsOnPort, versionDirs } from '../src/update-core'
 
 const REPO = process.cwd()
 const HOME = homedir()
@@ -55,7 +55,9 @@ ok(`repo ${plugin.version} · cache ${installed?.version ?? '?'} · ${dirs.lengt
 // Espelha em todos os diretórios: uma sessão antiga respawna o hub do próprio
 // root, e um diretório esquecido devolve o código velho no primeiro respawn.
 if (DRY) {
-  did(`espelharia ${SYNC_DIRS.join(', ')} + plugin.json em ${dirs.length} diretório(s)`)
+  did(
+    `espelharia ${SYNC_DIRS.join(', ')} + ${SYNC_FILES.length} arquivo(s) e apagaria ${STALE_FILES.join(', ')} em ${dirs.length} diretório(s)`,
+  )
 } else {
   const rsync = Bun.which('rsync')
   for (const dir of dirs) {
@@ -69,6 +71,7 @@ if (DRY) {
       mkdirSync(dirname(join(dir, file)), { recursive: true })
       copyFileSync(join(REPO, file), join(dir, file))
     }
+    for (const file of STALE_FILES) rmSync(join(dir, file), { force: true })
   }
   did(`código espelhado em ${dirs.length} diretório(s) do cache`)
 }

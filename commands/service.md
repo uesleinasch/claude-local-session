@@ -8,7 +8,7 @@ reconfigurar depois, por exemplo quando a unit ficou apontando para uma versão 
 cache.
 
 ```
-bun "${CLAUDE_PLUGIN_ROOT}/scripts/service.ts"
+"${CLAUDE_PLUGIN_ROOT}/bin/local-session" service
 ```
 
 O script é idempotente: o que já estiver certo aparece com `✓`, o que ele mudar com `▸`.

@@ -33,11 +33,17 @@ import {
   type TermListener,
 } from './terminal'
 import { MAX_UPLOAD_BYTES, sniffImage, uploadName } from './upload'
+import { isStandalone, pluginRoot } from './cli-core'
 import { detectPluginIdentity, type PluginIdentity } from './setup-core'
+import { assetPath } from './web-assets'
 
 const cfg = loadConfig()
-const ROOT = join(import.meta.dir, '..')
-const WEB_DIR = join(ROOT, 'web')
+const ROOT = pluginRoot({
+  standalone: isStandalone(Bun.main),
+  moduleDir: import.meta.dir,
+  execPath: process.execPath,
+  env: process.env.LOCAL_SESSION_ROOT,
+})
 
 const store = new HistoryStore(join(configDir(), 'history'))
 const notifier = new Notifier(cfg.notifyUrl === undefined ? null : postToNtfy(cfg.notifyUrl))
@@ -838,91 +844,103 @@ function onBrowserMessage(ws: Ws, msg: BrowserToHub): void {
 }
 
 let server: Server<WsData>
-try {
-  server = Bun.serve<WsData, string>({
-    port: cfg.port,
-    hostname: '0.0.0.0',
-    idleTimeout: 120,
+function startServer(): void {
+  try {
+    server = Bun.serve<WsData, string>({
+      port: cfg.port,
+      hostname: '0.0.0.0',
+      idleTimeout: 120,
 
-    fetch(req, srv) {
-      const url = new URL(req.url)
-      if (!tokenMatches(cfg.token, extractToken(req, url))) return notFound()
+      fetch(req, srv) {
+        const url = new URL(req.url)
+        if (!tokenMatches(cfg.token, extractToken(req, url))) return notFound()
 
-      if (url.pathname === '/_ws') {
-        const role = url.searchParams.get('role') === 'session' ? 'session' : 'browser'
-        return srv.upgrade(req, { data: { role } }) ? undefined : notFound()
-      }
-      if (url.pathname === '/_upload') return handleUpload(req, url)
-      if (url.pathname === '/_activity') return handleActivity(req)
-      if (url.pathname === '/_context') return handleContext(req)
+        if (url.pathname === '/_ws') {
+          const role = url.searchParams.get('role') === 'session' ? 'session' : 'browser'
+          return srv.upgrade(req, { data: { role } }) ? undefined : notFound()
+        }
+        if (url.pathname === '/_upload') return handleUpload(req, url)
+        if (url.pathname === '/_activity') return handleActivity(req)
+        if (url.pathname === '/_context') return handleContext(req)
 
-      const asset = STATIC[url.pathname]
-      if (!asset) return notFound()
-      const headers: Record<string, string> = {
-        'content-type': asset.type,
-        'cache-control': asset.immutable
-          ? 'private, max-age=31536000, immutable'
-          : 'no-store',
-      }
-      if (url.pathname === '/') {
-        headers['set-cookie'] =
-          `ls_token=${cfg.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`
-      }
-      return new Response(Bun.file(join(WEB_DIR, asset.file)), { headers })
-    },
+        const asset = STATIC[url.pathname]
+        if (!asset) return notFound()
+        const file = assetPath(asset.file)
+        if (file === null) return notFound()
+        const headers: Record<string, string> = {
+          'content-type': asset.type,
+          'cache-control': asset.immutable
+            ? 'private, max-age=31536000, immutable'
+            : 'no-store',
+        }
+        if (url.pathname === '/') {
+          headers['set-cookie'] =
+            `ls_token=${cfg.token}; HttpOnly; SameSite=Strict; Path=/; Max-Age=31536000`
+        }
+        return new Response(Bun.file(file), { headers })
+      },
 
-    websocket: {
-      open(ws: Ws) {
-        if (ws.data.role === 'browser') {
-          browserSockets.add(ws)
-          registry.addBrowser(ws as Sink)
+      websocket: {
+        open(ws: Ws) {
+          if (ws.data.role === 'browser') {
+            browserSockets.add(ws)
+            registry.addBrowser(ws as Sink)
+            try {
+              ws.send(configMsg())
+            } catch {}
+          }
+        },
+        message(ws: Ws, raw) {
+          let msg: unknown
           try {
-            ws.send(configMsg())
-          } catch {}
-        }
+            msg = JSON.parse(typeof raw === 'string' ? raw : raw.toString())
+          } catch {
+            return
+          }
+          if (typeof msg !== 'object' || msg === null) return
+          if (ws.data.role === 'session') onSessionMessage(ws, msg as SessionToHub)
+          else onBrowserMessage(ws, msg as BrowserToHub)
+        },
+        close(ws: Ws) {
+          if (ws.data.role === 'browser') {
+            browserSockets.delete(ws)
+            stopWatching(ws)
+            registry.removeBrowser(ws as Sink)
+          } else {
+            registry.removeSession(ws as Sink)
+          }
+        },
       },
-      message(ws: Ws, raw) {
-        let msg: unknown
-        try {
-          msg = JSON.parse(typeof raw === 'string' ? raw : raw.toString())
-        } catch {
-          return
-        }
-        if (typeof msg !== 'object' || msg === null) return
-        if (ws.data.role === 'session') onSessionMessage(ws, msg as SessionToHub)
-        else onBrowserMessage(ws, msg as BrowserToHub)
-      },
-      close(ws: Ws) {
-        if (ws.data.role === 'browser') {
-          browserSockets.delete(ws)
-          stopWatching(ws)
-          registry.removeBrowser(ws as Sink)
-        } else {
-          registry.removeSession(ws as Sink)
-        }
-      },
-    },
-  })
-} catch {
-  // Outra instância ganhou a porta na largada — o vencedor atende por todos.
-  process.exit(0)
-}
-
-let lastAlive = Date.now()
-setInterval(() => {
-  registry.sweep()
-  // Com spawn configurado, o hub é serviço permanente: matar a última sessão
-  // pelo navegador não pode derrubar justamente quem permite criar a próxima.
-  // Navegador conectado também segura — fechar tudo com alguém olhando o
-  // histórico derrubaria a página no meio da leitura.
-  if (registry.hasAlive() || registry.hasBrowsers() || CAN_SPAWN) {
-    lastAlive = Date.now()
-    return
-  }
-  if (Date.now() - lastAlive > IDLE_SHUTDOWN_MS) {
-    server.stop(true)
+    })
+  } catch {
+    // Outra instância ganhou a porta na largada — o vencedor atende por todos.
     process.exit(0)
   }
-}, 15_000)
+}
 
-process.stderr.write(`local-session hub: :${cfg.port}\n`)
+function watchIdle(): void {
+  let lastAlive = Date.now()
+  setInterval(() => {
+    registry.sweep()
+    // Com spawn configurado, o hub é serviço permanente: matar a última sessão
+    // pelo navegador não pode derrubar justamente quem permite criar a próxima.
+    // Navegador conectado também segura — fechar tudo com alguém olhando o
+    // histórico derrubaria a página no meio da leitura.
+    if (registry.hasAlive() || registry.hasBrowsers() || CAN_SPAWN) {
+      lastAlive = Date.now()
+      return
+    }
+    if (Date.now() - lastAlive > IDLE_SHUTDOWN_MS) {
+      server.stop(true)
+      process.exit(0)
+    }
+  }, 15_000)
+}
+
+export function main(): void {
+  startServer()
+  watchIdle()
+  process.stderr.write(`local-session hub: :${cfg.port}\n`)
+}
+
+if (import.meta.main) main()

@@ -17,13 +17,52 @@ bun test tests/hub-state.test.ts        # um arquivo
 bun test -t "auto mode"                 # um teste por nome
 bunx tsc --noEmit               # única checagem estática do repo — não há linter/formatter
 bun run hub                     # hub em primeiro plano, para depurar
+bun run build                   # dist/local-session, o executável único (~92 MB, ~0,2s)
 bun scripts/update.ts           # deploy local (ver "A dança do deploy")
 bun scripts/update.ts --check   # o que aconteceria, sem mexer
 bun scripts/setup.ts            # configura as 3 camadas de canal na máquina
 bun scripts/service.ts          # unit de usuário do systemd para o hub
 ```
 
-`bun run start` é o que o `.mcp.json` invoca (o MCP server), não um comando de desenvolvimento.
+## Um ponto de entrada, seis subcomandos
+
+Hub, MCP server, os dois hooks e os scripts de configuração são **um programa só**:
+`src/cli.ts` despacha por `process.argv[2]` (`hub`, `mcp`, `hook`, `context-hook`, `setup`,
+`service`, em `src/cli-core.ts`). `bun build --compile` aceita um entrypoint só, e um executável
+por programa multiplicaria o runtime do Bun — 92 MB cada.
+
+Nada invoca `bun` nem um `.ts` diretamente: `hooks/hooks.json`, `.claude-plugin/mcp.json` e
+`commands/*.md` chamam **`bin/local-session`**, um shim `sh` que prefere `dist/local-session`
+quando ele existe e cai no fonte quando não. É isso que faz a mesma árvore funcionar instalada
+do marketplace (sem binário) e empacotada. `tests/entrypoint.test.ts` guarda o acoplamento
+entre os quatro manifestos, o bit de execução do shim e a lista de subcomandos — sem ele, um
+caminho errado só aparece como "a régua de atividade parou de encher".
+
+O import de cada subcomando é **dinâmico** de propósito: `hub.ts` e `server.ts` fazem trabalho
+já no topo (leem o config, abrem o histórico, conectam no hub), e um import estático os faria
+rodar em todo subcomando. Cada módulo mantém `if (import.meta.main) main()`, então
+`bun src/hub.ts` continua funcionando como sempre.
+
+Essa config **não** pode voltar para um `.mcp.json` na raiz: ali ela também é lida como MCP
+*de projeto* por qualquer sessão aberta dentro do repo, contexto em que `${CLAUDE_PLUGIN_ROOT}`
+não é expandido e o server morre no boot com
+`ENOENT: Could not change directory to "${CLAUDE_PLUGIN_ROOT}"`. O `plugin.json` aponta para ela
+pelo campo `mcpServers`, e `scripts/update.ts` apaga o `.mcp.json` que tenha sobrado no cache.
+
+Pelo mesmo motivo o `mcp.json` roda `sh -c` em vez de chamar o shim direto: só há prova de que
+`${CLAUDE_PLUGIN_ROOT}` é expandido **dentro de uma linha de comando** — é o que os quatro hooks
+fazem desde sempre. No campo `command`, um harness que não expanda deixaria o caminho literal e
+a sessão subiria sem MCP, falha que só apareceria na próxima sessão nova.
+
+Dentro do binário não existe `src/*.ts` em disco, o que muda três resoluções — todas centradas
+em `src/cli-core.ts`, todas testadas:
+
+- **quem sou eu**: `Bun.main` começa com `/$bunfs/` (`isStandalone`);
+- **onde está a raiz do plugin**: `import.meta.dir` é o fs virtual e não serve, então vale o
+  diretório do executável ou `LOCAL_SESSION_ROOT` (`pluginRoot`) — sem isso `IDENTITY` fica nula,
+  `CAN_SPAWN` cai e o hub se autoencerra em 60s achando que está ocioso;
+- **como relançar o hub**: `spawn(execPath, ['hub'])` em vez do caminho do `.ts`
+  (`hubSpawnArgs`).
 
 ## Arquitetura: três processos e um navegador
 
@@ -71,7 +110,7 @@ default — `tailscaleAddress(nets = networkInterfaces())` em `src/config.ts` e
 
 | Núcleo (sem I/O, com teste unitário) | Casca (I/O, integração) |
 | --- | --- |
-| `hub-state.ts` (registro, feed, urgência), `notify.ts`, `hook-event.ts`, `context-report.ts`, `git-changes.ts`, `question-keys.ts`, `setup-core.ts`, `update-core.ts`, `upload.ts`, `tailscale.ts` | `hub.ts`, `server.ts`, `hub-client.ts`, `history.ts`, `terminal.ts`, `scripts/*.ts` |
+| `hub-state.ts` (registro, feed, urgência), `notify.ts`, `hook-event.ts`, `context-report.ts`, `git-changes.ts`, `question-keys.ts`, `setup-core.ts`, `update-core.ts`, `upload.ts`, `tailscale.ts`, `trust.ts`, `cli-core.ts`, `web-assets.ts` | `hub.ts`, `server.ts`, `hub-client.ts`, `history.ts`, `terminal.ts`, `cli.ts`, `scripts/*.ts` |
 | `web/markdown.js`, `web/session-status.js`, `web/connection.js` | `web/app.js`, `web/terminal-panel.js` |
 
 ## As três camadas do canal (por que "o prompt não chega")
@@ -98,6 +137,14 @@ localiza o pane pelo PID registrado; `src/question-keys.ts` traduz escolha em se
 teclas). Fora do tmux esses controles não aparecem na página. Alvo de `send-keys`/`capture-pane`
 tem de ser o **id do pane** (`%12`) — `=nome` só resolve para sessão/janela.
 
+Sessão nova nasce **detached**, então qualquer diálogo que o `claude` abra no boot trava tudo sem
+ninguém para responder — e, sem inicializar, ela nunca sobe o MCP nem registra no hub: a página
+fica sem a sessão enquanto o tmux segue vivo. É o caso do diálogo de confiança da pasta: o hub lê
+`hasTrustDialogAccepted` em `~/.claude.json` (`src/trust.ts`) **antes** de spawnar e devolve
+`spawn_trust` para a página confirmar; só então cria a sessão e aceita o diálogo por `send-keys`.
+As teclas só são enviadas se `capture-pane` mostrar o diálogo — Enter às cegas cairia no prompt de
+uma sessão já pronta.
+
 Os terminais remotos (`src/terminal.ts`) são sessões tmux próprias, nomeadas `lst-<slug>-<hash>`
 e presas ao **diretório**, não à sessão do Claude: sobrevivem ao hub e ao navegador.
 
@@ -123,7 +170,13 @@ um diretório esquecido ressuscita código velho — e mata o hub pelo **PID que
 Duas assimetrias que enganam ao depurar "a feature não responde":
 
 - `web/` é lido do disco a cada request; **o código do hub é o carregado no boot do processo** —
-  compare a idade do processo com o mtime dos arquivos.
+  compare a idade do processo com o mtime dos arquivos. Rodando do fonte isso continua valendo:
+  os imports `with { type: 'file' }` de `src/web-assets.ts` devolvem o caminho real no disco, e
+  só viram `/$bunfs/...` dentro do binário. Compilado, `web/` congela — `LOCAL_SESSION_WEB_DIR`
+  serve a página de um diretório e devolve a edição ao vivo.
+- **O shim prefere `dist/local-session`**: um binário velho ali é a armadilha de "editei e não
+  mudou" com outra cara. Depois de mexer em `src/`, `web/` ou `hooks/`, ou você recompila
+  (`bun run build`) ou apaga o `dist/`.
 - `managed-settings.json` só é lido na inicialização da sessão do Claude Code.
 
 Ao bumpar versão, `package.json` e `.claude-plugin/plugin.json` andam juntos. O bump aqui é

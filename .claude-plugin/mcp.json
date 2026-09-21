@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "local-session": {
+      "command": "sh",
+      "args": ["-c", "exec \"${CLAUDE_PLUGIN_ROOT}/bin/local-session\" mcp"]
+    }
+  }
+}

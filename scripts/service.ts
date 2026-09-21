@@ -3,9 +3,16 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
 import { join } from 'node:path'
+import { isStandalone } from '../src/cli-core'
 import { UNIT_NAME, systemdUnit } from '../src/setup-core'
 
 export type ServiceMode = 'apply' | 'check' | 'disable'
+
+export function serviceMode(argv: readonly string[]): ServiceMode {
+  if (argv.includes('--disable')) return 'disable'
+  if (argv.includes('--check')) return 'check'
+  return 'apply'
+}
 
 const HOME = homedir()
 const UNIT_DIR = join(HOME, '.config', 'systemd', 'user')
@@ -44,7 +51,7 @@ export function runService(mode: ServiceMode, root: string, verbose = true): voi
     return
   }
 
-  const wanted = systemdUnit(process.execPath, root)
+  const wanted = systemdUnit(process.execPath, root, isStandalone(Bun.main))
   const current = existsSync(UNIT_PATH) ? readFileSync(UNIT_PATH, 'utf8') : ''
 
   if (current === wanted) {
@@ -106,10 +113,8 @@ export function runService(mode: ServiceMode, root: string, verbose = true): voi
 }
 
 if (import.meta.main) {
-  const mode: ServiceMode = process.argv.includes('--disable')
-    ? 'disable'
-    : process.argv.includes('--check')
-      ? 'check'
-      : 'apply'
-  runService(mode, process.env.CLAUDE_PLUGIN_ROOT ?? join(import.meta.dir, '..'))
+  runService(
+    serviceMode(process.argv.slice(2)),
+    process.env.CLAUDE_PLUGIN_ROOT ?? join(import.meta.dir, '..'),
+  )
 }

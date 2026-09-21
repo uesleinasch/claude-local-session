@@ -200,3 +200,16 @@ describe('ensureAliasBlock', () => {
     expect(next.match(/# >>> local-session >>>/g)).toHaveLength(1)
   })
 })
+
+describe('systemdUnit no executável compilado', () => {
+  const unit = systemdUnit('/usr/bin/local-session', '/usr/lib/local-session', true)
+
+  test('chama o subcomando do binário — não há src/hub.ts em disco', () => {
+    expect(unit).toContain('ExecStart=/usr/bin/local-session hub')
+    expect(unit).not.toContain('src/hub.ts')
+  })
+
+  test('leva a raiz no ambiente: o binário do pacote vive longe dos metadados', () => {
+    expect(unit).toContain('Environment=LOCAL_SESSION_ROOT=/usr/lib/local-session')
+  })
+})

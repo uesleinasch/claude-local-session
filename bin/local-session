@@ -1,0 +1,20 @@
+#!/bin/sh
+# Ponto de entrada único do plugin: hooks, MCP server e slash commands passam
+# por aqui. Prefere o executável compilado; sem ele, cai no fonte com o bun.
+# Enquanto as duas formas coexistirem, este arquivo é o que mantém uma
+# instalação sem binário funcionando igual à empacotada.
+set -e
+
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+
+if [ -x "$root/dist/local-session" ]; then
+  exec "$root/dist/local-session" "$@"
+fi
+
+# O MCP server depende de @modelcontextprotocol/sdk e zod. Instalar aqui, uma
+# vez, em vez de no comando do mcp.json, que rodava `bun install` a cada sessão.
+if [ ! -d "$root/node_modules" ] && command -v bun >/dev/null 2>&1; then
+  (cd "$root" && bun install --no-summary >/dev/null 2>&1) || true
+fi
+
+exec bun "$root/src/cli.ts" "$@"

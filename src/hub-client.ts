@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { join } from 'node:path'
+import { hubSpawnArgs, isStandalone } from './cli-core'
 import type { HubToSession, SessionToHub } from './protocol'
 
 const MAX_QUEUE = 50
@@ -10,7 +10,7 @@ const BACKOFF_MAX_MS = 30_000
 export type HubClientOptions = {
   port: number
   token: string
-  /** Raiz do projeto — usada para localizar src/hub.ts ao spawnar o daemon. */
+  /** Raiz do plugin — localiza src/hub.ts ao spawnar o daemon fora do binário. */
   root: string
   register: Extract<SessionToHub, { type: 'register' }>
   onMessage: (msg: HubToSession) => void
@@ -101,7 +101,8 @@ export class HubClient {
     try {
       // Desanexado de propósito: o hub precisa sobreviver ao fim desta sessão.
       // Se outro daemon já tem a porta, este sai sozinho com EADDRINUSE.
-      const child = spawn(process.execPath, [join(this.opts.root, 'src', 'hub.ts')], {
+      const args = hubSpawnArgs(this.opts.root, isStandalone(Bun.main))
+      const child = spawn(process.execPath, args, {
         detached: true,
         stdio: 'ignore',
       })

@@ -6,7 +6,7 @@ allowed-tools: Bash(bun:*)
 Execute o setup do plugin:
 
 ```
-bun "${CLAUDE_PLUGIN_ROOT}/scripts/setup.ts"
+"${CLAUDE_PLUGIN_ROOT}/bin/local-session" setup
 ```
 
 O script é idempotente: o que já estiver certo aparece com `✓` e nada é reescrito. O que ele

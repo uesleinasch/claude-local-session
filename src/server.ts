@@ -5,14 +5,20 @@ import {
   CallToolRequestSchema,
   ListToolsRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js'
-import { basename, join } from 'node:path'
+import { basename } from 'node:path'
 import { z } from 'zod'
+import { isStandalone, pluginRoot } from './cli-core'
 import { lanAddress, loadConfig, tailscaleAddress } from './config'
 import { HubClient } from './hub-client'
 import type { HubToSession } from './protocol'
 import { probeTailscale, resolveState, tailscaleLines } from './tailscale'
 
-const ROOT = join(import.meta.dir, '..')
+const ROOT = pluginRoot({
+  standalone: isStandalone(Bun.main),
+  moduleDir: import.meta.dir,
+  execPath: process.execPath,
+  env: process.env.LOCAL_SESSION_ROOT,
+})
 const cfg = loadConfig()
 
 const SESSION_ID = process.env.CLAUDE_CODE_SESSION_ID ?? `pid-${process.pid}`
@@ -168,9 +174,6 @@ mcp.setRequestHandler(CallToolRequestSchema, async req => {
   }
 })
 
-await mcp.connect(new StdioServerTransport())
-hub.start()
-
 let shuttingDown = false
 function shutdown(): void {
   if (shuttingDown) return
@@ -179,12 +182,19 @@ function shutdown(): void {
   process.exit(0)
 }
 
-mcp.onclose = shutdown
-process.on('SIGTERM', shutdown)
-process.on('SIGINT', shutdown)
+export async function main(): Promise<void> {
+  await mcp.connect(new StdioServerTransport())
+  hub.start()
 
-// O socket do hub e os timers de reconexão seguram o event loop, então o EOF do
-// stdin não derruba o processo sozinho — sem isto, cada sessão encerrada deixa
-// um MCP server zumbi segurando a conexão com o hub.
-process.stdin.on('end', shutdown)
-process.stdin.on('close', shutdown)
+  mcp.onclose = shutdown
+  process.on('SIGTERM', shutdown)
+  process.on('SIGINT', shutdown)
+
+  // O socket do hub e os timers de reconexão seguram o event loop, então o EOF
+  // do stdin não derruba o processo sozinho — sem isto, cada sessão encerrada
+  // deixa um MCP server zumbi segurando a conexão com o hub.
+  process.stdin.on('end', shutdown)
+  process.stdin.on('close', shutdown)
+}
+
+if (import.meta.main) await main()

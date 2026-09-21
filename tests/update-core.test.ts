@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { pidsOnPort, versionDirs } from '../src/update-core'
+import { STALE_FILES, SYNC_DIRS, SYNC_FILES, pidsOnPort, versionDirs } from '../src/update-core'
 
 const SS_OUT = `State  Recv-Q Send-Q Local Address:Port  Peer Address:Port Process
 LISTEN 0      511          127.0.0.1:5173       0.0.0.0:*     users:(("node",pid=1234,fd=20))
@@ -64,5 +64,29 @@ describe('versionDirs', () => {
 
   test('cache inexistente não explode', () => {
     expect(versionDirs(join(dir, 'nao-existe'))).toEqual([])
+  })
+})
+
+describe('arquivos do plugin no cache', () => {
+  test('o deploy leva a config de MCP junto do manifesto', () => {
+    expect(SYNC_FILES).toContain(join('.claude-plugin', 'mcp.json'))
+    expect(SYNC_FILES).toContain(join('.claude-plugin', 'plugin.json'))
+  })
+
+  // O .mcp.json da raiz virou MCP de projeto em toda sessão aberta dentro do
+  // repo e morria com ENOENT no ${CLAUDE_PLUGIN_ROOT} literal. Deixá-lo para
+  // trás no cache o ressuscita ao lado da config nova.
+  test('o deploy apaga o .mcp.json da raiz que ficou no cache', () => {
+    expect(STALE_FILES).toContain('.mcp.json')
+  })
+
+  test('nenhum arquivo é espelhado e apagado ao mesmo tempo', () => {
+    for (const stale of STALE_FILES) expect(SYNC_FILES).not.toContain(stale)
+  })
+})
+
+describe('ponto de entrada único', () => {
+  test('o deploy espelha bin/ — é por onde hooks e mcp.json chamam o plugin', () => {
+    expect(SYNC_DIRS).toContain('bin')
   })
 })

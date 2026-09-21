@@ -1,6 +1,13 @@
 {
   "name": "local-session",
   "description": "Expõe cada sessão do Claude Code numa página web da rede local — chat, linha de atividade e aprovação de permissão pelo navegador.",
-  "version": "0.9.0",
-  "keywords": ["session", "lan", "web", "channel", "mcp"]
+  "version": "0.10.0",
+  "keywords": [
+    "session",
+    "lan",
+    "web",
+    "channel",
+    "mcp"
+  ],
+  "mcpServers": "./.claude-plugin/mcp.json"
 }

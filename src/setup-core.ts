@@ -49,7 +49,10 @@ export const UNIT_NAME = 'local-session-hub.service'
  * O hub sai com 0 quando outra instância já tem a porta — `on-failure` evita o
  * ciclo de reinício que `always` provocaria nessa disputa normal.
  */
-export function systemdUnit(bunPath: string, pluginRoot: string): string {
+export function systemdUnit(execPath: string, pluginRoot: string, standalone = false): string {
+  // No executável compilado não há `src/hub.ts` em disco para apontar: o
+  // próprio binário é o programa e o subcomando escolhe o hub.
+  const start = standalone ? `${execPath} hub` : `${execPath} ${join(pluginRoot, 'src', 'hub.ts')}`
   return [
     '[Unit]',
     'Description=local-session hub',
@@ -57,7 +60,8 @@ export function systemdUnit(bunPath: string, pluginRoot: string): string {
     '',
     '[Service]',
     'Type=simple',
-    `ExecStart=${bunPath} ${join(pluginRoot, 'src', 'hub.ts')}`,
+    `ExecStart=${start}`,
+    ...(standalone ? [`Environment=LOCAL_SESSION_ROOT=${pluginRoot}`] : []),
     'Restart=on-failure',
     'RestartSec=5',
     '',

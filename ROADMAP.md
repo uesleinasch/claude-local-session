@@ -153,26 +153,32 @@ Claude Code, foi considerado e **descartado**: sobraria um servidor web sem nada
 
 Ordem: o binário é o conteúdo do pacote, e a bandeja só vale depois que o pacote existir.
 
-- **Binário único (`bun build --compile`)** — tira o `bun` do PATH da equação, e com ele uma
-  classe de falha silenciosa real: os hooks invocam `bun` pelo PATH e engolem o erro de
-  propósito, então `bun` ausente aparece como "a régua de atividade fica vazia" e mais nada.
-  Dois pontos de quebra a resolver antes: `src/hub.ts:38-39` acha o `web/` por
-  `import.meta.dir`, então os assets passariam a ser embutidos em vez de lidos do disco — o que
-  também derruba a conveniência de editar `web/` e ver na hora, hoje usada no desenvolvimento; e
-  `src/hub-client.ts:104` respawna o daemon com
-  `spawn(process.execPath, [join(root, 'src', 'hub.ts')])`, caminho que não existe dentro de um
-  binário, então o spawn viraria o próprio executável com um argv (`local-session hub`). Custo a
-  medir: o tamanho, com o `web/vendor/` (xterm.js) embutido.
+- ~~**Binário único (`bun build --compile`)**~~ — feito: `bun run build` produz
+  `dist/local-session`, **92 MB em 0,2s**, com `web/vendor/` embutido (as 432 KB de assets somem
+  perto do runtime do Bun). Um entrypoint só é o que o `--compile` aceita, então os seis pontos
+  de entrada viraram subcomandos de `src/cli.ts`, e `bin/local-session` — shim `sh` que prefere
+  o binário e cai no fonte — é quem `hooks.json`, `mcp.json` e os slash commands chamam. Os
+  pontos de quebra eram mais que os dois previstos: além do `web/` por `import.meta.dir` e do
+  respawn por caminho `.ts`, estavam os quatro comandos de `hooks.json` (justamente onde `bun`
+  ausente vira "a régua não enche"), o `ExecStart` da unit do systemd, os slash commands, e a
+  raiz do plugin — que no fs virtual some e leva junto `IDENTITY`, `CAN_SPAWN` e a vida do
+  daemon. Ganho não previsto: o `mcp.json` rodava `bun install` **a cada sessão** para garantir
+  o SDK do MCP; com as deps embutidas, some. Editar `web/` e ver na hora sobreviveu de graça —
+  rodando do fonte, `with { type: 'file' }` devolve o caminho real no disco — e no binário volta
+  com `LOCAL_SESSION_WEB_DIR`.
 - **Pacote nativo (`.deb`/`.rpm`)** — o `postinst` roda com privilégio, então escreve o
   `/etc/claude-code/managed-settings.json` sem diálogo de senha, instala a unit do systemd e
   declara `tmux` como dependência de pacote em vez de descobri-lo em runtime (`Bun.which`, em
-  `src/hub.ts:71-74`), onde a ausência hoje só apaga botões da página sem dizer por quê. O que
-  ele **não** resolve, e é a incógnita que decide a viabilidade: o plugin é registrado por
-  usuário (`~/.claude/plugins/cache/<marketplace>/<plugin>/<versão>`) e o `marketplace.json` de
-  hoje aponta para o GitHub — falta verificar se o Claude Code aceita marketplace a partir de um
-  caminho de disco, que é o que permitiria ao pacote entregar o plugin de `/usr/lib` sem rede.
-  A função de shell do `--channels` também é por usuário: fica num passo pós-instalação (o
-  `/local-session:setup` de hoje), não no `postinst`.
+  `src/hub.ts:71-74`), onde a ausência hoje só apaga botões da página sem dizer por quê. **A
+  incógnita que decidia a viabilidade caiu** (verificado em 2026-09-21): `claude plugin
+  marketplace add <source>` aceita "a URL, path, or GitHub repo" e ainda tem
+  `--scope user|project|local`, então o pacote pode entregar o plugin em `/usr/lib` e registrá-lo
+  por caminho, sem rede. Falta desenhar: o registro é **por usuário**
+  (`~/.claude/plugins/cache/...`), então o `postinst` não consegue fazê-lo por quem ainda nem
+  logou — vai junto da função de shell do `--channels` num passo pós-instalação (o
+  `/local-session:setup` de hoje), não no `postinst`. Com o binário pronto, o conteúdo do pacote
+  passa a ser `dist/local-session` + `web/` opcional + a unit; `systemdUnit(..., standalone)` já
+  emite `ExecStart=<bin> hub` com `Environment=LOCAL_SESSION_ROOT`.
 - **Flatpak, Snap e AppImage não servem** — o trabalho do hub é justamente rodar `tmux`, `git` e
   `claude` do host, e o sandbox do Flatpak e do Snap existe para impedir exatamente isso. O
   AppImage não tem `postinst`, então não escreve o managed-settings nem instala a unit; vale como

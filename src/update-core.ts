@@ -2,8 +2,13 @@ import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 
 /** Diretórios do plugin que o deploy espelha do repo para o cache. */
-export const SYNC_DIRS = ['src', 'web', 'hooks', 'commands']
-export const SYNC_FILES = [join('.claude-plugin', 'plugin.json')]
+export const SYNC_DIRS = ['src', 'web', 'hooks', 'commands', 'bin']
+export const SYNC_FILES = [join('.claude-plugin', 'plugin.json'), join('.claude-plugin', 'mcp.json')]
+
+/** Arquivos que saíram do repo e precisam sumir do cache: enquanto o .mcp.json
+ * estiver na raiz de uma versão instalada, ele volta a ser lido como MCP de
+ * projeto por toda sessão aberta dentro do repositório. */
+export const STALE_FILES = ['.mcp.json']
 
 /**
  * Quem escuta a porta, lido do `ss -tlnp`. Casar só o endereço local evita
