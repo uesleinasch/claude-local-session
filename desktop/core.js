@@ -115,19 +115,38 @@ function aptInstallCommand(pacotes) {
   }
 }
 
+/** `Exec` do formato .desktop quebra em espaço não citado. */
+function citar(caminho) {
+  return caminho.includes(' ') ? `"${caminho}"` : caminho
+}
+
+/**
+ * Comando que o ambiente executa no login.
+ *
+ * Instalado, o alvo é o **shim** do sistema — o mesmo que o lançador do menu
+ * usa, e que já carrega o app embutido. Rodando do clone, `process.execPath` é
+ * o Electron cru e o app entra como argumento: gravar só o execPath faz o login
+ * abrir a tela padrão do Electron ("To run a local app, execute...").
+ */
+function autostartCommand({ shimDoSistema, execPath, appPath }) {
+  if (shimDoSistema) return `${citar(shimDoSistema)} --tray`
+  if (appPath) return `${citar(execPath)} ${citar(appPath)} --tray`
+  return `${citar(execPath)} --tray`
+}
+
 /**
  * O `.desktop` que o ambiente lê de `~/.config/autostart` no login. Fica na
  * home, e não em /etc/xdg/autostart: ligar a bandeja para todo usuário da
  * máquina seria decidir por quem não pediu. `--tray` faz o app subir só como
  * ícone, sem abrir janela na cara de quem acabou de logar.
  */
-function autostartEntry(execPath) {
+function autostartEntry(comando) {
   return [
     '[Desktop Entry]',
     'Type=Application',
     'Name=local-session',
     'Comment=Bandeja do local-session',
-    `Exec=${execPath} --tray`,
+    `Exec=${comando}`,
     'Icon=local-session',
     'Terminal=false',
     'X-GNOME-Autostart-enabled=true',
@@ -137,6 +156,7 @@ function autostartEntry(execPath) {
 
 module.exports = {
   aptInstallCommand,
+  autostartCommand,
   autostartEntry,
   ACTIONS,
   actionIds,

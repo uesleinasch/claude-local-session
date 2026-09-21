@@ -4,6 +4,8 @@ import {
   actionIds,
   aptInstallCommand,
   actionLabel,
+  autostartCommand,
+  autostartEntry,
   healthLabel,
   problemCount,
   resolveAction,
@@ -138,5 +140,56 @@ describe('instalar dependências', () => {
       'g++',
       'libgtk-3-0',
     ])
+  })
+})
+
+describe('autostart', () => {
+  const CLONE = '/casa/repo/desktop/node_modules/electron/dist/electron'
+  const APP = '/casa/repo/desktop'
+
+  /** Instalado, o alvo é o shim — o mesmo que o lançador do menu executa. */
+  test('com o shim do sistema, é ele que sobe no login', () => {
+    expect(
+      autostartCommand({
+        shimDoSistema: '/usr/bin/local-session-ui',
+        execPath: '/usr/lib/local-session-ui/local-session-ui',
+        appPath: '/usr/lib/local-session-ui/resources/app',
+      }),
+    ).toBe('/usr/bin/local-session-ui --tray')
+  })
+
+  /**
+   * Rodando do clone, `process.execPath` é o Electron cru e o app é argumento:
+   * gravar só o execPath faz o login abrir a tela padrão do Electron.
+   */
+  test('sem shim, o caminho do app vai no comando', () => {
+    expect(autostartCommand({ shimDoSistema: null, execPath: CLONE, appPath: APP })).toBe(
+      `${CLONE} ${APP} --tray`,
+    )
+  })
+
+  test('sem shim e sem app, sobra o executável — mas nunca silenciosamente vazio', () => {
+    expect(autostartCommand({ shimDoSistema: null, execPath: CLONE, appPath: null })).toBe(
+      `${CLONE} --tray`,
+    )
+  })
+
+  /** `Exec` do formato .desktop quebra em espaço não citado. */
+  test('caminho com espaço é citado', () => {
+    expect(
+      autostartCommand({
+        shimDoSistema: null,
+        execPath: '/casa/meus projetos/electron',
+        appPath: '/casa/meus projetos/app',
+      }),
+    ).toBe('"/casa/meus projetos/electron" "/casa/meus projetos/app" --tray')
+  })
+
+  test('a entrada leva o comando e as chaves que o ambiente exige', () => {
+    const entrada = autostartEntry('/usr/bin/local-session-ui --tray')
+    expect(entrada).toContain('Exec=/usr/bin/local-session-ui --tray')
+    expect(entrada).toContain('[Desktop Entry]')
+    expect(entrada).toContain('Type=Application')
+    expect(entrada).toContain('X-GNOME-Autostart-enabled=true')
   })
 })

@@ -9,6 +9,7 @@ const {
   resolveBinary,
   trayTooltip,
   problemCount,
+  autostartCommand,
   autostartEntry,
   aptInstallCommand,
 } = require('./core.js')
@@ -171,15 +172,24 @@ ipcMain.handle('abrir-link', (_ev, url) => {
   if (linksConhecidos().includes(url)) shell.openExternal(url)
 })
 const AUTOSTART = join(homedir(), '.config', 'autostart', 'local-session-ui.desktop')
+/** Instalado pelo `.deb`; é o que o lançador do menu executa. */
+const SHIM_SISTEMA = '/usr/bin/local-session-ui'
 
 ipcMain.handle('autostart', (_ev, ligar) => {
   try {
     if (ligar === undefined) return existsSync(AUTOSTART)
     if (ligar) {
       mkdirSync(join(homedir(), '.config', 'autostart'), { recursive: true })
-      // process.execPath é o próprio Electron empacotado — o mesmo caminho que
-      // o lançador do menu usa.
-      writeFileSync(AUTOSTART, autostartEntry(process.execPath))
+      writeFileSync(
+        AUTOSTART,
+        autostartEntry(
+          autostartCommand({
+            shimDoSistema: existsSync(SHIM_SISTEMA) ? SHIM_SISTEMA : null,
+            execPath: process.execPath,
+            appPath: app.getAppPath(),
+          }),
+        ),
+      )
     } else {
       rmSync(AUTOSTART, { force: true })
     }
