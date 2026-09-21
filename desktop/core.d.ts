@@ -17,3 +17,6 @@ export declare function healthLabel(health: string): string
 export declare function trayTooltip(status: Status | null): string
 export declare function problemCount(status: Status | null): number
 export declare function autostartEntry(execPath: string): string
+export declare function aptInstallCommand(
+  pacotes: readonly string[],
+): { bin: string; args: string[] } | null

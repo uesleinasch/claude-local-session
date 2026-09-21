@@ -155,6 +155,22 @@ no dia seguinte.
 A busca do binário repete a ordem do shim `bin/local-session` (repo, sistema, PATH). Manter as
 duas em sincronia é o que faz o app funcionar tanto instalado quanto rodando do clone.
 
+A janela é dividida em cinco seções — situação, acesso, dependências, serviço, canal — porque
+uma lista corrida de dez verificações e oito botões de peso igual não se lê. Cada `Check` carrega
+a `section` a que pertence (`src/status-core.ts`), as abas de dependências e canal mostram um
+contador do que não está ok, e a seção "situação" repete cada pendência como atalho para a seção
+que a resolve. Uma ação primária por seção, e só ela tem cor.
+
+**Instalar dependência passa por `pkexec`, nunca por um campo de senha nosso.** A senha fica no
+diálogo do sistema: não passa pela memória do app, não vai para swap nem crash dump, e ninguém
+se acostuma a digitar senha de root numa janela qualquer. O nome do pacote é validado contra
+`/^[a-z0-9][a-z0-9+.-]*$/` antes de virar argv de root — a lista vem da UI.
+
+O QR code sai do `qrencode` (dependência do pacote) como **PNG em `data:` URI**, não SVG por
+`innerHTML`: o CSP já libera `img-src data:` e nada de marcação externa entra no DOM. Só as URLs
+que o próprio hub montou viram QR. Sem o `qrencode` a seção mostra o botão que o instala; com
+ele instalado e ainda assim sem imagem, a mensagem diz isso em vez de mandar instalar de novo.
+
 O autostart da bandeja é um `.desktop` em `~/.config/autostart/`, escrito pela própria janela —
 **não** em `/etc/xdg/autostart/`, que ligaria o ícone para todo usuário da máquina. Ele sobe com
 `--tray`, sem abrir janela na cara de quem acabou de logar. O serviço do hub é outra coisa e

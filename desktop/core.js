@@ -101,6 +101,21 @@ function problemCount(status) {
 }
 
 /**
+ * Instalar pacote exige root. `pkexec` abre o diálogo de senha do **sistema**:
+ * a senha nunca passa pelo nosso processo, não vai parar em swap nem em crash
+ * dump, e ninguém se acostuma a digitar senha de root numa janela qualquer.
+ * `DEBIAN_FRONTEND=noninteractive` porque não há terminal para o apt perguntar.
+ */
+function aptInstallCommand(pacotes) {
+  const limpos = pacotes.filter(p => typeof p === 'string' && /^[a-z0-9][a-z0-9+.-]*$/.test(p))
+  if (limpos.length === 0) return null
+  return {
+    bin: 'pkexec',
+    args: ['env', 'DEBIAN_FRONTEND=noninteractive', 'apt-get', 'install', '-y', ...limpos],
+  }
+}
+
+/**
  * O `.desktop` que o ambiente lê de `~/.config/autostart` no login. Fica na
  * home, e não em /etc/xdg/autostart: ligar a bandeja para todo usuário da
  * máquina seria decidir por quem não pediu. `--tray` faz o app subir só como
@@ -121,6 +136,7 @@ function autostartEntry(execPath) {
 }
 
 module.exports = {
+  aptInstallCommand,
   autostartEntry,
   ACTIONS,
   actionIds,

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   buildChecks,
+  buildDependencies,
   buildStatus,
   overallHealth,
   unitExecTarget,
@@ -22,12 +23,27 @@ const TUDO_OK: StatusInput = {
   managedOk: true,
   replyPermissionOk: true,
   aliasOk: true,
-  hasTmux: true,
-  hasClaude: true,
   lanUrl: 'http://192.168.1.2:7777/?t=x',
   tailscaleUrl: 'http://maquina.ts.net:7777/?t=x',
-  tailscaleDetail: 'conectado',
+  dependencies: buildDependencies({
+    hasClaude: true,
+    hasTmux: true,
+    hasGit: true,
+    hasQrencode: true,
+    hasPkexec: true,
+    tailscale: 'running',
+  }),
 }
+
+const SEM = (id: string) =>
+  buildDependencies({
+    hasClaude: id !== 'claude',
+    hasTmux: id !== 'tmux',
+    hasGit: id !== 'git',
+    hasQrencode: id !== 'qrencode',
+    hasPkexec: id !== 'pkexec',
+    tailscale: id === 'tailscale' ? 'absent' : 'running',
+  })
 
 const check = (i: StatusInput, id: string) => buildChecks(i).find(c => c.id === id)
 
@@ -35,9 +51,9 @@ describe('overallHealth', () => {
   test('uma falha manda em tudo — não vira "quase bem"', () => {
     expect(
       overallHealth([
-        { id: 'a', title: '', health: 'ok', detail: '' },
-        { id: 'b', title: '', health: 'fail', detail: '' },
-        { id: 'c', title: '', health: 'warn', detail: '' },
+        { id: 'a', title: '', health: 'ok', detail: '', section: 'geral' },
+        { id: 'b', title: '', health: 'fail', detail: '', section: 'geral' },
+        { id: 'c', title: '', health: 'warn', detail: '', section: 'geral' },
       ]),
     ).toBe('fail')
   })
@@ -45,14 +61,14 @@ describe('overallHealth', () => {
   test('sem falha, um aviso basta para não ser ok', () => {
     expect(
       overallHealth([
-        { id: 'a', title: '', health: 'ok', detail: '' },
-        { id: 'b', title: '', health: 'warn', detail: '' },
+        { id: 'a', title: '', health: 'ok', detail: '', section: 'geral' },
+        { id: 'b', title: '', health: 'warn', detail: '', section: 'geral' },
       ]),
     ).toBe('warn')
   })
 
   test('tudo ok é ok', () => {
-    expect(overallHealth([{ id: 'a', title: '', health: 'ok', detail: '' }])).toBe('ok')
+    expect(overallHealth([{ id: 'a', title: '', health: 'ok', detail: '', section: 'geral' }])).toBe('ok')
   })
 })
 
@@ -80,9 +96,9 @@ describe('plugin e Claude Code', () => {
     expect(check({ ...TUDO_OK, pluginRegistered: false }, 'plugin')?.health).toBe('fail')
   })
 
-  test('sem Claude Code o check aparece; com ele, não polui a lista', () => {
-    expect(check({ ...TUDO_OK, hasClaude: false }, 'claude')?.health).toBe('fail')
-    expect(check(TUDO_OK, 'claude')).toBeUndefined()
+  test('Claude Code ausente derruba a saúde mesmo com todo check passando', () => {
+    const s = buildStatus({ ...TUDO_OK, dependencies: SEM('claude') })
+    expect(s.health).toBe('fail')
   })
 })
 
@@ -133,14 +149,14 @@ describe('buildStatus', () => {
   })
 
   test('todo check tem título e detalhe — a UI não mostra linha vazia', () => {
-    for (const c of buildStatus({ ...TUDO_OK, hasClaude: false, managedOk: false }).checks) {
+    for (const c of buildStatus({ ...TUDO_OK, dependencies: SEM('claude'), managedOk: false }).checks) {
       expect(c.title.length, c.id).toBeGreaterThan(0)
       expect(c.detail.length, c.id).toBeGreaterThan(0)
     }
   })
 
   test('ids são únicos — a UI usa como chave', () => {
-    const ids = buildStatus({ ...TUDO_OK, hasClaude: false, installedVersion: '0.1.0' }).checks.map(
+    const ids = buildStatus({ ...TUDO_OK, dependencies: SEM('claude'), installedVersion: '0.1.0' }).checks.map(
       c => c.id,
     )
     expect(new Set(ids).size).toBe(ids.length)
@@ -159,5 +175,51 @@ describe('unitExecTarget', () => {
 
   test('unit sem ExecStart não vira alvo inventado', () => {
     expect(unitExecTarget('[Service]\nType=simple')).toBeNull()
+  })
+})
+
+describe('dependências', () => {
+  test('cada uma diz o que se perde sem ela, não só que falta', () => {
+    for (const d of SEM('tmux')) expect(d.detail.length, d.id).toBeGreaterThan(10)
+  })
+
+  test('o que o apt resolve tem pacote; o que não, tem link', () => {
+    for (const d of buildDependencies({
+      hasClaude: false,
+      hasTmux: false,
+      hasGit: false,
+      hasQrencode: false,
+      hasPkexec: false,
+      tailscale: 'absent',
+    })) {
+      expect(Boolean(d.aptPackage || d.url), d.id).toBe(true)
+    }
+  })
+
+  test('tailscale não é instalável por aqui — repo de terceiros e login interativo', () => {
+    const ts = SEM('tailscale').find(d => d.id === 'tailscale')
+    expect(ts?.aptPackage).toBeUndefined()
+    expect(ts?.url).toBeTruthy()
+  })
+
+  test('só o Claude Code é obrigatório: o resto degrada, não impede', () => {
+    const obrigatorias = SEM('tmux').filter(d => d.required).map(d => d.id)
+    expect(obrigatorias).toEqual(['claude'])
+  })
+
+  test('faltar o que não é obrigatório não vira falha geral', () => {
+    expect(buildStatus({ ...TUDO_OK, dependencies: SEM('git') }).health).not.toBe('fail')
+  })
+})
+
+describe('seções', () => {
+  test('todo check pertence a uma seção da janela', () => {
+    const validas = ['geral', 'acesso', 'dependencias', 'servico', 'canal']
+    for (const c of buildStatus(TUDO_OK).checks) expect(validas, c.id).toContain(c.section)
+  })
+
+  test('as três camadas do canal ficam juntas', () => {
+    const canal = buildStatus(TUDO_OK).checks.filter(c => c.section === 'canal')
+    expect(canal.map(c => c.id).sort()).toEqual(['canal-alias', 'canal-managed', 'canal-permissao'])
   })
 })

@@ -1,8 +1,10 @@
 /* Mesma paleta da página do hub: quem usa os dois não troca de mundo. */
 :root {
   --bg: #0e0f11;
+  --sunken: #111315;
   --surface: #141618;
   --control: #17191c;
+  --raise: #191c1f;
   --line: #212429;
   --line-strong: #2a2e33;
   --ink: #e6e8ea;
@@ -12,15 +14,20 @@
   --amber: #f5a524;
   --red: #f87171;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --r: 8px;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html,
+body {
+  height: 100%;
+}
+
 body {
   margin: 0;
-  padding: 0 0 24px;
   background: var(--bg);
   color: var(--ink);
   font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -28,47 +35,49 @@ body {
   line-height: 1.5;
 }
 
-#topo {
-  position: sticky;
-  top: 0;
-  z-index: 2;
+#janela {
+  display: grid;
+  grid-template-columns: 210px 1fr;
+  height: 100%;
+}
+
+/* ---------- navegação ---------- */
+
+#lado {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  align-items: center;
-  justify-content: space-between;
-  padding: 14px 20px;
-  border-bottom: 1px solid var(--line);
-  background: var(--surface);
+  flex-direction: column;
+  gap: 20px;
+  padding: 18px 14px;
+  border-right: 1px solid var(--line);
+  background: var(--sunken);
 }
 
 #marca {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 10px;
   min-width: 0;
 }
 
-h1 {
-  margin: 0;
-  font-size: 16px;
+#marca div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+#marca strong {
+  font-size: 14px;
   font-weight: 650;
 }
 
 #versao {
   color: var(--ink-3);
   font-family: var(--mono);
-  font-size: 12px;
-}
-
-#resumo {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--ink-2);
+  font-size: 11px;
 }
 
 #bolha {
+  flex: none;
   width: 10px;
   height: 10px;
   border-radius: 50%;
@@ -85,27 +94,93 @@ h1 {
   background: var(--red);
 }
 
-main {
-  max-width: 720px;
-  margin: 0 auto;
-  padding: 0 20px;
+#abas {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-section {
-  margin-top: 22px;
+#abas button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--ink-3);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
 }
 
-section[hidden] {
+#abas button:hover:not(:disabled) {
+  background: var(--control);
+  color: var(--ink-2);
+}
+
+#abas button[aria-selected='true'] {
+  background: var(--raise);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* O contador é o que faz o problema ser achado sem procurar seção por seção. */
+.conta {
+  padding: 1px 7px;
+  border-radius: 10px;
+  background: var(--amber);
+  color: #0a0b0c;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.conta[hidden] {
   display: none;
 }
 
+/* ---------- palco ---------- */
+
+#palco {
+  overflow-y: auto;
+  padding: 26px 28px 40px;
+}
+
+.painel[hidden],
+#sem-binario[hidden] {
+  display: none;
+}
+
+.cabeca {
+  margin-bottom: 18px;
+}
+
 h2 {
-  margin: 0 0 10px;
+  margin: 0 0 4px;
+  font-size: 19px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  margin: 24px 0 8px;
   color: var(--ink-3);
   font-size: 11px;
   font-weight: 650;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+.cabeca p {
+  margin: 0;
+  max-width: 62ch;
+  color: var(--ink-3);
 }
 
 p {
@@ -118,17 +193,74 @@ ul {
   list-style: none;
 }
 
-#lista li {
+/* ---------- pendências (atalho para a seção que resolve) ---------- */
+
+#pendencias {
   display: flex;
-  gap: 10px;
-  padding: 10px 12px;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 22px;
+}
+
+#pendencias:empty {
+  display: none;
+}
+
+.pendencia {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--amber);
+  border-radius: var(--r);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.pendencia:hover:not(:disabled) {
+  border-color: var(--ink-3);
+  border-left-color: var(--amber);
+}
+
+.pendencia .titulo {
+  font-weight: 600;
+}
+
+.pendencia .detalhe {
+  grid-column: 1;
+}
+
+.pendencia .seta {
+  grid-row: 1 / 3;
+  grid-column: 2;
+  align-self: center;
+  color: var(--ink-3);
+}
+
+/* ---------- listas de estado ---------- */
+
+.checks li,
+#deps li {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+  padding: 11px 13px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r);
   background: var(--surface);
 }
 
-#lista li + li {
-  margin-top: 8px;
+.checks li + li,
+#deps li + li {
+  margin-top: 7px;
+}
+
+.checks {
+  margin-top: 18px;
 }
 
 .marca {
@@ -138,19 +270,25 @@ ul {
   text-align: center;
 }
 
-#lista li[data-health='ok'] .marca {
+.checks li[data-health='ok'] .marca,
+#deps li[data-present='true'] .marca {
   color: var(--green);
 }
-#lista li[data-health='warn'] .marca {
+.checks li[data-health='warn'] .marca {
   color: var(--amber);
 }
-#lista li[data-health='fail'] .marca {
+.checks li[data-health='fail'] .marca {
   color: var(--red);
+}
+#deps li[data-present='false'] .marca {
+  color: var(--amber);
 }
 
 /* Filho de flex não encolhe sozinho: sem isto um detalhe longo empurra a
    janela inteira para o scroll horizontal. */
-#lista li > div {
+.checks li > div,
+#deps li > div {
+  flex: 1;
   min-width: 0;
 }
 
@@ -179,11 +317,66 @@ code {
   word-break: break-all;
 }
 
+/* ---------- acesso ---------- */
+
+#qr-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  text-align: center;
+}
+
+/* Fundo claro porque leitor de QR espera módulos escuros sobre claro; o PNG do
+   qrencode vem com fundo branco, a borda só o integra ao painel. */
+#qr {
+  width: 220px;
+  height: 220px;
+  border: 8px solid #fff;
+  border-radius: 6px;
+  background: #fff;
+  image-rendering: pixelated;
+}
+
+#qr[hidden],
+#qr-falhou[hidden],
+#qr-ausente[hidden],
+#qr-sem-link[hidden],
+#qr-escolha[hidden],
+#instalar-tudo[hidden] {
+  display: none;
+}
+
+#qr-ausente,
+#qr-falhou,
+#qr-sem-link {
+  margin: 0;
+  color: var(--ink-3);
+}
+
+#qr-escolha {
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.alternativa[aria-pressed='true'] {
+  border-color: var(--green);
+  color: var(--ink);
+}
+
+#links {
+  margin-top: 18px;
+}
+
 #links li {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 0;
+  padding: 9px 0;
 }
 
 #links li + li {
@@ -196,15 +389,25 @@ code {
   color: var(--ink-2);
 }
 
+/* ---------- ações ---------- */
+
 .linha-botoes {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 8px;
+}
+
+#instalar-tudo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
 button {
-  padding: 8px 14px;
+  padding: 9px 14px;
+  min-height: 38px;
   border: 1px solid var(--line-strong);
   border-radius: 7px;
   background: var(--control);
@@ -219,8 +422,23 @@ button:hover:not(:disabled) {
 }
 
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
+}
+
+/* Von Restorff: uma ação primária por seção, e só ela tem cor. */
+button.primario {
+  min-height: 42px;
+  padding: 10px 18px;
+  border-color: transparent;
+  background: var(--green);
+  color: #0a0b0c;
+  font-weight: 650;
+}
+
+button.primario:hover:not(:disabled) {
+  border-color: transparent;
+  filter: brightness(1.08);
 }
 
 button.discreto {
@@ -231,13 +449,36 @@ button.perigo {
   color: var(--red);
 }
 
+#deps li button {
+  flex: none;
+  align-self: center;
+}
+
+#recarregar {
+  width: 100%;
+}
+
+#autostart-label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+
+#autostart-label input {
+  width: 17px;
+  height: 17px;
+  accent-color: var(--green);
+}
+
 #saida {
-  margin-top: 18px;
+  margin-top: 22px;
   padding: 12px;
   max-height: 220px;
   overflow: auto;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: var(--r);
   background: #0b0c0e;
   color: var(--ink-2);
   font-family: var(--mono);
@@ -253,16 +494,40 @@ button.perigo {
   display: inline;
 }
 
-#autostart-label {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--ink-2);
-  cursor: pointer;
+button:focus-visible,
+.pendencia:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 2px;
 }
 
-#autostart-label input {
-  width: 16px;
-  height: 16px;
-  accent-color: var(--green);
+/* Janela estreita: a navegação vira uma faixa no topo. */
+@media (max-width: 620px) {
+  #janela {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+
+  #lado {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  #abas {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  #abas button {
+    width: auto;
+  }
+
+  #palco {
+    padding: 20px 16px 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+  }
 }

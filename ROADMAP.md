@@ -199,6 +199,10 @@ Ordem: o binário é o conteúdo do pacote, e a bandeja só vale depois que o pa
   `sandbox` e CSP fechado. Liga e desliga o hub, habilita no boot, roda o setup, aplica o
   managed-settings por `pkexec` e copia o link com token. O autostart da bandeja é um `.desktop`
   em `~/.config/autostart/`, não em `/etc/xdg/autostart/`, que decidiria pelos outros usuários.
+  A janela tem cinco seções com contador de pendência por aba, **QR code** do endereço (via
+  `qrencode`, PNG em `data:` URI) para abrir no celular sem digitar, e um **checklist de
+  dependências** que instala o que falta com um clique — sempre por `pkexec`, para a senha ficar
+  no diálogo do sistema e nunca num campo nosso.
 
 Nada disso foi sondado ainda — as duas medições que faltam são se o `--compile` sobe e serve a
 página de fato (e em quantos MB), e se o marketplace aceita caminho de disco.

@@ -10,6 +10,7 @@ const {
   trayTooltip,
   problemCount,
   autostartEntry,
+  aptInstallCommand,
 } = require('./core.js')
 
 const ICON = join(__dirname, 'icon.png')
@@ -25,6 +26,11 @@ function executavel(p) {
 
 // Mesma ordem do shim bin/local-session. O app é casca: sem o binário ele não
 // tem o que mostrar, e é melhor dizer isso do que exibir uma tela vazia.
+function executavelNoPath(nome) {
+  const dirs = (process.env.PATH || '').split(':').filter(Boolean)
+  return dirs.some(d => executavel(join(d, nome)))
+}
+
 function acharBinario() {
   return resolveBinary(
     [
@@ -162,8 +168,7 @@ ipcMain.handle('acao', async (_ev, id) => {
 })
 ipcMain.handle('abrir-link', (_ev, url) => {
   // Só o que o próprio hub montou: o renderer não escolhe endereço.
-  const permitidos = [ultimoStatus?.links?.lan, ultimoStatus?.links?.tailscale].filter(Boolean)
-  if (permitidos.includes(url)) shell.openExternal(url)
+  if (linksConhecidos().includes(url)) shell.openExternal(url)
 })
 const AUTOSTART = join(homedir(), '.config', 'autostart', 'local-session-ui.desktop')
 
@@ -182,6 +187,39 @@ ipcMain.handle('autostart', (_ev, ligar) => {
   } catch {
     return existsSync(AUTOSTART)
   }
+})
+
+function linksConhecidos() {
+  return [ultimoStatus?.links?.lan, ultimoStatus?.links?.tailscale].filter(Boolean)
+}
+
+ipcMain.handle('instalar', async (_ev, pacotes) => {
+  const cmd = aptInstallCommand(Array.isArray(pacotes) ? pacotes : [])
+  if (!cmd) return { ok: false, saida: 'nenhum pacote válido para instalar' }
+  const r = await rodar(cmd.bin, cmd.args, 300_000)
+  await recarregar()
+  return r
+})
+
+/**
+ * PNG em data: URI, não SVG por innerHTML — o CSP já libera `img-src data:` e
+ * nada de marcação vinda de fora entra no DOM. Só as URLs que o próprio hub
+ * montou viram QR: o renderer não escolhe o que codificar.
+ */
+ipcMain.handle('qr', async (_ev, url) => {
+  if (!linksConhecidos().includes(url)) return null
+  if (!executavelNoPath('qrencode')) return null
+  return new Promise(resolve => {
+    execFile(
+      'qrencode',
+      ['-o', '-', '-t', 'PNG', '-s', '6', '-m', '2', '--', url],
+      { encoding: 'buffer', timeout: 10_000, maxBuffer: 4 * 1024 * 1024 },
+      (err, stdout) => {
+        if (err || !stdout || stdout.length === 0) return resolve(null)
+        resolve(`data:image/png;base64,${stdout.toString('base64')}`)
+      },
+    )
+  })
 })
 
 ipcMain.handle('copiar', (_ev, texto) => {

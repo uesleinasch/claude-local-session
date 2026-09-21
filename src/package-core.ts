@@ -69,7 +69,7 @@ export function controlFile(c: Control): string {
     `Maintainer: ${c.maintainer}`,
     // tmux é o que hoje se descobre com Bun.which em runtime, e cuja ausência
     // só apaga botões da página sem dizer por quê.
-    `Depends: ${['tmux', ...ELECTRON_DEPS].join(', ')}`,
+    `Depends: ${['tmux', 'qrencode', ...ELECTRON_DEPS].join(', ')}`,
     'Recommends: git',
     'Section: utils',
     'Priority: optional',

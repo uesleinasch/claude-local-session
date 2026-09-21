@@ -10,75 +10,143 @@
     <link rel="stylesheet" href="style.css" />
   </head>
   <body>
-    <header id="topo">
-      <div id="marca">
-        <h1>local-session</h1>
-        <span id="versao"></span>
-      </div>
-      <div id="resumo">
-        <span id="bolha" data-health="warn"></span>
-        <span id="resumo-texto">verificando…</span>
-      </div>
-    </header>
-
-    <main>
-      <section id="sem-binario" hidden>
-        <h2>não encontrei o executável</h2>
-        <p>
-          Esta janela é só a casca: todo o diagnóstico vem do
-          <code>local-session</code>, que não está em <code>/usr/bin</code> nem no
-          <code>dist/</code> deste repositório.
-        </p>
-        <p>Instale o pacote ou rode <code>bun run build</code> a partir do repositório.</p>
-      </section>
-
-      <section id="acesso" hidden>
-        <h2>acesso</h2>
-        <ul id="links"></ul>
-      </section>
-
-      <section id="hub-box" hidden>
-        <h2>hub</h2>
-        <p id="hub-detalhe"></p>
-        <div class="linha-botoes">
-          <button type="button" data-acao="hub-start">ligar</button>
-          <button type="button" data-acao="hub-restart">reiniciar</button>
-          <button type="button" data-acao="hub-stop" class="perigo">desligar</button>
+    <div id="janela">
+      <nav id="lado" aria-label="Seções">
+        <div id="marca">
+          <span id="bolha" data-health="warn" aria-hidden="true"></span>
+          <div>
+            <strong>local-session</strong>
+            <span id="versao"></span>
+          </div>
         </div>
-        <div class="linha-botoes">
-          <button type="button" data-acao="boot-on">ligar junto com o sistema</button>
-          <button type="button" data-acao="boot-off" class="discreto">não ligar no boot</button>
-        </div>
-      </section>
 
-      <section id="janela-box">
-        <h2>esta janela</h2>
-        <p class="detalhe">
-          O hub roda sozinho como serviço; isto é só o ícone de bandeja.
-        </p>
-        <label id="autostart-label">
-          <input type="checkbox" id="autostart" />
-          abrir a bandeja quando eu entrar na conta
-        </label>
-      </section>
+        <ul id="abas" role="tablist" aria-orientation="vertical">
+          <li><button type="button" role="tab" data-secao="geral" aria-selected="true">situação</button></li>
+          <li><button type="button" role="tab" data-secao="acesso" aria-selected="false">acesso</button></li>
+          <li>
+            <button type="button" role="tab" data-secao="dependencias" aria-selected="false">
+              dependências<span class="conta" id="conta-dependencias" hidden></span>
+            </button>
+          </li>
+          <li><button type="button" role="tab" data-secao="servico" aria-selected="false">serviço</button></li>
+          <li>
+            <button type="button" role="tab" data-secao="canal" aria-selected="false">
+              canal<span class="conta" id="conta-canal" hidden></span>
+            </button>
+          </li>
+        </ul>
 
-      <section id="checagens" hidden>
-        <h2>verificação</h2>
-        <ul id="lista"></ul>
-      </section>
-
-      <section id="acoes">
-        <h2>configuração</h2>
-        <div class="linha-botoes">
-          <button type="button" data-acao="setup">configurar tudo</button>
-          <button type="button" data-acao="canal">habilitar o canal (pede senha)</button>
-          <button type="button" data-acao="service" class="discreto">instalar o serviço</button>
-        </div>
         <button type="button" id="recarregar" class="discreto">verificar de novo</button>
-      </section>
+      </nav>
 
-      <pre id="saida" hidden aria-live="polite"></pre>
-    </main>
+      <main id="palco">
+        <section id="sem-binario" hidden>
+          <h2>não encontrei o executável</h2>
+          <p>
+            Esta janela é a casca: o diagnóstico vem do <code>local-session</code>, que não está
+            em <code>/usr/bin</code> nem no <code>dist/</code> deste repositório.
+          </p>
+          <p>Instale o pacote ou rode <code>bun run build</code> a partir do repositório.</p>
+        </section>
+
+        <!-- situação -->
+        <section class="painel" data-painel="geral">
+          <header class="cabeca">
+            <h2 id="resumo-titulo">verificando…</h2>
+            <p id="resumo-texto"></p>
+          </header>
+          <div id="pendencias"></div>
+          <ul class="checks" id="checks-geral"></ul>
+        </section>
+
+        <!-- acesso -->
+        <section class="painel" data-painel="acesso" hidden>
+          <header class="cabeca">
+            <h2>abrir no celular</h2>
+            <p>Aponte a câmera. O endereço já leva o token de acesso.</p>
+          </header>
+
+          <div id="qr-area">
+            <img id="qr" alt="QR code do endereço da página" hidden />
+            <p id="qr-ausente" hidden>
+              O QR code precisa do <code>qrencode</code>.
+              <button type="button" class="primario" data-instalar="qrencode">instalar agora</button>
+            </p>
+            <p id="qr-sem-link" hidden>O hub precisa estar no ar para ter endereço.</p>
+            <p id="qr-falhou" hidden>
+              O <code>qrencode</code> está instalado mas não gerou a imagem. Use o link abaixo.
+            </p>
+          </div>
+
+          <div id="qr-escolha" class="linha-botoes" hidden>
+            <button type="button" data-link="tailscale" class="alternativa">tailnet</button>
+            <button type="button" data-link="lan" class="alternativa">rede local</button>
+          </div>
+
+          <ul id="links"></ul>
+          <ul class="checks" id="checks-acesso"></ul>
+        </section>
+
+        <!-- dependências -->
+        <section class="painel" data-painel="dependencias" hidden>
+          <header class="cabeca">
+            <h2>dependências</h2>
+            <p>O que está instalado e o que se perde sem cada uma.</p>
+          </header>
+          <div id="instalar-tudo" hidden>
+            <button type="button" class="primario" id="btn-instalar-tudo"></button>
+            <span class="detalhe">pede a senha no diálogo do sistema</span>
+          </div>
+          <ul id="deps"></ul>
+        </section>
+
+        <!-- serviço -->
+        <section class="painel" data-painel="servico" hidden>
+          <header class="cabeca">
+            <h2>hub</h2>
+            <p id="hub-detalhe"></p>
+          </header>
+          <div class="linha-botoes">
+            <button type="button" class="primario" data-acao="hub-restart">reiniciar</button>
+            <button type="button" data-acao="hub-start">ligar</button>
+            <button type="button" data-acao="hub-stop" class="perigo">desligar</button>
+          </div>
+
+          <h3>no boot</h3>
+          <div class="linha-botoes">
+            <button type="button" data-acao="boot-on">ligar junto com o sistema</button>
+            <button type="button" data-acao="boot-off" class="discreto">não ligar</button>
+            <button type="button" data-acao="service" class="discreto">reinstalar a unit</button>
+          </div>
+
+          <h3>esta janela</h3>
+          <label id="autostart-label">
+            <input type="checkbox" id="autostart" />
+            abrir a bandeja quando eu entrar na conta
+          </label>
+
+          <ul class="checks" id="checks-servico"></ul>
+        </section>
+
+        <!-- canal -->
+        <section class="painel" data-painel="canal" hidden>
+          <header class="cabeca">
+            <h2>canal</h2>
+            <p>
+              As três camadas que o prompt atravessa. Faltando qualquer uma, ele é descartado em
+              silêncio antes de chegar ao modelo.
+            </p>
+          </header>
+          <div class="linha-botoes">
+            <button type="button" class="primario" data-acao="setup">configurar tudo</button>
+            <button type="button" data-acao="canal">habilitar em /etc (pede senha)</button>
+          </div>
+          <ul class="checks" id="checks-canal"></ul>
+        </section>
+
+        <pre id="saida" hidden aria-live="polite"></pre>
+      </main>
+    </div>
 
     <script src="app.js"></script>
   </body>

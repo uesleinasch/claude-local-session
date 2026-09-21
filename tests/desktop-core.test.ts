@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { Status } from '../src/status-core'
 import {
   actionIds,
+  aptInstallCommand,
   actionLabel,
   healthLabel,
   problemCount,
@@ -72,7 +73,8 @@ describe('bandeja', () => {
     hub: { port: 7777, pid: 1, answering: true, managedByService: true },
     service: { installed: true, enabled: true, active: true, linger: true },
     links: { lan: null, tailscale: null },
-    checks: [{ id: 'a', title: 't', health: 'ok', detail: 'd' }],
+    checks: [{ id: 'a', title: 't', health: 'ok', detail: 'd', section: 'geral' }],
+    dependencies: [],
     health: 'ok',
   }
   const status = (over: Partial<Status> = {}): Status => ({ ...BASE, ...over })
@@ -95,9 +97,9 @@ describe('bandeja', () => {
   test('o contador conta só o que não está ok', () => {
     const s = status({
       checks: [
-        { id: 'a', title: 't', health: 'ok', detail: 'd' },
-        { id: 'b', title: 't', health: 'warn', detail: 'd' },
-        { id: 'c', title: 't', health: 'fail', detail: 'd' },
+        { id: 'a', title: 't', health: 'ok', detail: 'd', section: 'geral' },
+        { id: 'b', title: 't', health: 'warn', detail: 'd', section: 'geral' },
+        { id: 'c', title: 't', health: 'fail', detail: 'd', section: 'geral' },
       ],
     })
     expect(problemCount(s)).toBe(2)
@@ -105,5 +107,36 @@ describe('bandeja', () => {
 
   test('todo estado de saúde tem rótulo em português', () => {
     for (const h of ['ok', 'warn', 'fail']) expect(healthLabel(h)).not.toBe('desconhecido')
+  })
+})
+
+describe('instalar dependências', () => {
+  test('passa pelo pkexec: a senha é do diálogo do sistema, não da nossa janela', () => {
+    const c = aptInstallCommand(['tmux'])
+    expect(c?.bin).toBe('pkexec')
+    expect(c?.args).toContain('apt-get')
+  })
+
+  test('sem terminal, o apt não pode ficar esperando resposta', () => {
+    expect(aptInstallCommand(['tmux'])?.args).toContain('DEBIAN_FRONTEND=noninteractive')
+  })
+
+  test('nome de pacote é validado — a lista vem da UI e vira argv de root', () => {
+    expect(aptInstallCommand(['tmux; rm -rf /'])).toBeNull()
+    expect(aptInstallCommand(['--option=x'])).toBeNull()
+    expect(aptInstallCommand(['/etc/passwd'])).toBeNull()
+    expect(aptInstallCommand([])).toBeNull()
+  })
+
+  test('descarta o inválido e instala o válido em vez de recusar tudo', () => {
+    expect(aptInstallCommand(['tmux', 'rm -rf /', 'git'])?.args.slice(-2)).toEqual(['tmux', 'git'])
+  })
+
+  test('aceita nomes reais do apt, com ponto, mais e hífen', () => {
+    expect(aptInstallCommand(['libasound2t64', 'g++', 'libgtk-3-0'])?.args.slice(-3)).toEqual([
+      'libasound2t64',
+      'g++',
+      'libgtk-3-0',
+    ])
   })
 })

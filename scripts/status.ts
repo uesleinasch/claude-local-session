@@ -18,8 +18,14 @@ import {
   UNIT_NAME,
   type ManagedSettings,
 } from '../src/setup-core'
-import { buildStatus, unitExecTarget, type Health, type Status } from '../src/status-core'
-import { probeTailscale, resolveState, type TailscaleState } from '../src/tailscale'
+import {
+  buildDependencies,
+  buildStatus,
+  unitExecTarget,
+  type Health,
+  type Status,
+} from '../src/status-core'
+import { probeTailscale, resolveState } from '../src/tailscale'
 import { pidsOnPort } from '../src/update-core'
 
 const HOME = homedir()
@@ -105,21 +111,18 @@ export async function collect(): Promise<Status> {
     managedOk: !mergeManagedSettings(managed, BUILT_IDENTITY).changed,
     replyPermissionOk: !mergeUserPermissions(perms, replyToolName(BUILT_IDENTITY)).changed,
     aliasOk: !ensureAliasBlock(rc, aliasCommand(BUILT_IDENTITY)).changed,
-    hasTmux: Bun.which('tmux') !== null,
-    hasClaude: Bun.which('claude') !== null,
     unitStale: unitTarget !== null && !existsSync(unitTarget),
     lanUrl: url(lan),
     tailscaleUrl: tailscale?.kind === 'running' ? url(tailscale.host) : null,
-    tailscaleDetail: tailscaleDetail(tailscale),
+    dependencies: buildDependencies({
+      hasClaude: Bun.which('claude') !== null,
+      hasTmux: Bun.which('tmux') !== null,
+      hasGit: Bun.which('git') !== null,
+      hasQrencode: Bun.which('qrencode') !== null,
+      hasPkexec: Bun.which('pkexec') !== null,
+      tailscale: tailscale?.kind ?? 'absent',
+    }),
   })
-}
-
-function tailscaleDetail(state: TailscaleState | null): string | null {
-  if (state === null) return null
-  if (state.kind === 'running') return `tailnet: ${state.host}`
-  if (state.kind === 'stopped') return 'tailscale instalado, mas desligado'
-  if (state.kind === 'needs-login') return 'tailscale desligado — falta autenticar'
-  return null
 }
 
 const MARK: Record<Health, string> = {
@@ -139,6 +142,15 @@ export function printStatus(status: Status, json: boolean): void {
     console.log(`  ${MARK[c.health]} ${c.title} — ${c.detail}`)
     if (c.fix) console.log(`      ${c.fix}`)
   }
+  const faltando = status.dependencies.filter(d => !d.present)
+  if (faltando.length > 0) {
+    console.log('')
+    for (const d of faltando) {
+      console.log(`  ${d.required ? MARK.fail : MARK.warn} ${d.title} — ${d.detail}`)
+      if (d.aptPackage) console.log(`      sudo apt install ${d.aptPackage}`)
+    }
+  }
+
   if (status.links.lan) console.log(`\n  rede local: ${status.links.lan}`)
   if (status.links.tailscale) console.log(`  tailnet:    ${status.links.tailscale}`)
   console.log('')

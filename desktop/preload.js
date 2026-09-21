@@ -12,5 +12,7 @@ contextBridge.exposeInMainWorld('ls', {
   abrirLink: url => ipcRenderer.invoke('abrir-link', url),
   copiar: texto => ipcRenderer.invoke('copiar', texto),
   autostart: ligar => ipcRenderer.invoke('autostart', ligar),
+  instalar: pacotes => ipcRenderer.invoke('instalar', pacotes),
+  qr: url => ipcRenderer.invoke('qr', url),
   aoAtualizar: cb => ipcRenderer.on('status', (_ev, payload) => cb(payload)),
 })
