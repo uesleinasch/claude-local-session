@@ -1,0 +1,16 @@
+<!--
+  Camada da frente do ícone adaptativo: canvas de 108dp com a máscara do sistema
+  comendo a borda, então o desenho fica reduzido ao miolo. O `desktop/icon.svg`
+  desenha de 34 a 222 num canvas de 256 — usar aquele traçado direto aqui faria o
+  Android cortar o monitor. A escala de 0.30 põe a diagonal do desenho dentro do
+  círculo seguro de 66dp, e o `rx` do monitor absorve o que sobra no canto.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 108 108">
+  <g transform="translate(54 54) scale(0.3) translate(-128 -127)">
+    <rect x="40" y="58" width="176" height="116" rx="14" fill="none" stroke="#4ade80" stroke-width="12"/>
+    <path d="M96 196h64" stroke="#4ade80" stroke-width="12" stroke-linecap="round"/>
+    <path d="M128 174v22" stroke="#4ade80" stroke-width="12" stroke-linecap="round"/>
+    <circle cx="128" cy="116" r="15" fill="#4ade80"/>
+    <path d="M92 90a48 48 0 0 0 0 52M164 90a48 48 0 0 1 0 52" stroke="#f5a524" stroke-width="11" stroke-linecap="round" fill="none"/>
+  </g>
+</svg>

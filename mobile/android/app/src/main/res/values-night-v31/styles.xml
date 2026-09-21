@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  No Android 12+ o sistema desenha a própria splash e ignora o windowBackground:
+  sem estes dois atributos o app abre numa tela branca. O qualificador `night`
+  tem precedência sobre `version`, então o par values-night-v31 precisa existir
+  ou o modo escuro volta a cair no tema sem eles.
+-->
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowSplashScreenBackground">@color/fundo_splash</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_icone</item>
+    </style>
+</resources>
