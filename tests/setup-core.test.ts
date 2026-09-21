@@ -1,12 +1,14 @@
 import { describe, expect, test } from 'bun:test'
 import {
   aliasCommand,
+  channelAliasPresent,
   detectPluginIdentity,
   ensureAliasBlock,
   mergeManagedSettings,
   mergeUserPermissions,
   rcPathFor,
   removeManagedEntry,
+  sourcedPaths,
   replyToolName,
   systemdUnit,
 } from '../src/setup-core'
@@ -233,5 +235,53 @@ describe('removeManagedEntry', () => {
   test('entrada ausente não conta como mudança', () => {
     const atual = { channelsEnabled: true, allowedChannelPlugins: [outro] }
     expect(removeManagedEntry(atual, ID).changed).toBe(false)
+  })
+})
+
+describe('sourcedPaths', () => {
+  const HOME = '/home/u'
+
+  test('acha o que o rc carrega com source e com ponto', () => {
+    const rc = 'source ~/.zshrc.local\n. /etc/algo.sh\n'
+    expect(sourcedPaths(rc, HOME)).toEqual(['/home/u/.zshrc.local', '/etc/algo.sh'])
+  })
+
+  test('resolve ~ e $HOME, que é como todo rc escreve', () => {
+    expect(sourcedPaths('source "$HOME/a.sh"\nsource ~/b.sh', HOME)).toEqual([
+      '/home/u/a.sh',
+      '/home/u/b.sh',
+    ])
+  })
+
+  test('pega o source escondido atrás de um teste condicional', () => {
+    const rc = '[[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh'
+    expect(sourcedPaths(rc, HOME)).toContain('/home/u/.p10k.zsh')
+  })
+
+  test('ignora comentário — rc é cheio de exemplo comentado', () => {
+    expect(sourcedPaths('# source ~/nao-existe.sh', HOME)).toEqual([])
+  })
+
+  test('caminho com variável que não sabemos resolver fica de fora', () => {
+    expect(sourcedPaths('source "$ZSH/oh-my-zsh.sh"', HOME)).toEqual([])
+  })
+
+  test('não repete o mesmo arquivo', () => {
+    expect(sourcedPaths('source ~/a.sh\nsource ~/a.sh', HOME)).toEqual(['/home/u/a.sh'])
+  })
+})
+
+describe('channelAliasPresent', () => {
+  test('encontra a flag num arquivo incluído, não só no rc principal', () => {
+    const local = 'claude() { command claude --channels plugin:local-session@unac "$@" }'
+    expect(channelAliasPresent(['# rc vazio', local], ID)).toBe(true)
+  })
+
+  test('ausente em todos é ausente', () => {
+    expect(channelAliasPresent(['', '# nada aqui'], ID)).toBe(false)
+  })
+
+  test('a flag de outro plugin não conta como a nossa', () => {
+    expect(channelAliasPresent(['--channels plugin:outro@terceiros'], ID)).toBe(false)
   })
 })

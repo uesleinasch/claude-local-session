@@ -208,7 +208,11 @@ prompt é **descartado em silêncio** antes de chegar ao modelo:
    (declarar essa chave **substitui** a allowlist padrão da Anthropic, não soma a ela — por isso
    `setup-core.ts` faz merge).
 2. a flag por sessão `claude --channels plugin:local-session@unac` (sem equivalente em
-   `settings.json`; daí a função de shell que o instalador escreve no rc).
+   `settings.json`; daí a função de shell que o instalador escreve no rc). **Procurar o bloco só
+   no rc principal dá falso positivo**: ele costuma acabar num arquivo que o rc carrega
+   (`~/.zshrc.local` e afins), configurado e funcionando. `sourcedPaths` + `channelAliasPresent`
+   em `src/setup-core.ts` olham os incluídos, e o `setup` não reescreve quando acha o bloco num
+   deles — seriam duas definições da mesma função, e a última a carregar venceria.
 3. opcional: `mcp__plugin_local-session_local-session__reply` no `permissions.allow`, senão cada
    resposta fica parada num card de permissão.
 

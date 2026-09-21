@@ -8,12 +8,14 @@ import { readConfig } from '../src/config'
 import {
   MANAGED_SETTINGS_PATH,
   aliasCommand,
+  channelAliasPresent,
   detectPluginIdentity,
   ensureAliasBlock,
   mergeManagedSettings,
   mergeUserPermissions,
   rcPathFor,
   replyToolName,
+  sourcedPaths,
   type ManagedSettings,
   type PluginIdentity,
 } from '../src/setup-core'
@@ -157,9 +159,18 @@ export async function main(): Promise<void> {
   // 3. alias que ativa o canal sem exigir memória
   const rcPath = rcPathFor(process.env.SHELL ?? '', HOME)
   const rc = existsSync(rcPath) ? readFileSync(rcPath, 'utf8') : ''
+  const incluidos = sourcedPaths(rc, HOME)
+  const jaConfigurado = channelAliasPresent(
+    [rc, ...incluidos.map(f => (existsSync(f) ? readFileSync(f, 'utf8') : ''))],
+    id,
+  )
   const alias = ensureAliasBlock(rc, aliasCommand(id))
 
-  if (!alias.changed) {
+  if (jaConfigurado) {
+    // Pode estar num arquivo que o rc carrega; reescrever no principal criaria
+    // uma segunda definição da mesma função, e a última a carregar venceria.
+    ok('sessões novas já abrem com o canal ativo')
+  } else if (!alias.changed) {
     ok(`alias já configurado em ${rcPath}`)
   } else if (!APPLY) {
     miss(`falta o alias em ${rcPath}`)

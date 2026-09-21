@@ -197,7 +197,7 @@ export function buildChecks(i: StatusInput): Check[] {
     title: 'sessões novas abrem com --channels',
     health: i.aliasOk ? 'ok' : 'warn',
     detail: i.aliasOk
-      ? 'a função de shell está no rc'
+      ? 'a função de shell está configurada'
       : 'sem a flag por sessão, a sessão nasce sem canal',
     ...(i.aliasOk ? {} : { fix: 'local-session setup' }),
   })

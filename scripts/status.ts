@@ -8,13 +8,13 @@ import { lanAddress, readConfig, tailscaleAddress } from '../src/config'
 import { BUILT_IDENTITY, BUILT_VERSION, installedVersion } from '../src/plugin-meta'
 import { DEFAULT_PORT } from '../src/protocol'
 import {
-  aliasCommand,
-  ensureAliasBlock,
+  channelAliasPresent,
   MANAGED_SETTINGS_PATH,
   mergeManagedSettings,
   mergeUserPermissions,
   rcPathFor,
   replyToolName,
+  sourcedPaths,
   UNIT_NAME,
   type ManagedSettings,
 } from '../src/setup-core'
@@ -76,6 +76,9 @@ export async function collect(): Promise<Status> {
   const perms = readJson<Record<string, unknown>>(settingsPath)
   const rcPath = rcPathFor(process.env.SHELL ?? '', HOME)
   const rc = existsSync(rcPath) ? readFileSync(rcPath, 'utf8') : ''
+  // O bloco pode estar num arquivo que o rc carrega (~/.zshrc.local e afins):
+  // olhar só o principal acusaria ausência do que está lá e funciona.
+  const rcTextos = [rc, ...sourcedPaths(rc, HOME).map(f => (existsSync(f) ? readFileSync(f, 'utf8') : ''))]
 
   const unitPath = join(HOME, '.config/systemd/user', UNIT_NAME)
   const unitInstalled =
@@ -110,7 +113,7 @@ export async function collect(): Promise<Status> {
       ) ?? false,
     managedOk: !mergeManagedSettings(managed, BUILT_IDENTITY).changed,
     replyPermissionOk: !mergeUserPermissions(perms, replyToolName(BUILT_IDENTITY)).changed,
-    aliasOk: !ensureAliasBlock(rc, aliasCommand(BUILT_IDENTITY)).changed,
+    aliasOk: channelAliasPresent(rcTextos, BUILT_IDENTITY),
     unitStale: unitTarget !== null && !existsSync(unitTarget),
     lanUrl: url(lan),
     tailscaleUrl: tailscale?.kind === 'running' ? url(tailscale.host) : null,

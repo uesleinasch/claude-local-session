@@ -75,6 +75,36 @@ export function replyToolName(id: PluginIdentity): string {
   return `mcp__plugin_${id.plugin}_${SERVER_NAME}__reply`
 }
 
+/**
+ * Caminhos que o rc carrega com `source`/`.`. O bloco do canal costuma morar
+ * num deles — `~/.zshrc.local` é onde muita máquina guarda personalização — e
+ * olhar só o rc principal acusa ausência do que está lá e funciona.
+ */
+export function sourcedPaths(rc: string, home: string): string[] {
+  const achados: string[] = []
+  for (const linha of rc.split('\n')) {
+    const semComentario = linha.split('#')[0] ?? ''
+    for (const m of semComentario.matchAll(/(?:^|[;&|]|&&|\|\|)\s*(?:source|\.)\s+"?([^"'\s;&|]+)"?/g)) {
+      const bruto = m[1]
+      if (bruto === undefined) continue
+      let caminho = bruto
+      if (caminho.startsWith('~/')) caminho = join(home, caminho.slice(2))
+      else if (caminho.startsWith('$HOME/')) caminho = join(home, caminho.slice(6))
+      // Caminho montado com outra variável não dá para resolver sem rodar o
+      // shell, e rodar o shell do usuário para um diagnóstico sai caro.
+      if (!caminho.startsWith('/') || caminho.includes('$')) continue
+      if (!achados.includes(caminho)) achados.push(caminho)
+    }
+  }
+  return achados
+}
+
+/** A flag por sessão está configurada em algum destes arquivos? */
+export function channelAliasPresent(contents: readonly string[], id: PluginIdentity): boolean {
+  const marca = `--channels plugin:${id.plugin}@${id.marketplace}`
+  return contents.some(c => c.includes(marca))
+}
+
 export function rcPathFor(shell: string, home: string): string {
   if (shell.includes('zsh')) return join(home, '.zshrc')
   if (shell.includes('bash')) return join(home, '.bashrc')
