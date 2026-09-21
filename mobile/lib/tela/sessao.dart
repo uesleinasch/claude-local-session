@@ -11,6 +11,7 @@ class TelaSessao extends StatefulWidget {
     required this.aoAbrirAjustes,
     required this.aoPerderOHub,
     required this.ponte,
+    required this.aoCarregarPagina,
   });
 
   final String url;
@@ -18,6 +19,7 @@ class TelaSessao extends StatefulWidget {
   final VoidCallback aoAbrirAjustes;
   final VoidCallback aoPerderOHub;
   final PonteWeb ponte;
+  final VoidCallback aoCarregarPagina;
 
   @override
   State<TelaSessao> createState() => _TelaSessaoState();
@@ -76,6 +78,12 @@ class _TelaSessaoState extends State<TelaSessao> {
             onWebViewCreated: (controle) {
               _controle = controle;
               widget.ponte.ligar(controle);
+            },
+            // A ponte JS nasce no fim de app.js: antes do load, entregar
+            // compartilhamento cairia no vazio.
+            onLoadStop: (_, url) {
+              widget.ponte.marcarCarregada();
+              widget.aoCarregarPagina();
             },
             onReceivedError: (_, requisicao, erro) {
               if (requisicao.isForMainFrame ?? false) widget.aoPerderOHub();

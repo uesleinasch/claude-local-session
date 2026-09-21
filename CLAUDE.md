@@ -214,6 +214,18 @@ URL `http://host:7777/?t=…` que ela produz. Nem o Electron nem o hub mudaram p
   `tailscaleAddress(nets = …)`. `flutter test` cobre os núcleos; `bun test` não depende do
   Flutter estar instalado.
 
+O que o nativo acrescenta à página, e o preço de cada um:
+
+- **Ponte `window.localSession`** (fim de `web/app.js`): `inserirNoComposer` e `sessaoAtual`, só
+  isso. É contrato entre dois repositórios de código que nada liga em tempo de build — daí
+  `tests/ponte-mobile.test.ts` falhar se um dos nomes sumir do `app.js`. Imagem compartilhada
+  **não** passa por aqui: sobe pela rota `/_upload` e só o caminho volta pela ponte, porque uma
+  foto de vários MB atravessando `evaluateJavascript` é pedir para quebrar.
+- **Avisos com o app fechado**: sem FCM não há push, então é serviço em primeiro plano assinando
+  o tópico ntfy que o hub já publica — e o Android cobra por isso uma notificação permanente na
+  barra. Por isso é opt-in nos ajustes, desligado por padrão. O tópico vem do `/_endpoints`, não
+  de uma segunda configuração no celular.
+
 ## `src/protocol.ts` é o contrato
 
 Todas as mensagens dos quatro lados vivem lá: `SessionToHub`, `HubToSession`, `BrowserToHub`,

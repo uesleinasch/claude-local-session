@@ -21,6 +21,9 @@ Future<void> mostrarAjustes(
   required void Function(ModoRede) aoTrocarModo,
   required VoidCallback aoProcurarDeNovo,
   required VoidCallback aoParearOutro,
+  required bool avisosLigados,
+  required String? topicoNtfy,
+  required Future<void> Function(bool) aoTrocarAvisos,
 }) {
   return showModalBottomSheet<void>(
     context: context,
@@ -33,6 +36,9 @@ Future<void> mostrarAjustes(
       aoTrocarModo: aoTrocarModo,
       aoProcurarDeNovo: aoProcurarDeNovo,
       aoParearOutro: aoParearOutro,
+      avisosLigados: avisosLigados,
+      topicoNtfy: topicoNtfy,
+      aoTrocarAvisos: aoTrocarAvisos,
     ),
   );
 }
@@ -45,6 +51,9 @@ class _Ajustes extends StatefulWidget {
     required this.aoTrocarModo,
     required this.aoProcurarDeNovo,
     required this.aoParearOutro,
+    required this.avisosLigados,
+    required this.topicoNtfy,
+    required this.aoTrocarAvisos,
   });
 
   final ModoRede modo;
@@ -53,6 +62,9 @@ class _Ajustes extends StatefulWidget {
   final void Function(ModoRede) aoTrocarModo;
   final VoidCallback aoProcurarDeNovo;
   final VoidCallback aoParearOutro;
+  final bool avisosLigados;
+  final String? topicoNtfy;
+  final Future<void> Function(bool) aoTrocarAvisos;
 
   @override
   State<_Ajustes> createState() => _AjustesState();
@@ -60,6 +72,7 @@ class _Ajustes extends StatefulWidget {
 
 class _AjustesState extends State<_Ajustes> {
   late ModoRede _modo = widget.modo;
+  late bool _avisos = widget.avisosLigados;
 
   @override
   Widget build(BuildContext context) {
@@ -97,6 +110,31 @@ class _AjustesState extends State<_Ajustes> {
                 ],
               ),
             ),
+            const Divider(height: 28),
+            Text('Avisar com o app fechado', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            if (widget.topicoNtfy == null)
+              const Text(
+                'Só funciona com um tópico ntfy no hub: ponha "notifyUrl" no '
+                '~/.claude/local-session/config.json e reinicie o hub.',
+                style: TextStyle(fontSize: 12, height: 1.4),
+              )
+            else
+              SwitchListTile(
+                value: _avisos,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Escutar os avisos da sessão'),
+                // Sem FCM, manter conexão com o app fechado exige serviço em
+                // primeiro plano — e o Android cobra por isso um ícone fixo.
+                subtitle: const Text(
+                  'Deixa uma notificação permanente na barra, como o app do ntfy.',
+                  style: TextStyle(fontSize: 12),
+                ),
+                onChanged: (ligar) async {
+                  setState(() => _avisos = ligar);
+                  await widget.aoTrocarAvisos(ligar);
+                },
+              ),
             const Divider(height: 28),
             if (endereco != null)
               Text('Conectado em $endereco', style: const TextStyle(fontSize: 12)),

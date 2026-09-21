@@ -405,6 +405,19 @@ Se aparecer "não encontrei o hub", é uma destas três: a máquina está fora d
 está em nenhuma das redes, ou o token mudou (o hub responde 404 nos três casos, de propósito —
 veja *Segurança*). Nesse último caso, escaneie o QR de novo.
 
+**Compartilhar de outro app.** O Local Session aparece na folha de compartilhamento do Android:
+mandar um texto cai direto no composer da sessão aberta, e mandar uma imagem sobe pela mesma
+rota `/_upload` do clipe da página, deixando `imagem anexada: <caminho>` no composer. Anexar da
+galeria ou tirar foto pelo clipe também funciona dentro do app.
+
+**Ser avisado com o app fechado.** Em *ajustes*, "escutar os avisos da sessão" assina o tópico
+ntfy que o hub já publica (a chave `notifyUrl` do `config.json`; sem ela o app explica o que
+configurar). Sem FCM não existe push no Android, então manter a conexão exige um serviço em
+primeiro plano — e o Android cobra por isso uma **notificação permanente na barra**, como o
+próprio app do ntfy. Por isso vem desligado. Tocar no aviso abre o app, não a sessão específica:
+o payload do ntfy leva o rótulo, não o id da sessão, e enfiá-lo no campo `click` mandaria um
+endereço com token para um servidor de terceiros.
+
 Para compilar e instalar, com o Flutter e o SDK do Android na máquina:
 
 ```bash

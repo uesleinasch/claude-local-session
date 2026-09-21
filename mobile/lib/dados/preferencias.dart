@@ -43,14 +43,19 @@ class Preferencias {
     }
   }
 
-  Future<String?> lerVersaoDoHub() async {
+  Future<String?> lerVersaoDoHub() => _campoDaDescoberta('versao');
+
+  /// O tópico vem do `notifyUrl` do hub: quem já configurou lá não configura de novo aqui.
+  Future<String?> lerTopicoNtfy() => _campoDaDescoberta('ntfy');
+
+  Future<String?> _campoDaDescoberta(String chave) async {
     final prefs = await SharedPreferences.getInstance();
     final bruto = prefs.getString(_chaveDescoberta);
     if (bruto == null) return null;
     try {
       final payload = jsonDecode(bruto);
-      final versao = payload is Map<String, dynamic> ? payload['versao'] : null;
-      return versao is String ? versao : null;
+      final valor = payload is Map<String, dynamic> ? payload[chave] : null;
+      return valor is String && valor.isNotEmpty ? valor : null;
     } catch (_) {
       return null;
     }

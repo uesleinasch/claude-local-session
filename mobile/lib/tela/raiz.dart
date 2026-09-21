@@ -1,13 +1,21 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:local_session/compartilhamento/enviar_imagem.dart';
+import 'package:local_session/compartilhamento/fila.dart';
+import 'package:local_session/compartilhamento/receber.dart';
 import 'package:local_session/dados/cofre.dart';
 import 'package:local_session/dados/preferencias.dart';
 import 'package:local_session/descoberta/candidatos.dart';
 import 'package:local_session/descoberta/sonda.dart';
+import 'package:local_session/notificacao/servico.dart';
 import 'package:local_session/pareamento/link.dart';
 import 'package:local_session/ponte/ponte_web.dart';
 import 'package:local_session/tela/ajustes.dart';
 import 'package:local_session/tela/pareamento.dart';
 import 'package:local_session/tela/sessao.dart';
+import 'package:receive_sharing_intent/receive_sharing_intent.dart';
 
 enum _Fase { carregando, semPareamento, procurando, conectado, semHub }
 
@@ -20,27 +28,47 @@ class TelaRaiz extends StatefulWidget {
 
 class _TelaRaizState extends State<TelaRaiz> with WidgetsBindingObserver {
   final _ponte = PonteWeb();
+  late final _fila = FilaDeCompartilhados(composer: _ponte, subirImagem: _subirImagem);
+  late final _receptor = ReceptorDeCompartilhamento(fila: _fila);
+  StreamSubscription<List<SharedMediaFile>>? _compartilhados;
 
   static const _cofre = Cofre();
   static const _prefs = Preferencias();
+  static const _avisos = ServicoDeAvisos();
 
   _Fase _fase = _Fase.carregando;
   Pareamento? _pareamento;
   ModoRede _modo = ModoRede.automatico;
   Candidato? _vencedor;
   String? _versaoDoHub;
+  String? _topicoNtfy;
+  bool _avisosLigados = false;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _comecar();
+    _ouvirCompartilhamentos();
   }
 
   @override
   void dispose() {
+    _compartilhados?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  /// O Android pode acordar o app por um compartilhamento antes de a WebView
+  /// existir; a ponte devolve `false` nesse caso e nada é perdido em silêncio.
+  void _ouvirCompartilhamentos() {
+    _compartilhados = ReceiveSharingIntent.instance.getMediaStream().listen(
+      _receptor.processar,
+      onError: (_) {},
+    );
+    unawaited(
+      ReceiveSharingIntent.instance.getInitialMedia().then(_receptor.processar),
+    );
   }
 
   @override
@@ -51,15 +79,20 @@ class _TelaRaizState extends State<TelaRaiz> with WidgetsBindingObserver {
   }
 
   Future<void> _comecar() async {
+    await _avisos.preparar();
     final pareamento = await _cofre.ler();
     final modo = await _prefs.lerModo();
     final versao = await _prefs.lerVersaoDoHub();
+    final topico = await _prefs.lerTopicoNtfy();
+    final avisosLigados = await _avisos.ligado();
     if (!mounted) return;
 
     setState(() {
       _pareamento = pareamento;
       _modo = modo;
       _versaoDoHub = versao;
+      _topicoNtfy = topico;
+      _avisosLigados = avisosLigados;
     });
 
     if (pareamento == null) {
@@ -99,13 +132,34 @@ class _TelaRaizState extends State<TelaRaiz> with WidgetsBindingObserver {
     if (payload != null) await _prefs.salvarDescoberta(payload);
     await _prefs.salvarVencedor(vencedor);
     final versao = await _prefs.lerVersaoDoHub();
+    final topico = await _prefs.lerTopicoNtfy();
     if (!mounted) return;
 
     setState(() {
       _vencedor = vencedor;
       _versaoDoHub = versao;
+      _topicoNtfy = topico;
       _fase = _Fase.conectado;
     });
+  }
+
+  Future<String?> _subirImagem(String caminhoNoAparelho) async {
+    final pareamento = _pareamento;
+    final vencedor = _vencedor;
+    if (pareamento == null || vencedor == null) return null;
+
+    final sessao = await _ponte.sessaoAtual();
+    if (sessao == null) return null;
+
+    final arquivo = File(caminhoNoAparelho);
+    if (!arquivo.existsSync()) return null;
+
+    return enviarImagem(
+      baseUrl: vencedor.baseUrl(pareamento.esquema),
+      token: pareamento.token,
+      sessao: sessao,
+      bytes: await arquivo.readAsBytes(),
+    );
   }
 
   Future<void> _parear(Pareamento pareamento) async {
@@ -141,7 +195,22 @@ class _TelaRaizState extends State<TelaRaiz> with WidgetsBindingObserver {
       aoTrocarModo: _trocarModo,
       aoProcurarDeNovo: _procurar,
       aoParearOutro: _parearOutro,
+      avisosLigados: _avisosLigados,
+      topicoNtfy: _topicoNtfy,
+      aoTrocarAvisos: _trocarAvisos,
     );
+  }
+
+  Future<void> _trocarAvisos(bool ligar) async {
+    final topico = _topicoNtfy;
+    if (ligar && topico != null) {
+      await _avisos.ligar(topico);
+    } else {
+      await _avisos.desligar();
+    }
+    final ligado = await _avisos.ligado();
+    if (!mounted) return;
+    setState(() => _avisosLigados = ligado);
   }
 
   @override
@@ -157,6 +226,7 @@ class _TelaRaizState extends State<TelaRaiz> with WidgetsBindingObserver {
         aoAbrirAjustes: _abrirAjustes,
         aoPerderOHub: _procurar,
         ponte: _ponte,
+        aoCarregarPagina: () => unawaited(_fila.entregar()),
       ),
     };
   }
