@@ -27,12 +27,17 @@ como serviço, para a página continuar podendo criar sessões novas.
 
 ### Pelo pacote (Debian/Ubuntu)
 
-Um `.deb` traz o executável, o serviço, a entrada de menu e a **interface de configuração**:
+Um `.deb` traz o executável, o serviço, a entrada de menu e a **interface de configuração**.
+Baixe o pacote da [última release](https://github.com/uesleinasch/claude-local-session/releases/latest)
+e instale:
 
 ```bash
-sudo apt install ./local-session_<versão>_amd64.deb
+gh release download --repo uesleinasch/claude-local-session --pattern '*.deb'
+sudo apt install ./local-session_*_amd64.deb
 local-session setup
 ```
+
+Sem o `gh`, baixe o `.deb` pela página da release e rode as duas últimas linhas.
 
 O `apt` faz o que é de root — binário em `/usr/bin`, `tmux` como dependência de pacote e o
 `/etc/claude-code/managed-settings.json` sem diálogo de senha. O `local-session setup` faz o
