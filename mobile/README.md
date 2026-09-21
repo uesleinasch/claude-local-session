@@ -29,6 +29,23 @@ ntfy** num serviço em primeiro plano para avisar com o app fechado.
 O núcleo recebe o efeito como parâmetro — `correr(candidatos, sonda)` — pelo mesmo motivo que
 `tailscaleAddress(nets = …)` no hub: teste sem rede.
 
+## Ícone e splash
+
+O ícone legado sai do mesmo `desktop/icon.svg` das duas interfaces; a camada adaptativa tem
+arquivo próprio (`icone/frente.svg`) porque o Android come a borda do canvas de 108dp e o
+traçado do desktop, que vai quase até o limite, apareceria cortado. `bun scripts/mobile-icones.ts`
+(na raiz) rasteriza os dois com `inkscape`.
+
+## Publicar uma versão
+
+`bun scripts/release-apk.ts` na raiz do repo: compila em release, recusa versão já publicada e
+sobe o APK como release `app-v<semver>` no GitHub. Para instalar no celular, abra o release
+logado e toque no `.apk` — sem cabo. Suba a versão em `pubspec.yaml` antes de cada publicação;
+republicar a mesma falha de propósito.
+
+A assinatura é a chave de **debug** desta máquina: nada de senha para guardar, mas se você
+perder a máquina o app novo não atualiza por cima do antigo (precisa desinstalar).
+
 ## Comandos
 
 ```bash
@@ -58,6 +75,10 @@ adb install -r build/app/outputs/flutter-apk/app-debug.apk
   java8-support — mensagem que não nomeia o plugin culpado.
 - **A WebView só navega no host pareado** (`podeNavegar`): sem barra de endereço, um link do
   feed levaria para fora do hub sem sinal nenhum na tela.
+- **`drawable-v21/` vence `drawable/`** em qualquer aparelho moderno, e **`night` vence
+  `version`**: a splash precisa ser corrigida nos dois pares de pasta, senão o template branco
+  continua valendo. No Android 12+ o sistema ainda ignora o `windowBackground` e desenha a
+  própria splash, que exige `windowSplashScreenBackground` e `windowSplashScreenAnimatedIcon`.
 - **`window.localSession` só existe depois do `onLoadStop`**, não do `onWebViewCreated`: a ponte
   nasce no fim de `app.js`. O Android entrega o compartilhamento antes disso, então
   `FilaDeCompartilhados` segura o item até a página carregar — entregar mais cedo o perderia em

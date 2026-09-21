@@ -35,6 +35,9 @@ cd mobile && flutter test       # núcleos puros do app
 cd mobile && flutter analyze    # checagem estática do Dart
 cd mobile && flutter build apk --debug
 adb install -r mobile/build/app/outputs/flutter-apk/app-debug.apk
+bun scripts/mobile-icones.ts    # rasteriza os mipmaps (exige inkscape)
+bun scripts/release-apk.ts      # build release + release no GitHub
+bun scripts/release-apk.ts --check
 ```
 
 ## Um ponto de entrada, oito subcomandos
@@ -226,6 +229,29 @@ O que o nativo acrescenta à página, e o preço de cada um:
   barra. Por isso é opt-in nos ajustes, desligado por padrão. O tópico vem do `/_endpoints`, não
   de uma segunda configuração no celular.
 
+### Ícone, splash e release
+
+O ícone legado sai do **mesmo** `desktop/icon.svg` das duas interfaces; só a camada adaptativa
+tem arquivo próprio (`mobile/icone/frente.svg`), porque o Android come a borda do canvas de
+108dp e o traçado do desktop, que vai quase até o limite, apareceria cortado.
+`bun scripts/mobile-icones.ts` rasteriza os dois com `inkscape`.
+
+Três precedências de recurso que fazem o trabalho parecer não ter surtido efeito, todas
+guardadas por `tests/mobile-recursos.test.ts`:
+
+- **`drawable-v21/` vence `drawable/`** em qualquer aparelho moderno: mexer só no segundo deixa
+  a splash branca do template valendo na prática;
+- **`night` vence `version`**, então os atributos de splash do Android 12+ precisam existir em
+  `values-v31/` **e** em `values-night-v31/`;
+- no Android 12+ o sistema **ignora** o `windowBackground` e desenha a própria splash — sem
+  `windowSplashScreenBackground` e `windowSplashScreenAnimatedIcon`, abre em branco.
+
+O release do APK é `bun scripts/release-apk.ts`: exige árvore limpa (APK de árvore suja não se
+reproduz), recusa versão já publicada em vez de sobrescrever, e publica como `app-v<semver>` —
+prefixo que separa as tags do app das do plugin. A assinatura é a **chave de debug** desta
+máquina, escolha consciente para não haver segredo a guardar; o custo é que, perdida a máquina,
+o app novo não atualiza por cima do antigo.
+
 ## `src/protocol.ts` é o contrato
 
 Todas as mensagens dos quatro lados vivem lá: `SessionToHub`, `HubToSession`, `BrowserToHub`,
@@ -245,7 +271,7 @@ default — `tailscaleAddress(nets = networkInterfaces())` em `src/config.ts` e
 
 | Núcleo (sem I/O, com teste unitário) | Casca (I/O, integração) |
 | --- | --- |
-| `hub-state.ts` (registro, feed, urgência), `notify.ts`, `hook-event.ts`, `context-report.ts`, `git-changes.ts`, `question-keys.ts`, `setup-core.ts`, `update-core.ts`, `upload.ts`, `tailscale.ts`, `trust.ts`, `cli-core.ts`, `web-assets.ts`, `plugin-meta.ts`, `package-core.ts`, `status-core.ts`, `desktop/core.js` | `hub.ts`, `server.ts`, `hub-client.ts`, `history.ts`, `terminal.ts`, `cli.ts`, `scripts/*.ts`, `desktop/main.js` |
+| `hub-state.ts` (registro, feed, urgência), `notify.ts`, `hook-event.ts`, `context-report.ts`, `git-changes.ts`, `question-keys.ts`, `setup-core.ts`, `update-core.ts`, `upload.ts`, `tailscale.ts`, `trust.ts`, `cli-core.ts`, `web-assets.ts`, `plugin-meta.ts`, `package-core.ts`, `status-core.ts`, `endpoints.ts`, `release-core.ts`, `desktop/core.js` | `hub.ts`, `server.ts`, `hub-client.ts`, `history.ts`, `terminal.ts`, `cli.ts`, `scripts/*.ts`, `desktop/main.js` |
 | `web/markdown.js`, `web/session-status.js`, `web/connection.js` | `web/app.js`, `web/terminal-panel.js` |
 
 ## As três camadas do canal (por que "o prompt não chega")
