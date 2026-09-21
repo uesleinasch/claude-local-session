@@ -17,6 +17,7 @@ import {
   controlFile,
   debArchitecture,
   debFileName,
+  compressionArgs,
   DESKTOP_ENTRY,
   desktopEntry,
   ICON_PATH,
@@ -137,10 +138,15 @@ try {
 
   mkdirSync(OUT_DIR, { recursive: true })
   const saida = join(OUT_DIR, debFileName(version, arch))
-  execFileSync('dpkg-deb', ['--build', '--root-owner-group', raiz, saida], { stdio: 'inherit' })
+  const compressao = process.argv.includes('--xz') ? 'xz' : 'zstd'
+  execFileSync(
+    'dpkg-deb',
+    ['--build', '--root-owner-group', ...compressionArgs(compressao), raiz, saida],
+    { stdio: 'inherit' },
+  )
 
   const mb = (Bun.file(saida).size / 1024 / 1024).toFixed(0)
-  did(`${saida} · ${mb} MB`)
+  did(`${saida} · ${mb} MB · ${compressao}${compressao === 'zstd' ? ' (--xz comprime mais, devagar)' : ''}`)
   ok('inclui a interface (Electron) — não há pacote electron nos repos para depender')
   ok(`instale com: sudo apt install ${saida}`)
   console.log('\n  depois da instalação, cada usuário roda uma vez: local-session setup\n')

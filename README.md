@@ -25,6 +25,29 @@ como serviço, para a página continuar podendo criar sessões novas.
 
 ## Instalação
 
+### Pelo pacote (Debian/Ubuntu)
+
+Um `.deb` traz o executável, o serviço, a entrada de menu e a **interface de configuração**:
+
+```bash
+sudo apt install ./local-session_<versão>_amd64.deb
+local-session setup
+```
+
+O `apt` faz o que é de root — binário em `/usr/bin`, `tmux` como dependência de pacote e o
+`/etc/claude-code/managed-settings.json` sem diálogo de senha. O `local-session setup` faz o
+que é por usuário e o pacote não tem como fazer por quem ainda nem logou: registra o plugin no
+Claude Code, escreve o alias do canal e liga o serviço.
+
+Depois disso, `local-session` no terminal diagnostica a instalação (`--json` para consumo por
+programa) e **local-session** no menu de aplicativos abre a janela de configuração, com ícone
+de bandeja, estado do hub e o link com token a um clique.
+
+O pacote tem ~111 MB porque carrega o runtime do Bun e o Electron: nenhum dos dois está nos
+repositórios do Debian/Ubuntu para ser declarado como dependência.
+
+### Pelo instalador (qualquer Linux)
+
 Clone, leia o script e execute — um comando resolve tudo, inclusive numa máquina recém-formatada:
 
 ```bash

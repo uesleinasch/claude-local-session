@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   BIN_PATH,
+  compressionArgs,
   controlFile,
   debArchitecture,
   debFileName,
@@ -144,5 +145,21 @@ describe('a interface vai dentro do pacote', () => {
   test('o launcher aponta para o Electron renomeado, não para `electron`', () => {
     expect(uiLauncher()).toContain(`/${UI_DIR}/${UI_EXEC}`)
     expect(uiLauncher()).not.toMatch(/\/electron["\s]/)
+  })
+})
+
+describe('compressão', () => {
+  test('zstd é explícito: o padrão do dpkg-deb varia com a versão', () => {
+    expect(compressionArgs('zstd')).toEqual(['-Zzstd'])
+  })
+
+  test('sem nível explícito — o dpkg-deb 1.21 só aceita 0-9 e recusa 19', () => {
+    for (const tipo of ['zstd', 'xz'] as const) {
+      expect(compressionArgs(tipo).some(a => a.startsWith('-z')), tipo).toBe(false)
+    }
+  })
+
+  test('xz continua disponível para quando o download importa mais', () => {
+    expect(compressionArgs('xz')).toEqual(['-Zxz'])
   })
 })

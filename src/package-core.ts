@@ -167,3 +167,15 @@ export function desktopEntry(): string {
 export function uiLauncher(): string {
   return ['#!/bin/sh', `exec /${UI_DIR}/${UI_EXEC} "$@"`, ''].join('\n')
 }
+
+/**
+ * Explícito porque o padrão varia com a versão do `dpkg-deb`: o 1.21 do Ubuntu
+ * já entrega `data.tar.zst` sozinho (medido em 2026-09-21), mas um mais antigo
+ * cai no xz e leva minutos de CPU a mais para comprimir os ~250 MB do Electron.
+ * `--xz` fica para quando o que importa é o último megabyte do download.
+ */
+export function compressionArgs(tipo: 'zstd' | 'xz'): string[] {
+  // Sem `-z`: o dpkg-deb 1.21 aceita só 0–9 aqui, e os níveis altos do zstd
+  // (até 22) valem para o zstd solto, não para ele.
+  return tipo === 'xz' ? ['-Zxz'] : ['-Zzstd']
+}
