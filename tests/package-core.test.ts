@@ -5,9 +5,14 @@ import {
   debArchitecture,
   debFileName,
   postinstScript,
+  desktopEntry,
   postrmScript,
   SHARE_DIRS,
   SHARE_FILES,
+  UI_BIN,
+  UI_DIR,
+  UI_EXEC,
+  uiLauncher,
 } from '../src/package-core'
 
 const CONTROL = {
@@ -105,5 +110,39 @@ describe('nome e arquitetura', () => {
 
   test('arquitetura que não sabemos empacotar não vira pacote errado', () => {
     expect(debArchitecture('riscv64')).toBeNull()
+  })
+})
+
+describe('a interface vai dentro do pacote', () => {
+  test('o Electron não é dependência: não existe pacote electron nos repos', () => {
+    const control = controlFile(CONTROL)
+    expect(control).not.toMatch(/Depends:.*\belectron\b/)
+  })
+
+  test('as bibliotecas que o Electron carrega, sim — senão o app nem abre', () => {
+    const control = controlFile(CONTROL)
+    for (const lib of ['libgtk-3-0', 'libnss3', 'libxtst6']) expect(control).toContain(lib)
+  })
+
+  test('o .desktop chama o launcher e casa a janela com o ícone', () => {
+    const d = desktopEntry()
+    expect(d).toContain(`Exec=/${UI_BIN}`)
+    expect(d).toContain('StartupWMClass=')
+    expect(d.startsWith('[Desktop Entry]')).toBe(true)
+  })
+
+  test('uma categoria principal só — com duas o app aparece repetido no menu', () => {
+    const cat = desktopEntry()
+      .split('\n')
+      .find(l => l.startsWith('Categories='))!
+    const principais = ['Development', 'Utility', 'Network', 'System', 'Settings'].filter(c =>
+      cat.includes(c),
+    )
+    expect(principais).toHaveLength(1)
+  })
+
+  test('o launcher aponta para o Electron renomeado, não para `electron`', () => {
+    expect(uiLauncher()).toContain(`/${UI_DIR}/${UI_EXEC}`)
+    expect(uiLauncher()).not.toMatch(/\/electron["\s]/)
   })
 })

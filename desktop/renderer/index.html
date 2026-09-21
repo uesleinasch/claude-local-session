@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'self'; script-src 'self'; img-src 'self' data:"
+    />
+    <title>local-session</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header id="topo">
+      <div id="marca">
+        <h1>local-session</h1>
+        <span id="versao"></span>
+      </div>
+      <div id="resumo">
+        <span id="bolha" data-health="warn"></span>
+        <span id="resumo-texto">verificando…</span>
+      </div>
+    </header>
+
+    <main>
+      <section id="sem-binario" hidden>
+        <h2>não encontrei o executável</h2>
+        <p>
+          Esta janela é só a casca: todo o diagnóstico vem do
+          <code>local-session</code>, que não está em <code>/usr/bin</code> nem no
+          <code>dist/</code> deste repositório.
+        </p>
+        <p>Instale o pacote ou rode <code>bun run build</code> a partir do repositório.</p>
+      </section>
+
+      <section id="acesso" hidden>
+        <h2>acesso</h2>
+        <ul id="links"></ul>
+      </section>
+
+      <section id="hub-box" hidden>
+        <h2>hub</h2>
+        <p id="hub-detalhe"></p>
+        <div class="linha-botoes">
+          <button type="button" data-acao="hub-start">ligar</button>
+          <button type="button" data-acao="hub-restart">reiniciar</button>
+          <button type="button" data-acao="hub-stop" class="perigo">desligar</button>
+        </div>
+        <div class="linha-botoes">
+          <button type="button" data-acao="boot-on">ligar junto com o sistema</button>
+          <button type="button" data-acao="boot-off" class="discreto">não ligar no boot</button>
+        </div>
+      </section>
+
+      <section id="janela-box">
+        <h2>esta janela</h2>
+        <p class="detalhe">
+          O hub roda sozinho como serviço; isto é só o ícone de bandeja.
+        </p>
+        <label id="autostart-label">
+          <input type="checkbox" id="autostart" />
+          abrir a bandeja quando eu entrar na conta
+        </label>
+      </section>
+
+      <section id="checagens" hidden>
+        <h2>verificação</h2>
+        <ul id="lista"></ul>
+      </section>
+
+      <section id="acoes">
+        <h2>configuração</h2>
+        <div class="linha-botoes">
+          <button type="button" data-acao="setup">configurar tudo</button>
+          <button type="button" data-acao="canal">habilitar o canal (pede senha)</button>
+          <button type="button" data-acao="service" class="discreto">instalar o serviço</button>
+        </div>
+        <button type="button" id="recarregar" class="discreto">verificar de novo</button>
+      </section>
+
+      <pre id="saida" hidden aria-live="polite"></pre>
+    </main>
+
+    <script src="app.js"></script>
+  </body>
+</html>

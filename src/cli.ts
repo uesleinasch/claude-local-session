@@ -58,4 +58,10 @@ switch (cmd) {
     const { managedMode, runManaged } = await import('../scripts/managed')
     process.exit(runManaged(managedMode(process.argv.slice(3))))
   }
+  case 'status': {
+    const { collect, printStatus } = await import('../scripts/status')
+    const status = await collect()
+    printStatus(status, process.argv.includes('--json'))
+    process.exit(status.health === 'fail' ? 1 : 0)
+  }
 }

@@ -190,11 +190,15 @@ Ordem: o binário é o conteúdo do pacote, e a bandeja só vale depois que o pa
   daemon de rede e ao DNS que o Tailscale reconfigura — conflito real com VPN corporativa —
   a decisão é oferecer, não instalar. A tool `link` já detecta e ensina os passos; a bandeja
   mostraria o mesmo estado com um botão.
-- **Bandeja com o estado do hub** — depois do pacote, é o que troca "leia o README e rode um
-  comando" por uma janela: hub de pé ou não, o link com QR code para o celular ler (hoje o
-  caminho é pedir o link ao Claude e digitar à mão), ligar e desligar o serviço, e as três
-  camadas do canal com ✓ ou ✗ em vez de um `grep` no log. Decisão de produto mais que de
-  engenharia: cria uma dependência de toolkit gráfico que o projeto hoje não tem.
+- ~~**Bandeja com o estado do hub**~~ — feita: app Electron (`desktop/`) com ícone de bandeja e
+  janela de configuração, empacotado **dentro do mesmo `.deb`** — não existe pacote `electron`
+  nos repos do Debian/Ubuntu (verificado em 2026-09-21), então ele viaja junto e o pacote vai de
+  26 MB para 111 MB. O app é casca: roda `local-session status --json` e desenha; toda a regra
+  está em `src/status-core.ts`, puro e testado, compartilhado com o `status` em texto. A janela
+  manda **ids** de ação contra uma allowlist, nunca linha de comando, com `contextIsolation`,
+  `sandbox` e CSP fechado. Liga e desliga o hub, habilita no boot, roda o setup, aplica o
+  managed-settings por `pkexec` e copia o link com token. O autostart da bandeja é um `.desktop`
+  em `~/.config/autostart/`, não em `/etc/xdg/autostart/`, que decidiria pelos outros usuários.
 
 Nada disso foi sondado ainda — as duas medições que faltam são se o `--compile` sobe e serve a
 página de fato (e em quantos MB), e se o marketplace aceita caminho de disco.

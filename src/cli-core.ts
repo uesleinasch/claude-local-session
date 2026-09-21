@@ -13,6 +13,7 @@ export const COMMANDS = [
   'setup',
   'service',
   'managed-settings',
+  'status',
 ] as const
 
 export type Command = (typeof COMMANDS)[number]
@@ -25,6 +26,7 @@ const DESCRIPTIONS: Record<Command, string> = {
   setup: 'configura as camadas do canal nesta máquina',
   service: 'instala o hub como serviço de usuário do systemd',
   'managed-settings': 'habilita o canal em /etc (usado pelo postinst do pacote)',
+  status: 'diagnóstico da instalação; --json para consumo por programa',
 }
 
 export function parseCommand(argv: readonly string[]): Command | null {

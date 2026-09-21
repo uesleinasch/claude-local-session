@@ -1,0 +1,14 @@
+{
+  "name": "local-session-ui",
+  "productName": "local-session",
+  "version": "0.12.0",
+  "private": true,
+  "description": "Interface de configuração do local-session",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^40.0.0"
+  }
+}
