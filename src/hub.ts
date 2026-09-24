@@ -1,6 +1,15 @@
 import type { Server, ServerWebSocket } from 'bun'
 import { execFile } from 'node:child_process'
-import { mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  realpathSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
+import { cp, readdir } from 'node:fs/promises'
 import { homedir, hostname } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import {
@@ -13,6 +22,15 @@ import {
   tokenMatches,
 } from './config'
 import { montarDescoberta } from './endpoints'
+import {
+  contentDisposition,
+  copyTarget,
+  findDirs,
+  insideBase,
+  isWithin,
+  validName,
+  type DirChild,
+} from './files'
 import { formatChanges } from './git-changes'
 import { HistoryStore } from './history'
 import { Registry, type Sink } from './hub-state'
@@ -96,10 +114,20 @@ const QUICK_PROMPTS = parseQuickPrompts(cfg.quickPrompts) ?? DEFAULT_QUICK_PROMP
 // Favoritos: persistidos como `projects` no config.json, editáveis pela página.
 let favorites = (cfg.projects ?? []).filter(p => typeof p === 'string' && p.startsWith('/'))
 
-/** Fronteira de navegação/spawn: a home do usuário e os projectsRoot do config. */
+function realPath(path: string): string | null {
+  try {
+    return realpathSync(path)
+  } catch {
+    return null
+  }
+}
+
+const BASES = [HOME, ...ROOTS].map(p => realPath(p) ?? p)
+
+/** Fronteira de navegação/spawn/arquivos: a home do usuário e os projectsRoot do config. */
 function allowedBase(path: string): boolean {
-  if (path === HOME || path.startsWith(`${HOME}/`)) return true
-  return ROOTS.some(root => path === root || path.startsWith(`${root}/`))
+  const real = realPath(path)
+  return real !== null && insideBase(real, BASES)
 }
 
 function isDir(path: string): boolean {
@@ -110,15 +138,106 @@ function isDir(path: string): boolean {
   }
 }
 
-function listDirs(path: string): { name: string; path: string }[] | null {
+type Listing = Pick<Extract<HubToBrowser, { type: 'dir' }>, 'dirs' | 'files'>
+
+function listEntries(path: string): Listing | null {
   try {
-    return readdirSync(path, { withFileTypes: true })
-      .filter(e => e.isDirectory() && !e.name.startsWith('.'))
-      .map(e => ({ name: e.name, path: join(path, e.name) }))
+    const entries = readdirSync(path, { withFileTypes: true })
+      .filter(e => !e.name.startsWith('.') && (e.isDirectory() || e.isFile()))
       .sort((a, b) => a.name.localeCompare(b.name))
       .slice(0, MAX_DIRS)
+    const out: Listing = { dirs: [], files: [] }
+    for (const e of entries) {
+      const full = join(path, e.name)
+      try {
+        const st = statSync(full)
+        if (e.isDirectory()) out.dirs.push({ name: e.name, path: full, mtime: st.mtimeMs })
+        else out.files.push({ name: e.name, path: full, size: st.size, mtime: st.mtimeMs })
+      } catch {}
+    }
+    return out
   } catch {
     return null
+  }
+}
+
+function sendDir(ws: Ws, path: string): void {
+  const listing = listEntries(path)
+  if (listing === null) {
+    toast(ws, 'não consegui ler o diretório')
+    return
+  }
+  const up = dirname(path)
+  const parent = up !== path && allowedBase(up) ? up : null
+  toBrowser(ws, { type: 'dir', path, parent, ...listing })
+}
+
+const FIND_BUDGET_MS = 1500
+const MAX_QUERY = 100
+
+async function readChildren(path: string): Promise<DirChild[] | null> {
+  try {
+    const entries = await readdir(path, { withFileTypes: true })
+    return entries.map(e => ({ name: e.name, isDir: e.isDirectory() }))
+  } catch {
+    return null
+  }
+}
+
+async function findFor(ws: Ws, root: string, query: string, seq: number): Promise<void> {
+  const real = realPath(root)
+  if (real === null || !insideBase(real, BASES) || !isDir(real)) {
+    toast(ws, 'fora da área permitida')
+    return
+  }
+  const { results, truncated } = await findDirs(real, query, readChildren, {
+    deadline: Date.now() + FIND_BUDGET_MS,
+  })
+  toBrowser(ws, { type: 'found', root, query, seq, results, truncated })
+}
+
+const MAX_COPIES = 2
+let copying = 0
+
+async function copyEntry(ws: Ws, from: string, to: string): Promise<void> {
+  const realFrom = realPath(from)
+  const realTo = realPath(to)
+  if (realFrom === null || realTo === null || !insideBase(realFrom, BASES) || !insideBase(realTo, BASES)) {
+    toast(ws, 'fora da área permitida')
+    return
+  }
+  if (!isDir(realTo)) {
+    toast(ws, 'o destino não é uma pasta')
+    return
+  }
+  if (isWithin(realTo, realFrom)) {
+    toast(ws, 'não dá para copiar uma pasta para dentro dela')
+    return
+  }
+  const name = copyTarget(basename(realFrom), n => existsSync(join(realTo, n)))
+  if (name === null) {
+    toast(ws, 'cópias demais com esse nome')
+    return
+  }
+  if (copying >= MAX_COPIES) {
+    toast(ws, 'já há cópias em andamento — espere terminar')
+    return
+  }
+  copying++
+  toast(ws, `copiando ${basename(realFrom)}…`)
+  try {
+    await cp(realFrom, join(realTo, name), {
+      recursive: true,
+      errorOnExist: true,
+      force: false,
+      verbatimSymlinks: true,
+    })
+    toast(ws, `copiado como ${name}`)
+  } catch {
+    toast(ws, `a cópia de ${basename(realFrom)} falhou`)
+  } finally {
+    copying--
+    broadcastBrowsers({ type: 'dir_changed', path: to })
   }
 }
 
@@ -132,6 +251,7 @@ const STATIC: Record<string, { file: string; type: string; immutable?: true }> =
   '/app.js': { file: 'app.js', type: 'text/javascript; charset=utf-8' },
   '/markdown.js': { file: 'markdown.js', type: 'text/javascript; charset=utf-8' },
   '/connection.js': { file: 'connection.js', type: 'text/javascript; charset=utf-8' },
+  '/browse-core.js': { file: 'browse-core.js', type: 'text/javascript; charset=utf-8' },
   '/session-status.js': { file: 'session-status.js', type: 'text/javascript; charset=utf-8' },
   '/terminal-panel.js': { file: 'terminal-panel.js', type: 'text/javascript; charset=utf-8' },
   '/style.css': { file: 'style.css', type: 'text/css; charset=utf-8' },
@@ -169,6 +289,10 @@ function configMsg(): string {
     home: HOME,
     ...(OUTDATED ? { outdated: OUTDATED } : {}),
   } satisfies HubToBrowser)
+}
+
+function broadcastBrowsers(msg: HubToBrowser): void {
+  for (const sock of browserSockets) toBrowser(sock, msg)
 }
 
 // Favorito marcado num navegador aparece em todos os outros na hora.
@@ -555,6 +679,28 @@ async function handleContext(req: Request): Promise<Response> {
 
 // O canal só carrega texto, então a foto vira arquivo em disco e o prompt cita
 // o caminho — o Claude abre com Read como faria com qualquer arquivo do projeto.
+function handleDownload(req: Request, url: URL): Response {
+  if (req.method !== 'GET') return notFound()
+  const asked = url.searchParams.get('path')
+  if (asked === null || !asked.startsWith('/')) return notFound()
+  const real = realPath(resolve(asked))
+  if (real === null || !insideBase(real, BASES)) return notFound()
+  try {
+    if (!statSync(real).isFile()) return notFound()
+  } catch {
+    return notFound()
+  }
+  // octet-stream + nosniff: um .html do disco renderizado nesta origem rodaria com o token.
+  return new Response(Bun.file(real), {
+    headers: {
+      'content-type': 'application/octet-stream',
+      'content-disposition': contentDisposition(basename(resolve(asked))),
+      'x-content-type-options': 'nosniff',
+      'cache-control': 'no-store',
+    },
+  })
+}
+
 async function handleUpload(req: Request, url: URL): Promise<Response> {
   if (req.method !== 'POST') return notFound()
   const raw = await req.arrayBuffer()
@@ -750,27 +896,53 @@ function onBrowserMessage(ws: Ws, msg: BrowserToHub): void {
         toast(ws, 'fora da área permitida')
         return
       }
-      const dirs = listDirs(path)
-      if (dirs === null) {
-        toast(ws, 'não consegui ler o diretório')
+      sendDir(ws, path)
+      return
+    }
+    case 'mkdir': {
+      if (typeof msg.parent !== 'string' || typeof msg.name !== 'string') return
+      const parent = resolve(msg.parent)
+      if (!allowedBase(parent) || !isDir(parent)) {
+        toast(ws, 'fora da área permitida')
         return
       }
-      const up = dirname(path)
-      const parent = up !== path && allowedBase(up) ? up : null
+      if (!validName(msg.name)) {
+        toast(ws, 'nome inválido')
+        return
+      }
       try {
-        ws.send(JSON.stringify({ type: 'dir', path, parent, dirs } satisfies HubToBrowser))
-      } catch {}
+        mkdirSync(join(parent, msg.name))
+      } catch (err) {
+        const code = (err as NodeJS.ErrnoException).code
+        toast(ws, code === 'EEXIST' ? 'já existe um item com esse nome' : 'não consegui criar a pasta')
+        return
+      }
+      sendDir(ws, parent)
+      broadcastBrowsers({ type: 'dir_changed', path: parent })
+      return
+    }
+    case 'find': {
+      if (typeof msg.root !== 'string' || typeof msg.query !== 'string') return
+      const query = msg.query.trim()
+      if (query.length < 2 || query.length > MAX_QUERY) return
+      const seq = typeof msg.seq === 'number' ? msg.seq : 0
+      void findFor(ws, resolve(msg.root), query, seq)
+      return
+    }
+    case 'copy': {
+      if (typeof msg.from !== 'string' || typeof msg.to !== 'string') return
+      void copyEntry(ws, resolve(msg.from), resolve(msg.to))
       return
     }
     case 'favorite': {
       if (typeof msg.path !== 'string' || typeof msg.on !== 'boolean') return
       const path = resolve(msg.path)
-      if (!allowedBase(path)) {
-        toast(ws, 'fora da área permitida')
-        return
-      }
       const has = favorites.includes(path)
       if (msg.on && !has) {
+        if (!allowedBase(path)) {
+          toast(ws, 'fora da área permitida')
+          return
+        }
         if (!isDir(path)) {
           toast(ws, 'diretório inexistente')
           return
@@ -904,6 +1076,7 @@ function startServer(): void {
         }
         if (url.pathname === '/_endpoints') return handleEndpoints()
         if (url.pathname === '/_upload') return handleUpload(req, url)
+        if (url.pathname === '/_download') return handleDownload(req, url)
         if (url.pathname === '/_activity') return handleActivity(req)
         if (url.pathname === '/_context') return handleContext(req)
 

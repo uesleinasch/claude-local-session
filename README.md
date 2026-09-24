@@ -302,6 +302,18 @@ um tmux seu, sobrevive ao hub e ao navegador, e você pode anexá-la depois no t
 `tmux attach`. A allowlist é comparada por igualdade exata: o navegador nunca envia um
 caminho arbitrário. Sem `projects`, o recurso fica desligado.
 
+**Arquivos pelo celular.** Os favoritos viram uma faixa de atalhos no topo: tocar num deles
+abre a pasta, e **▶ sessão aqui** inicia a sessão na pasta aberta. O caminho no alto é
+clicável e a `☆` ao lado favorita a pasta. A lista ordena por nome, data ou tamanho, e a
+busca filtra a pasta aberta e, a partir de 2 letras, procura também nas subpastas (até 6
+níveis, sem entrar em pastas ocultas nem `node_modules`). Os arquivos aparecem com o tamanho.
+`+ pasta` cria uma pasta no diretório aberto; `⧉` copia uma pasta ou um arquivo, e a
+barra **colar aqui** aparece em qualquer outra pasta até você colar ou cancelar. Colar
+nunca sobrescreve: se o nome já existe, a cópia vira `nome (cópia)`, `nome (cópia 2)`… `↓`
+baixa o arquivo. No app Android o download vai para **Downloads**, pelo gerenciador de
+downloads do sistema. Tudo fica restrito à mesma área da navegação, e um symlink que
+aponte para fora dela é recusado. Renomear, mover e apagar ainda não existem.
+
 **Receber aviso no celular.** Quem publica é o hub, não o navegador — o aviso chega com a
 página fechada, o celular bloqueado e nenhum WebSocket de pé. É o caminho para largar a
 página e ser chamado quando ela precisa de você.

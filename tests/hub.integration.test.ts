@@ -1,7 +1,16 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test'
 import type { Subprocess } from 'bun'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { loadConfig } from '../src/config'
@@ -437,6 +446,123 @@ describe('upload de imagem', () => {
   test('sem token não sobe nada', async () => {
     const res = await fetch(`${base()}/_upload?session=up-3`, { method: 'POST', body: png })
     expect(res.status).toBe(404)
+  })
+})
+
+describe('gerenciador de arquivos', () => {
+  let area: string
+  let page: Collector
+
+  beforeAll(async () => {
+    area = realpathSync(mkdtempSync(join(tmpdir(), 'ls-files-')))
+    mkdirSync(join(area, 'modelo', 'src'), { recursive: true })
+    writeFileSync(join(area, 'modelo', 'src', 'a.txt'), 'conteúdo')
+    writeFileSync(join(area, 'relatório.txt'), 'olá')
+    symlinkSync('/', join(area, 'fuga'))
+    page = await connect('browser')
+  })
+
+  afterAll(() => {
+    page?.socket.close()
+    rmSync(area, { recursive: true, force: true })
+  })
+
+  test('a listagem traz arquivos com tamanho, além das pastas', async () => {
+    page.socket.send(JSON.stringify({ type: 'browse', path: area }))
+    const dir = await page.wait(m => m.type === 'dir' && m.path === area)
+    expect(dir.dirs.map((d: any) => d.name)).toEqual(['modelo'])
+    expect(dir.files).toEqual([
+      expect.objectContaining({ name: 'relatório.txt', size: 4, path: join(area, 'relatório.txt') }),
+    ])
+  })
+
+  test('symlink para fora da área não é navegável', async () => {
+    page.socket.send(JSON.stringify({ type: 'browse', path: join(area, 'fuga', 'etc') }))
+    const t = await page.wait(m => m.type === 'toast' && m.text === 'fora da área permitida')
+    expect(t).toBeDefined()
+  })
+
+  test('cria pasta e devolve a listagem atualizada', async () => {
+    page.socket.send(JSON.stringify({ type: 'mkdir', parent: area, name: 'nova pasta' }))
+    await page.wait(
+      m => m.type === 'dir' && m.path === area && m.dirs.some((d: any) => d.name === 'nova pasta'),
+    )
+    expect(existsSync(join(area, 'nova pasta'))).toBe(true)
+  })
+
+  test('nome que sai do diretório é recusado', async () => {
+    page.socket.send(JSON.stringify({ type: 'mkdir', parent: area, name: '../escapou' }))
+    await page.wait(m => m.type === 'toast' && m.text === 'nome inválido')
+    expect(existsSync(join(area, '..', 'escapou'))).toBe(false)
+  })
+
+  test('copiar pasta para a mesma pasta cria a cópia sem sobrescrever', async () => {
+    page.socket.send(JSON.stringify({ type: 'copy', from: join(area, 'modelo'), to: area }))
+    await page.wait(m => m.type === 'toast' && m.text === 'copiado como modelo (cópia)')
+    expect(readFileSync(join(area, 'modelo (cópia)', 'src', 'a.txt'), 'utf8')).toBe('conteúdo')
+  })
+
+  test('copiar pasta para dentro dela mesma é recusado', async () => {
+    page.socket.send(
+      JSON.stringify({ type: 'copy', from: join(area, 'modelo'), to: join(area, 'modelo', 'src') }),
+    )
+    await page.wait(m => m.type === 'toast' && m.text === 'não dá para copiar uma pasta para dentro dela')
+  })
+
+  test('copiar de fora da área é recusado', async () => {
+    page.socket.send(JSON.stringify({ type: 'copy', from: join(area, 'fuga', 'etc'), to: area }))
+    await page.wait(m => m.type === 'toast' && m.text === 'fora da área permitida')
+    expect(existsSync(join(area, 'etc'))).toBe(false)
+  })
+
+  test('pastas trazem a data de modificação', async () => {
+    page.socket.send(JSON.stringify({ type: 'browse', path: area }))
+    const dir = await page.wait(m => m.type === 'dir' && m.path === area)
+    expect(typeof dir.dirs[0].mtime).toBe('number')
+  })
+
+  test('busca acha subpasta pelo nome e não atravessa symlink para fora', async () => {
+    page.socket.send(JSON.stringify({ type: 'find', root: area, query: 'SRC', seq: 7 }))
+    const found = await page.wait(m => m.type === 'found' && m.seq === 7)
+    const rels = found.results.map((r: any) => r.rel).sort()
+    expect(rels).toContain('modelo/src')
+    expect(found.results.every((r: any) => r.path.startsWith(area))).toBe(true)
+
+    page.socket.send(JSON.stringify({ type: 'find', root: area, query: 'etc', seq: 8 }))
+    const fora = await page.wait(m => m.type === 'found' && m.seq === 8)
+    expect(fora.results).toEqual([])
+  })
+
+  test('busca com raiz fora da área é recusada', async () => {
+    const toastsAntes = page.seen().filter(m => m.type === 'toast').length
+    page.socket.send(JSON.stringify({ type: 'find', root: '/etc', query: 'ssh', seq: 9 }))
+    page.socket.send(JSON.stringify({ type: 'find', root: area, query: 'modelo', seq: 10 }))
+    await page.wait(m => m.type === 'found' && m.seq === 10)
+    const novos = page.seen().filter(m => m.type === 'toast').slice(toastsAntes)
+    expect(novos.map(m => m.text)).toContain('fora da área permitida')
+    expect(page.seen().some(m => m.type === 'found' && m.seq === 9)).toBe(false)
+  })
+
+  test('download entrega o arquivo como anexo', async () => {
+    const path = encodeURIComponent(join(area, 'relatório.txt'))
+    const res = await fetch(`${base()}/_download?path=${path}`, {
+      headers: { cookie: `ls_token=${token}` },
+    })
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-disposition')).toContain(`filename*=UTF-8''relat%C3%B3rio.txt`)
+    expect(res.headers.get('content-type')).toBe('application/octet-stream')
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(await res.text()).toBe('olá')
+  })
+
+  test('download recusa pasta, symlink para fora e requisição sem token', async () => {
+    const q = (p: string) => encodeURIComponent(p)
+    const semToken = await fetch(`${base()}/_download?path=${q(join(area, 'relatório.txt'))}`)
+    expect(semToken.status).toBe(404)
+    for (const p of [join(area, 'modelo'), join(area, 'fuga', 'etc', 'hostname'), '/etc/hostname']) {
+      const res = await fetch(`${base()}/_download?t=${token}&path=${q(p)}`)
+      expect(res.status).toBe(404)
+    }
   })
 })
 

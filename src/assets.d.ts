@@ -25,6 +25,11 @@ declare module '*/web/markdown.js' {
   export default path
 }
 
+declare module '*/web/browse-core.js' {
+  const path: string
+  export default path
+}
+
 declare module '*/web/connection.js' {
   const path: string
   export default path

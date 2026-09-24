@@ -1,5 +1,6 @@
 import { join } from 'node:path'
 import appJs from '../web/app.js' with { type: 'file' }
+import browseCoreJs from '../web/browse-core.js' with { type: 'file' }
 import connectionJs from '../web/connection.js' with { type: 'file' }
 import indexHtml from '../web/index.html' with { type: 'file' }
 import markdownJs from '../web/markdown.js' with { type: 'file' }
@@ -20,6 +21,7 @@ import xtermJs from '../web/vendor/xterm.js' with { type: 'file' }
 const EMBEDDED: Record<string, string> = {
   'index.html': indexHtml,
   'app.js': appJs,
+  'browse-core.js': browseCoreJs,
   'markdown.js': markdownJs,
   'connection.js': connectionJs,
   'session-status.js': sessionStatusJs,

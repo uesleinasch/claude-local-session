@@ -57,16 +57,36 @@
           />
         </div>
 
-        <p class="group-title">favoritos</p>
-        <ul id="spawn-list"></ul>
-        <p id="spawn-empty" hidden>nenhum favorito — marque uma pasta com ☆ abaixo.</p>
+        <div id="fav-strip">
+          <p class="group-title">favoritos</p>
+          <ul id="spawn-list" aria-label="Pastas favoritas"></ul>
+          <p id="spawn-empty" hidden>nenhum favorito — abra uma pasta e toque em ☆.</p>
+        </div>
 
         <div id="browse-head">
-          <p class="group-title">procurar</p>
-          <p id="browse-path"></p>
+          <div id="browse-where">
+            <nav id="browse-crumbs" aria-label="Caminho da pasta aberta"></nav>
+            <button id="browse-fav" type="button" data-on="false" aria-label="Marcar como favorito">☆</button>
+          </div>
+          <div id="browse-tools">
+            <button id="browse-spawn" type="button">▶ sessão aqui</button>
+            <button id="browse-mkdir" type="button" aria-label="Nova pasta aqui">+ pasta</button>
+            <label class="sr-only" for="browse-sort">Ordenar por</label>
+            <select id="browse-sort"></select>
+          </div>
+        </div>
+        <div id="clip-bar" hidden>
+          <span id="clip-name"></span>
+          <button id="clip-paste" type="button">colar aqui</button>
+          <button id="clip-cancel" type="button" aria-label="Cancelar cópia">✕</button>
         </div>
         <ul id="browse-list"></ul>
         <p id="browse-empty" hidden>nada aqui com esse nome.</p>
+        <div id="find-box" hidden>
+          <p class="group-title">nas subpastas</p>
+          <ul id="find-list"></ul>
+          <p id="find-status"></p>
+        </div>
       </section>
 
       <main id="feed" aria-label="Conversa e atividade" aria-live="polite" aria-relevant="additions">

@@ -224,6 +224,10 @@ O que o nativo acrescenta à página, e o preço de cada um:
   `tests/ponte-mobile.test.ts` falhar se um dos nomes sumir do `app.js`. Imagem compartilhada
   **não** passa por aqui: sobe pela rota `/_upload` e só o caminho volta pela ponte, porque uma
   foto de vários MB atravessando `evaluateJavascript` é pedir para quebrar.
+- **Download** vai pelo `DownloadManager` do sistema (canal `local_session/download` no
+  `MainActivity.kt`), com o cookie do token copiado do `CookieManager` da WebView: o
+  download roda em outro processo, que sem isso levaria 404. O nome passa por
+  `nomeDoDownload`, que tira qualquer `/` antes de virar caminho em Downloads.
 - **Avisos com o app fechado**: sem FCM não há push, então é serviço em primeiro plano assinando
   o tópico ntfy que o hub já publica — e o Android cobra por isso uma notificação permanente na
   barra. Por isso é opt-in nos ajustes, desligado por padrão. O tópico vem do `/_endpoints`, não
@@ -271,8 +275,8 @@ default — `tailscaleAddress(nets = networkInterfaces())` em `src/config.ts` e
 
 | Núcleo (sem I/O, com teste unitário) | Casca (I/O, integração) |
 | --- | --- |
-| `hub-state.ts` (registro, feed, urgência), `notify.ts`, `hook-event.ts`, `context-report.ts`, `git-changes.ts`, `question-keys.ts`, `setup-core.ts`, `update-core.ts`, `upload.ts`, `tailscale.ts`, `trust.ts`, `cli-core.ts`, `web-assets.ts`, `plugin-meta.ts`, `package-core.ts`, `status-core.ts`, `endpoints.ts`, `release-core.ts`, `desktop/core.js` | `hub.ts`, `server.ts`, `hub-client.ts`, `history.ts`, `terminal.ts`, `cli.ts`, `scripts/*.ts`, `desktop/main.js` |
-| `web/markdown.js`, `web/session-status.js`, `web/connection.js` | `web/app.js`, `web/terminal-panel.js` |
+| `hub-state.ts` (registro, feed, urgência), `files.ts`, `notify.ts`, `hook-event.ts`, `context-report.ts`, `git-changes.ts`, `question-keys.ts`, `setup-core.ts`, `update-core.ts`, `upload.ts`, `tailscale.ts`, `trust.ts`, `cli-core.ts`, `web-assets.ts`, `plugin-meta.ts`, `package-core.ts`, `status-core.ts`, `endpoints.ts`, `release-core.ts`, `desktop/core.js` | `hub.ts`, `server.ts`, `hub-client.ts`, `history.ts`, `terminal.ts`, `cli.ts`, `scripts/*.ts`, `desktop/main.js` |
+| `web/markdown.js`, `web/session-status.js`, `web/connection.js`, `web/browse-core.js` | `web/app.js`, `web/terminal-panel.js` |
 
 ## As três camadas do canal (por que "o prompt não chega")
 
@@ -317,8 +321,17 @@ e presas ao **diretório**, não à sessão do Claude: sobrevivem ao hub e ao na
 
 - Token é a única barreira e a página aprova `Bash`. Requisição sem token válido recebe **404**,
   nunca 401 (401 confirmaria que o serviço existe); comparação por `timingSafeEqual`.
-- O navegador nunca envia caminho arbitrário: `spawn`/`browse` comparam por igualdade exata
-  contra a home e `projectsRoot`; as teclas do terminal são a allowlist `TERM_KEYS`.
+- O navegador nunca envia caminho arbitrário: `spawn`, `browse`, `mkdir`, `copy`, `find` e
+  `/_download` passam o caminho por `realpath` e só então comparam com a home e os
+  `projectsRoot` (também resolvidos, em `BASES`). Comparar o texto cru deixaria um symlink
+  apontando para `/` sair da área. Nome de pasta nova passa por `validName`
+  (`src/files.ts`); colar nunca sobrescreve (`copyTarget`). As teclas do terminal são a
+  allowlist `TERM_KEYS`.
+- `find` (busca em subpastas) é assíncrono e tem prazo de 1,5 s: um `readdirSync` recursivo
+  pela home travaria o hub para todas as sessões. Não segue symlink — é o que o mantém dentro
+  da área sem checar cada resultado.
+- `/_download` responde sempre `application/octet-stream` + `nosniff` + `attachment`: um
+  `.html` do disco renderizado na origem do hub rodaria com o token.
 - Upload é reconhecido pelos **bytes**, não pelo nome nem pelo content-type.
 - `web/vendor/` é xterm.js/addon-fit de terceiros (MIT), servido com `cache-control: immutable`.
   Não editar.

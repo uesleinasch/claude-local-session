@@ -136,6 +136,9 @@ export type BrowserToHub =
   | { type: 'kill'; sessionId: string }
   | { type: 'changes'; sessionId: string }
   | { type: 'browse'; path: string }
+  | { type: 'mkdir'; parent: string; name: string }
+  | { type: 'copy'; from: string; to: string }
+  | { type: 'find'; root: string; query: string; seq: number }
   | { type: 'favorite'; path: string; on: boolean }
   | { type: 'term_open'; dir: string; cols: number; rows: number }
   | { type: 'term_input'; text: string; enter?: boolean }
@@ -160,7 +163,22 @@ export type HubToBrowser =
       /** Binário mais novo que a cópia do plugin no cache do usuário. */
       outdated?: { built: string; installed: string }
     }
-  | { type: 'dir'; path: string; parent: string | null; dirs: { name: string; path: string }[] }
+  | {
+      type: 'dir'
+      path: string
+      parent: string | null
+      dirs: { name: string; path: string; mtime: number }[]
+      files: { name: string; path: string; size: number; mtime: number }[]
+    }
+  | { type: 'dir_changed'; path: string }
+  | {
+      type: 'found'
+      root: string
+      query: string
+      seq: number
+      results: { name: string; path: string; rel: string }[]
+      truncated: boolean
+    }
   | { type: 'changes'; sessionId: string; ok: boolean; text: string; branch?: string }
   | { type: 'toast'; text: string }
   | { type: 'spawn_trust'; dir: string }

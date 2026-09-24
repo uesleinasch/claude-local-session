@@ -5,6 +5,7 @@ import {
   PONG_TIMEOUT_MS,
   wakeAction,
 } from './connection.js'
+import { crumbs, parseSort, relativeTime, SORT_OPTIONS, sortEntries } from './browse-core.js'
 import { renderMarkdown } from './markdown.js'
 import { sessionStatus } from './session-status.js'
 import { createTerminalPanel } from './terminal-panel.js'
@@ -55,13 +56,25 @@ const toastEl = document.getElementById('toast')
 const spawnBox = document.getElementById('spawn')
 const spawnList = document.getElementById('spawn-list')
 const spawnEmpty = document.getElementById('spawn-empty')
-const browsePathEl = document.getElementById('browse-path')
+const browseCrumbs = document.getElementById('browse-crumbs')
+const browseFav = document.getElementById('browse-fav')
+const browseSpawn = document.getElementById('browse-spawn')
+const browseSort = document.getElementById('browse-sort')
+const findBox = document.getElementById('find-box')
+const findList = document.getElementById('find-list')
+const findStatus = document.getElementById('find-status')
 const browseList = document.getElementById('browse-list')
 const browseEmpty = document.getElementById('browse-empty')
+const browseMkdir = document.getElementById('browse-mkdir')
+const clipBar = document.getElementById('clip-bar')
+const clipName = document.getElementById('clip-name')
+const clipPaste = document.getElementById('clip-paste')
+const clipCancel = document.getElementById('clip-cancel')
 const dirSearch = document.getElementById('dir-search')
 
 const token = new URLSearchParams(location.search).get('t')
 const LAST_KEY = 'local-session.last'
+const SORT_STORE = 'local-session.browse-sort'
 const OUTBOX_KEY = 'local-session.outbox'
 const MAX_EVENTS = 200
 /** Acima disso a rajada nasce recolhida: o resumo diz o que houve numa linha. */
@@ -92,8 +105,14 @@ let hubConfig = {
   home: '',
 }
 let browse = null
+let clip = null
 let toastTimer = null
 let dirFilter = ''
+let sort = parseSort(readStored(SORT_STORE))
+let subSearch = null
+let findSeq = 0
+let findTimer = null
+let favScrolledFor = null
 
 let outbox = []
 try {
@@ -336,8 +355,25 @@ function handle(msg) {
       path: msg.path,
       parent: msg.parent ?? null,
       dirs: Array.isArray(msg.dirs) ? msg.dirs : [],
+      files: Array.isArray(msg.files) ? msg.files : [],
     }
     renderSpawn()
+    scheduleFind()
+    return
+  }
+  if (msg.type === 'found') {
+    if (msg.seq !== findSeq || !subSearch) return
+    subSearch = {
+      ...subSearch,
+      pending: false,
+      results: Array.isArray(msg.results) ? msg.results : [],
+      truncated: msg.truncated === true,
+    }
+    renderFind()
+    return
+  }
+  if (msg.type === 'dir_changed') {
+    if (browse && browse.path === msg.path) send({ type: 'browse', path: browse.path })
     return
   }
   if (msg.type === 'spawn_trust') {
@@ -925,115 +961,290 @@ function toggleFavorite(dir, isFav) {
   if (!send({ type: 'favorite', path: dir, on: !isFav })) showToast('sem conexão com o hub')
 }
 
+function readStored(key) {
+  try {
+    return localStorage.getItem(key)
+  } catch {
+    return null
+  }
+}
+
+function writeStored(key, value) {
+  try {
+    localStorage.setItem(key, value)
+  } catch {}
+}
+
+function openDir(path) {
+  send({ type: 'browse', path })
+}
+
+const lastSegment = path => path.split('/').filter(Boolean).pop() ?? path
+
+function el(tag, className, text) {
+  const node = document.createElement(tag)
+  if (className) node.className = className
+  if (text !== undefined) node.textContent = text
+  return node
+}
+
+function iconButton(className, label, glyph, onClick) {
+  const btn = el('button', `dir-action ${className}`, glyph)
+  btn.type = 'button'
+  btn.setAttribute('aria-label', label)
+  btn.addEventListener('click', onClick)
+  return btn
+}
+
+function entryRow({ name, meta, onOpen, actions, isFile }) {
+  const li = el('li', isFile ? 'dir-item file-item' : 'dir-item')
+  const main = el(onOpen ? 'button' : 'div', onOpen ? 'dir-name' : 'dir-name file-name')
+  if (onOpen) {
+    main.type = 'button'
+    main.addEventListener('click', onOpen)
+  }
+  const text = el('span', 'dir-text')
+  text.append(el('span', 'dir-label', name))
+  if (meta) text.append(el('span', 'dir-meta', meta))
+  main.append(text)
+  li.append(main, ...actions)
+  return li
+}
+
+function renderFavorites(needle) {
+  spawnList.replaceChildren()
+  const favs = hubConfig.projects.filter(d => needle === '' || d.toLowerCase().includes(needle))
+  spawnEmpty.hidden = favs.length > 0
+  spawnEmpty.textContent =
+    needle !== '' && hubConfig.projects.length > 0
+      ? 'nenhum favorito com esse nome.'
+      : 'nenhum favorito — abra uma pasta e toque em ☆.'
+  for (const dir of favs) {
+    const li = el('li', 'fav-chip')
+    const btn = el('button', 'fav-chip-btn', lastSegment(dir))
+    btn.type = 'button'
+    btn.title = tilde(dir)
+    btn.setAttribute('aria-label', `Abrir ${tilde(dir)}`)
+    if (browse?.path === dir) btn.setAttribute('aria-current', 'location')
+    btn.addEventListener('click', () => openDir(dir))
+    li.append(btn)
+    spawnList.append(li)
+  }
+  if (browse?.path === favScrolledFor) return
+  favScrolledFor = browse?.path ?? null
+  const current = spawnList.querySelector('[aria-current]')?.parentElement
+  if (current) spawnList.scrollLeft = current.offsetLeft - spawnList.offsetLeft - 16
+}
+
+function renderHead() {
+  browseCrumbs.replaceChildren()
+  if (!browse) {
+    browseCrumbs.textContent = '…'
+    return
+  }
+  const parts = crumbs(browse.path, hubConfig.home)
+  parts.forEach((part, i) => {
+    if (i > 0) browseCrumbs.append(el('span', 'crumb-sep', '›'))
+    const last = i === parts.length - 1
+    const btn = el('button', 'crumb', part.label)
+    btn.type = 'button'
+    if (last) btn.setAttribute('aria-current', 'page')
+    else btn.addEventListener('click', () => openDir(part.path))
+    browseCrumbs.append(btn)
+  })
+  browseCrumbs.scrollLeft = browseCrumbs.scrollWidth
+
+  const isFav = hubConfig.projects.includes(browse.path)
+  browseFav.dataset.on = String(isFav)
+  browseFav.textContent = isFav ? '★' : '☆'
+  browseFav.setAttribute('aria-label', isFav ? 'Remover dos favoritos' : 'Marcar como favorito')
+  browseSpawn.setAttribute('aria-label', `Nova sessão em ${tilde(browse.path)}`)
+}
+
 function renderSpawn() {
   spawnBox.hidden = !hubConfig.canSpawn
-  spawnList.replaceChildren()
   browseList.replaceChildren()
   if (!hubConfig.canSpawn) return
 
   const needle = dirFilter.trim().toLowerCase()
-  const favs = hubConfig.projects.filter(
-    d => needle === '' || d.toLowerCase().includes(needle),
-  )
-  spawnEmpty.hidden = favs.length > 0
-  if (favs.length === 0 && needle !== '') {
-    spawnEmpty.textContent = 'nenhum favorito com esse nome.'
-  } else {
-    spawnEmpty.textContent = 'nenhum favorito — marque uma pasta com ☆ abaixo.'
-  }
-
-  for (const dir of favs) {
-    const li = document.createElement('li')
-    li.className = 'fav-item'
-
-    const mark = document.createElement('button')
-    mark.type = 'button'
-    mark.className = 'fav-mark'
-    mark.setAttribute('aria-label', `Remover ${tilde(dir)} dos favoritos`)
-    mark.textContent = '★'
-    mark.addEventListener('click', () => toggleFavorite(dir, true))
-
-    const id = document.createElement('div')
-    id.className = 'fav-id'
-    const name = document.createElement('span')
-    name.className = 'fav-name'
-    name.textContent = dir.split('/').filter(Boolean).pop() ?? dir
-    const path = document.createElement('span')
-    path.className = 'fav-path'
-    path.textContent = tilde(dir)
-    id.append(name, path)
-
-    const openBtn = document.createElement('button')
-    openBtn.type = 'button'
-    openBtn.className = 'fav-open'
-    openBtn.textContent = 'abrir'
-    openBtn.addEventListener('click', () => confirmSpawn(dir))
-
-    li.append(mark, id, openBtn)
-    spawnList.append(li)
-  }
-
-  browsePathEl.textContent = browse ? tilde(browse.path) : '…'
+  renderFavorites(needle)
+  renderHead()
   if (!browse) return
 
-  if (browse.parent && needle === '') {
-    const li = document.createElement('li')
-    li.className = 'dir-item'
-    const up = document.createElement('button')
-    up.type = 'button'
-    up.className = 'dir-name dir-up'
-    const label = document.createElement('span')
-    label.className = 'dir-label'
-    label.textContent = 'voltar'
-    up.append(label)
-    up.addEventListener('click', () => send({ type: 'browse', path: browse.parent }))
-    li.append(up)
-    browseList.append(li)
-  }
-
-  const dirs = browse.dirs.filter(d => needle === '' || d.name.toLowerCase().includes(needle))
-  browseEmpty.hidden = dirs.length > 0
+  const now = Date.now()
+  const match = e => needle === '' || e.name.toLowerCase().includes(needle)
+  const dirs = sortEntries(browse.dirs.filter(match), sort.key, sort.desc)
+  const files = sortEntries(browse.files.filter(match), sort.key, sort.desc)
+  browseEmpty.hidden = dirs.length + files.length > 0
 
   for (const d of dirs) {
-    const li = document.createElement('li')
-    li.className = 'dir-item'
-
-    const name = document.createElement('button')
-    name.type = 'button'
-    name.className = 'dir-name'
-    const label = document.createElement('span')
-    label.className = 'dir-label'
-    label.textContent = d.name
-    name.append(label)
-    name.addEventListener('click', () => send({ type: 'browse', path: d.path }))
-
-    const isFav = hubConfig.projects.includes(d.path)
-    const star = document.createElement('button')
-    star.type = 'button'
-    star.className = 'dir-action dir-star'
-    star.dataset.on = String(isFav)
-    star.setAttribute(
-      'aria-label',
-      isFav ? `Remover ${tilde(d.path)} dos favoritos` : `Marcar ${tilde(d.path)} como favorito`,
+    browseList.append(
+      entryRow({
+        name: d.name,
+        meta: relativeTime(d.mtime, now),
+        onOpen: () => openDir(d.path),
+        actions: [
+          copyButton(d.path, d.name),
+          iconButton('dir-spawn', `Nova sessão em ${tilde(d.path)}`, '+', () => confirmSpawn(d.path)),
+        ],
+      }),
     )
-    star.textContent = isFav ? '★' : '☆'
-    star.addEventListener('click', () => toggleFavorite(d.path, isFav))
+  }
 
-    const plus = document.createElement('button')
-    plus.type = 'button'
-    plus.className = 'dir-action dir-spawn'
-    plus.setAttribute('aria-label', `Nova sessão em ${tilde(d.path)}`)
-    plus.textContent = '+'
-    plus.addEventListener('click', () => confirmSpawn(d.path))
+  if (dirs.length > 0 && files.length > 0) {
+    browseList.append(el('li', 'list-divider', 'arquivos'))
+  }
 
-    li.append(name, star, plus)
-    browseList.append(li)
+  for (const f of files) {
+    const down = el('a', 'dir-action dir-download', '↓')
+    down.href = `/_download?path=${encodeURIComponent(f.path)}`
+    down.download = f.name
+    down.setAttribute('aria-label', `Baixar ${f.name}`)
+    const meta = [humanSize(f.size), relativeTime(f.mtime, now)].filter(Boolean).join(' · ')
+    browseList.append(
+      entryRow({ name: f.name, meta, isFile: true, actions: [copyButton(f.path, f.name), down] }),
+    )
   }
 }
+
+function scheduleFind() {
+  clearTimeout(findTimer)
+  const query = dirFilter.trim()
+  if (query.length < 2 || !browse) {
+    subSearch = null
+    renderFind()
+    return
+  }
+  if (subSearch && subSearch.query === query && subSearch.root === browse.path) return
+  subSearch = { query, root: browse.path, pending: true, results: [], truncated: false }
+  renderFind()
+  const root = browse.path
+  findTimer = setTimeout(() => {
+    findSeq++
+    if (!send({ type: 'find', root, query, seq: findSeq })) {
+      subSearch = { ...subSearch, pending: false }
+      findStatus.textContent = 'sem conexão com o hub'
+      findStatus.hidden = false
+    }
+  }, 300)
+}
+
+function renderFind() {
+  findBox.hidden = subSearch === null
+  findList.replaceChildren()
+  if (!subSearch) return
+  const shown = new Set(browse?.dirs.map(d => d.path) ?? [])
+  const results = subSearch.results.filter(r => !shown.has(r.path))
+  for (const r of results) {
+    findRow(r)
+  }
+  if (subSearch.pending) findStatus.textContent = 'procurando nas subpastas…'
+  else if (results.length === 0) findStatus.textContent = 'nada nas subpastas com esse nome.'
+  else if (subSearch.truncated) {
+    findStatus.textContent = `mostrando os primeiros ${results.length} — refine a busca.`
+  }
+  else findStatus.textContent = ''
+  findStatus.hidden = findStatus.textContent === ''
+}
+
+function findRow(r) {
+  const parent = r.rel.includes('/') ? r.rel.slice(0, r.rel.lastIndexOf('/')) : ''
+  findList.append(
+    entryRow({
+      name: r.name,
+      meta: parent === '' ? undefined : parent,
+      onOpen: () => {
+        dirSearch.value = ''
+        dirFilter = ''
+        openDir(r.path)
+      },
+      actions: [
+        iconButton('dir-spawn', `Nova sessão em ${tilde(r.path)}`, '+', () => confirmSpawn(r.path)),
+      ],
+    }),
+  )
+}
+
+function copyButton(path, name) {
+  const btn = document.createElement('button')
+  btn.type = 'button'
+  btn.className = 'dir-action dir-copy'
+  btn.setAttribute('aria-label', `Copiar ${name}`)
+  btn.textContent = '⧉'
+  btn.addEventListener('click', () => {
+    clip = { path, name }
+    renderClip()
+    showToast(`${name} copiado — abra a pasta de destino e toque em colar aqui`)
+  })
+  return btn
+}
+
+function humanSize(bytes) {
+  if (typeof bytes !== 'number' || bytes < 0) return ''
+  if (bytes < 1024) return `${bytes} B`
+  const units = ['KB', 'MB', 'GB', 'TB']
+  let n = bytes / 1024
+  let i = 0
+  while (n >= 1024 && i < units.length - 1) {
+    n /= 1024
+    i++
+  }
+  return `${n < 10 ? n.toFixed(1) : Math.round(n)} ${units[i]}`
+}
+
+function renderClip() {
+  clipBar.hidden = clip === null
+  if (clip) clipName.textContent = `copiado: ${clip.name}`
+}
+
+clipPaste.addEventListener('click', () => {
+  if (!clip || !browse) return
+  if (!send({ type: 'copy', from: clip.path, to: browse.path })) {
+    showToast('sem conexão com o hub')
+    return
+  }
+  clip = null
+  renderClip()
+})
+
+clipCancel.addEventListener('click', () => {
+  clip = null
+  renderClip()
+})
+
+browseMkdir.addEventListener('click', () => {
+  if (!browse) return
+  const name = prompt(`Nome da nova pasta em ${tilde(browse.path)}:`)
+  if (name === null || name.trim() === '') return
+  if (!send({ type: 'mkdir', parent: browse.path, name: name.trim() })) {
+    showToast('sem conexão com o hub')
+  }
+})
 
 dirSearch.addEventListener('input', () => {
   dirFilter = dirSearch.value
   renderSpawn()
+  scheduleFind()
+})
+
+for (const opt of SORT_OPTIONS) {
+  const o = el('option', '', opt.label)
+  o.value = opt.value
+  browseSort.append(o)
+}
+browseSort.value = `${sort.key}-${sort.desc ? 'desc' : 'asc'}`
+browseSort.addEventListener('change', () => {
+  sort = parseSort(browseSort.value)
+  writeStored(SORT_STORE, browseSort.value)
+  renderSpawn()
+})
+
+browseFav.addEventListener('click', () => {
+  if (browse) toggleFavorite(browse.path, hubConfig.projects.includes(browse.path))
+})
+
+browseSpawn.addEventListener('click', () => {
+  if (browse) confirmSpawn(browse.path)
 })
 
 function decide(sessionId, requestId, behavior, buttons) {
