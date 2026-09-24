@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
+import 'package:local_session/download/baixar.dart';
+import 'package:local_session/download/nome.dart';
 import 'package:local_session/ponte/ponte_web.dart';
 import 'package:local_session/tela/navegacao.dart';
 
@@ -44,6 +46,16 @@ class _TelaSessaoState extends State<TelaSessao> {
     if (mounted) Navigator.of(context).maybePop();
   }
 
+  Future<void> _baixar(DownloadStartRequest pedido) async {
+    if (!podeNavegar(widget.host, pedido.url)) return;
+    final nome = nomeDoDownload(pedido.contentDisposition, pedido.url);
+    final ok = await baixarParaDownloads(pedido.url, nome);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ok ? 'baixando $nome para Downloads' : 'não consegui baixar $nome')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
@@ -70,7 +82,9 @@ class _TelaSessaoState extends State<TelaSessao> {
               useHybridComposition: true,
               javaScriptCanOpenWindowsAutomatically: false,
               mediaPlaybackRequiresUserGesture: false,
+              useOnDownloadStart: true,
             ),
+            onDownloadStartRequest: (_, pedido) => _baixar(pedido),
             shouldOverrideUrlLoading: (_, acao) async =>
                 podeNavegar(widget.host, acao.request.url)
                     ? NavigationActionPolicy.ALLOW
