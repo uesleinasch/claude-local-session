@@ -430,6 +430,11 @@ próprio app do ntfy. Por isso vem desligado. Tocar no aviso abre o app, não a 
 o payload do ntfy leva o rótulo, não o id da sessão, e enfiá-lo no campo `click` mandaria um
 endereço com token para um servidor de terceiros.
 
+**Instalar sem cabo.** Cada versão do app sai como release própria, com tag `app-v<versão>`
+(a atual está entre as [releases](https://github.com/uesleinasch/claude-local-session/releases)).
+Abra a release pelo navegador do celular, logado no GitHub, e toque no `.apk`. Ele é assinado
+sempre com a mesma chave, então instala por cima da versão anterior sem perder o pareamento.
+
 Para compilar e instalar, com o Flutter e o SDK do Android na máquina:
 
 ```bash
@@ -550,3 +555,52 @@ Estrutura:
 | `install.sh`        | Instalador de máquina nova — casca fina sobre o setup |
 
 O design completo está em `docs/superpowers/specs/2026-08-07-claude-local-session-design.md`.
+
+### Lançar uma versão
+
+Release é **por tag**: quem compila e publica é o GitHub Actions
+(`.github/workflows/release.yml`), nunca a máquina de quem desenvolve. Há duas famílias de tag,
+cada uma com a própria contagem:
+
+| tag | publica | a versão vem de |
+| --- | --- | --- |
+| `v0.13.1` | o `.deb`, marcado como **Latest** | `.claude-plugin/plugin.json` **e** `package.json` |
+| `app-v1.1.1` | o `.apk`, fora do Latest | `mobile/pubspec.yaml` |
+
+O APK fica fora do Latest de propósito: o comando de instalação acima baixa o `.deb` de
+`/releases/latest`, e um APK ali deixaria esse comando sem pacote para achar.
+
+O passo a passo, para o pacote:
+
+```bash
+# 1. suba a versão nos dois manifestos, commite e envie a main
+bun scripts/conferir-tag.ts v0.13.1     # confere se a tag bate com o código
+# 2. crie a tag anotada: a 1ª linha vira o título, o resto vira as notas
+git tag -a v0.13.1 -m "correção do setup instalado pelo pacote" -m "## O que mudou ..."
+git push origin v0.13.1
+```
+
+Para o app é igual, com a versão no `pubspec.yaml` e a tag `app-v<versão>`.
+
+O que o workflow faz, e onde ele para:
+
+1. **confere a tag contra o código.** Tag que não bate com a versão dos manifestos derruba
+   tudo antes de compilar, e o erro diz qual arquivo diverge;
+2. **testa.** O pacote passa por `tsc` e `bun test`; o app, por `flutter analyze` e
+   `flutter test`;
+3. **compila e publica.** Para o app, antes de compilar, confere se a chave de assinatura que
+   veio do secret `ANDROID_DEBUG_KEYSTORE` tem a impressão SHA-256 fixada no workflow. Com
+   outra chave, o Android recusaria atualizar o app instalado.
+
+Tag anotada vira título e notas da release; tag leve cai nas notas geradas pelo GitHub. Versão
+já publicada é recusada, nunca sobrescrita: para corrigir uma release, lance a próxima.
+
+Para ensaiar sem publicar, rode o mesmo workflow à mão: tudo acontece, menos a publicação.
+
+```bash
+gh workflow run release -f tag=v0.13.1
+gh run watch
+```
+
+`bun scripts/release-apk.ts` recusa publicar fora do CI; `--local` força, como saída de
+emergência quando o Actions estiver fora do ar.
