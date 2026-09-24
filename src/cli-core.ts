@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 
 /**
@@ -70,16 +71,20 @@ export type RootSources = {
   execPath: string
   /** `LOCAL_SESSION_ROOT`, quando definido. */
   env?: string | undefined
+  has?: (path: string) => boolean
 }
 
 /**
  * Raiz do plugin — de onde saem `.claude-plugin/*.json`, e com eles a identidade
  * que habilita criar sessões. No binário `import.meta.dir` é o fs virtual e não
- * serve; sobra o diretório do executável (`<root>/dist/local-session`) ou, quando
- * o pacote instala o binário longe dos metadados, o env.
+ * serve; sobra o diretório do executável (`<root>/dist/local-session`), a árvore
+ * que o pacote instala ao lado (`/usr/bin` → `/usr/share/local-session`) ou o env.
  */
 export function pluginRoot(src: RootSources): string {
   if (src.env !== undefined && src.env !== '') return src.env
-  if (src.standalone) return join(dirname(src.execPath), '..')
-  return join(src.moduleDir, '..')
+  if (!src.standalone) return join(src.moduleDir, '..')
+  const has = src.has ?? existsSync
+  const bin = dirname(src.execPath)
+  const candidates = [join(bin, '..'), join(bin, '..', 'share', 'local-session')]
+  return candidates.find(c => has(join(c, '.claude-plugin', 'plugin.json'))) ?? join(bin, '..')
 }

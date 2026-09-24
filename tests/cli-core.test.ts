@@ -63,8 +63,37 @@ describe('pluginRoot', () => {
 
   test('no binário, é o pai do diretório do executável', () => {
     expect(
-      pluginRoot({ ...base, standalone: true, execPath: '/opt/local-session/dist/local-session' }),
+      pluginRoot({
+        ...base,
+        standalone: true,
+        execPath: '/opt/local-session/dist/local-session',
+        has: p => p === '/opt/local-session/.claude-plugin/plugin.json',
+      }),
     ).toBe('/opt/local-session')
+  })
+
+  test('instalado pelo pacote, acha a árvore em share/ sem precisar do env', () => {
+    const has = (p: string) => p === '/usr/share/local-session/.claude-plugin/plugin.json'
+    expect(
+      pluginRoot({ ...base, standalone: true, execPath: '/usr/bin/local-session', has }),
+    ).toBe('/usr/share/local-session')
+  })
+
+  test('no binário, o layout do repo vence o de share/ quando os dois existem', () => {
+    expect(
+      pluginRoot({
+        ...base,
+        standalone: true,
+        execPath: '/opt/local-session/dist/local-session',
+        has: () => true,
+      }),
+    ).toBe('/opt/local-session')
+  })
+
+  test('sem metadados em lugar nenhum, cai no pai do diretório do executável', () => {
+    expect(
+      pluginRoot({ ...base, standalone: true, execPath: '/usr/bin/local-session', has: () => false }),
+    ).toBe('/usr')
   })
 
   test('o env vence os dois — o pacote separa binário de metadados', () => {
