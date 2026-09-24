@@ -9,6 +9,7 @@ const REPO = join(import.meta.dir, '..')
 const MOBILE = join(REPO, 'mobile')
 const DRY = process.argv.includes('--check')
 const SEM_BUILD = process.argv.includes('--sem-build')
+const LOCAL = process.argv.includes('--local')
 
 const ok = (s: string) => console.log(`  \x1b[32m✓\x1b[0m ${s}`)
 const did = (s: string) => console.log(`  \x1b[33m▸\x1b[0m ${s}`)
@@ -33,6 +34,10 @@ function acharFlutter(): string {
 }
 
 console.log('\nlocal-session release do apk\n')
+
+if (!DRY && !LOCAL && process.env.GITHUB_ACTIONS !== 'true') {
+  die('a release sai do CI: crie e envie a tag (git tag -a app-v<versão> && git push origin app-v<versão>); --local força daqui')
+}
 
 const versao = versaoDoPubspec(readFileSync(join(MOBILE, 'pubspec.yaml'), 'utf8'))
 if (versao === null) die('mobile/pubspec.yaml sem versão semver na chave `version:`')

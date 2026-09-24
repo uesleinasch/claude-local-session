@@ -36,8 +36,16 @@ cd mobile && flutter analyze    # checagem estática do Dart
 cd mobile && flutter build apk --debug
 adb install -r mobile/build/app/outputs/flutter-apk/app-debug.apk
 bun scripts/mobile-icones.ts    # rasteriza os mipmaps (exige inkscape)
-bun scripts/release-apk.ts      # build release + release no GitHub
 bun scripts/release-apk.ts --check
+```
+
+Release é **por tag**, e quem publica é o GitHub Actions (`.github/workflows/release.yml`):
+
+```bash
+bun scripts/conferir-tag.ts v0.13.1              # a tag bate com o código?
+git tag -a v0.13.1 -m "título" -m "notas em markdown" && git push origin v0.13.1
+git tag -a app-v1.1.1 -m "app 1.1.1" && git push origin app-v1.1.1
+gh workflow run release -f tag=v0.13.1           # ensaio: tudo menos publicar
 ```
 
 ## Um ponto de entrada, oito subcomandos
@@ -250,11 +258,20 @@ guardadas por `tests/mobile-recursos.test.ts`:
 - no Android 12+ o sistema **ignora** o `windowBackground` e desenha a própria splash — sem
   `windowSplashScreenBackground` e `windowSplashScreenAnimatedIcon`, abre em branco.
 
-O release do APK é `bun scripts/release-apk.ts`: exige árvore limpa (APK de árvore suja não se
-reproduz), recusa versão já publicada em vez de sobrescrever, e publica como `app-v<semver>` —
-prefixo que separa as tags do app das do plugin. A assinatura é a **chave de debug** desta
-máquina, escolha consciente para não haver segredo a guardar; o custo é que, perdida a máquina,
-o app novo não atualiza por cima do antigo.
+As releases saem do workflow `release`, disparado por tag: `v<semver>` publica o `.deb` como
+`Latest`, e `app-v<semver>` publica o APK fora do `latest` (o README baixa o `.deb` de
+`/releases/latest`). O primeiro job roda `scripts/conferir-tag.ts` (`conferirTag`, em
+`src/release-core.ts`): a tag tem de bater com `plugin.json` **e** `package.json`, ou com o
+`pubspec.yaml`, senão nada é compilado. Tag anotada vira título e notas da release; tag leve
+cai no `--generate-notes`.
+
+O job do app chama o mesmo `scripts/release-apk.ts`, que exige árvore limpa (APK de árvore suja
+não se reproduz), recusa versão já publicada e **recusa publicar fora do CI** — `--local` é a
+saída de emergência. A assinatura continua sendo a **chave de debug desta máquina**, que viaja
+como o secret `ANDROID_DEBUG_KEYSTORE` (base64). O workflow compara o SHA-256 do certificado
+com o valor fixado no YAML antes de compilar: um secret trocado geraria APK que o Android
+recusa instalar por cima, e só se descobriria no celular. Trocar a chave exige atualizar os
+dois juntos.
 
 ## `src/protocol.ts` é o contrato
 

@@ -1,0 +1,132 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'app-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'tag a ensaiar (v0.13.0 ou app-v1.1.0) — roda tudo menos a publicação'
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+  BUN_VERSION: 1.3.14
+  FLUTTER_VERSION: 3.47.5
+
+jobs:
+  conferir:
+    runs-on: ubuntu-latest
+    outputs:
+      alvo: ${{ steps.tag.outputs.alvo }}
+      versao: ${{ steps.tag.outputs.versao }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - id: tag
+        run: bun scripts/conferir-tag.ts "$TAG"
+
+  plugin:
+    needs: conferir
+    if: needs.conferir.outputs.alvo == 'plugin'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: sudo apt-get update && sudo apt-get install -y tmux
+      - run: bun install --frozen-lockfile
+      - run: bunx tsc --noEmit
+      - run: bun test
+      - run: bun run build
+      - name: electron
+        working-directory: desktop
+        run: npm ci && node node_modules/electron/install.js
+      - run: bun run package
+      - name: notas da tag
+        if: github.event_name == 'push'
+        run: |
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          if [ "$(git cat-file -t "$GITHUB_REF_NAME")" = tag ]; then
+            git tag -l --format='%(contents:subject)' "$GITHUB_REF_NAME" > titulo.txt
+            git tag -l --format='%(contents:body)' "$GITHUB_REF_NAME" > notas.md
+          fi
+      - name: publicar
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSAO: ${{ needs.conferir.outputs.versao }}
+        run: |
+          titulo="$GITHUB_REF_NAME"
+          if [ -s titulo.txt ]; then titulo="$GITHUB_REF_NAME — $(cat titulo.txt)"; fi
+          if [ -s notas.md ]; then notas=(--notes-file notas.md); else notas=(--generate-notes); fi
+          gh release create "$GITHUB_REF_NAME" \
+            --verify-tag \
+            --title "$titulo" \
+            "${notas[@]}" \
+            --latest \
+            "dist/local-session_${VERSAO}_amd64.deb"
+
+  app:
+    needs: conferir
+    if: needs.conferir.outputs.alvo == 'app'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+      # A chave precisa ser a mesma da primeira instalação: com outra, o Android
+      # recusa atualizar o app por cima e obriga a desinstalar e parear de novo.
+      - name: chave de assinatura
+        env:
+          KEYSTORE: ${{ secrets.ANDROID_DEBUG_KEYSTORE }}
+          ESPERADA: 1B:55:79:DD:EB:FA:D9:D7:73:94:58:56:4E:16:03:CB:13:25:FC:80:BF:24:56:F7:3E:B2:A2:9B:8E:E5:E6:1F
+        run: |
+          mkdir -p ~/.android
+          printf '%s' "$KEYSTORE" | base64 -d > ~/.android/debug.keystore
+          achada=$(keytool -list -v -keystore ~/.android/debug.keystore -storepass android | awk '/SHA256:/ { print $2; exit }')
+          if [ "$achada" != "$ESPERADA" ]; then
+            echo "::error::a chave do secret ANDROID_DEBUG_KEYSTORE não é a do app instalado ($achada)"
+            exit 1
+          fi
+      # O gradle.properties do repo pede 8 GB de heap; o runner tem ~7. O arquivo
+      # em ~/.gradle vence o do projeto sem sujar a árvore, que o release exige limpa.
+      - run: |
+          mkdir -p ~/.gradle
+          echo 'org.gradle.jvmargs=-Xmx4G -XX:MaxMetaspaceSize=1G' > ~/.gradle/gradle.properties
+      - working-directory: mobile
+        run: flutter pub get && flutter analyze && flutter test
+      - name: ensaio
+        if: github.event_name != 'push'
+        working-directory: mobile
+        run: flutter build apk --release
+      - name: publicar
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bun scripts/release-apk.ts

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { nomeDoApk, tagDaVersao, versaoDoPubspec, jaPublicada } from '../src/release-core'
+import { conferirTag, jaPublicada, nomeDoApk, tagDaVersao, versaoDoPubspec } from '../src/release-core'
 
 describe('versaoDoPubspec', () => {
   test('lê a versão ignorando o build number', () => {
@@ -51,5 +51,35 @@ describe('jaPublicada', () => {
 describe('nomeDoApk', () => {
   test('o arquivo publicado leva a versão no nome', () => {
     expect(nomeDoApk('1.2.3')).toBe('local-session-1.2.3.apk')
+  })
+})
+
+describe('conferirTag', () => {
+  const versoes = { plugin: '0.13.1', pacote: '0.13.1', app: '1.1.1' }
+
+  test('tag do plugin que bate com plugin.json e package.json', () => {
+    expect(conferirTag('v0.13.1', versoes)).toEqual({ ok: true, alvo: 'plugin', versao: '0.13.1' })
+  })
+
+  test('tag do app que bate com o pubspec', () => {
+    expect(conferirTag('app-v1.1.1', versoes)).toEqual({ ok: true, alvo: 'app', versao: '1.1.1' })
+  })
+
+  test('versão divergente reprova e diz qual arquivo', () => {
+    const r = conferirTag('v0.13.2', versoes)
+    expect(r.ok).toBe(false)
+    if (!r.ok) expect(r.erro).toContain('plugin.json')
+    const pacote = conferirTag('v0.13.1', { ...versoes, pacote: '0.13.0' })
+    expect(pacote.ok).toBe(false)
+    if (!pacote.ok) expect(pacote.erro).toContain('package.json')
+    const app = conferirTag('app-v1.2.0', versoes)
+    expect(app.ok).toBe(false)
+    if (!app.ok) expect(app.erro).toContain('pubspec.yaml')
+  })
+
+  test('tag fora do padrão reprova', () => {
+    for (const t of ['0.13.1', 'v0.13', 'v0.13.1-rc1', 'app-1.1.1', 'refs/tags/v0.13.1', '']) {
+      expect(conferirTag(t, versoes).ok).toBe(false)
+    }
   })
 })
