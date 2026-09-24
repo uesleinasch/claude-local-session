@@ -96,7 +96,8 @@ const notas = [
   'Instalar: abra este arquivo no celular e confirme a instalação.',
   '',
   `Precisa de um hub na versão 0.12.1 ou mais nova — é a que expõe a rota`,
-  '`/_endpoints`, por onde o app descobre o endereço sozinho.',
+  '`/_endpoints`, por onde o app descobre o endereço sozinho. Baixar arquivos',
+  'para Downloads exige o hub 0.13.0, que expõe a rota `/_download`.',
 ].join('\n')
 
 // `--latest=false` não é detalhe: o README manda baixar o `.deb` de
