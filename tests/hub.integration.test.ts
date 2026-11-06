@@ -168,7 +168,7 @@ describe('gate de token', () => {
     const webDir = join(import.meta.dir, '..', 'web')
     const html = readFileSync(join(webDir, 'index.html'), 'utf8')
     const wanted = new Set(
-      [...html.matchAll(/(?:src|href)="(\/[^"]+)"/g)].map(m => m[1]!).filter(p => p !== '/'),
+      [...html.matchAll(/(?:src|href)="(\/[^"#]+)/g)].map(m => m[1]!).filter(p => p !== '/'),
     )
     for (const file of ['app.js', 'terminal-panel.js']) {
       const mod = readFileSync(join(webDir, file), 'utf8')
@@ -196,6 +196,12 @@ describe('gate de token', () => {
     expect(res.headers.get('cache-control')).toContain('immutable')
   })
 
+  test('sprite de ícones servido com token é svg', async () => {
+    const res = await fetch(`${base()}/icons.svg?t=${token}`)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('image/svg+xml; charset=utf-8')
+  })
+
   test('responde 404 sem token, sem revelar o serviço', async () => {
     for (const path of [
       '/',
@@ -203,6 +209,7 @@ describe('gate de token', () => {
       '/style.css',
       '/tokens.css',
       '/fonts/inter-latin-opsz-normal.woff2',
+      '/icons.svg',
       '/_ws',
       '/_activity',
     ]) {

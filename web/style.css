@@ -98,6 +98,41 @@ body {
   white-space: nowrap;
 }
 
+.icon {
+  display: block;
+  flex-shrink: 0;
+  fill: currentColor;
+}
+
+#browse-spawn,
+#browse-mkdir,
+#term-kill,
+.turn-again,
+.perm-verdict,
+#attach-state {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-8);
+}
+
+#back,
+#more,
+#attach,
+#send,
+#browse-fav,
+#clip-cancel,
+#sheet-close,
+#term-close,
+.dir-action,
+.session-drop,
+.menu-icon,
+.file-chev,
+.act-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 :focus-visible {
   outline: 2px solid var(--amber);
   outline-offset: 2px;

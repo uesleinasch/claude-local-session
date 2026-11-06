@@ -457,7 +457,7 @@ function closeMenu() {
   moreBtn.setAttribute('aria-expanded', 'false')
 }
 
-function menuItem({ icon, label, value, accent, danger, onClick }) {
+function menuItem({ icon: iconName, label, value, accent, danger, onClick }) {
   const btn = document.createElement('button')
   btn.type = 'button'
   btn.className = danger ? 'menu-item menu-danger' : 'menu-item'
@@ -467,7 +467,7 @@ function menuItem({ icon, label, value, accent, danger, onClick }) {
   const ico = document.createElement('span')
   ico.className = 'menu-icon'
   ico.setAttribute('aria-hidden', 'true')
-  ico.textContent = icon
+  if (iconName) ico.append(icon(iconName, 20))
 
   const text = document.createElement('span')
   text.className = 'menu-label'
@@ -493,7 +493,7 @@ function buildMenu(s) {
   if (s.alive && hubConfig.canInterrupt) {
     menuMain.append(
       menuItem({
-        icon: '◈',
+        icon: 'tune',
         label: 'modelo',
         value: s.model?.name ?? '—',
         accent: true,
@@ -507,7 +507,7 @@ function buildMenu(s) {
 
   menuMain.append(
     menuItem({
-      icon: '⑂',
+      icon: 'difference',
       label: 'mudanças',
       onClick: () => {
         closeMenu()
@@ -523,7 +523,7 @@ function buildMenu(s) {
   if (hubConfig.canTerminal && s.cwd !== '') {
     menuMain.append(
       menuItem({
-        icon: '▮',
+        icon: 'terminal',
         label: 'terminal',
         onClick: () => {
           closeMenu()
@@ -544,7 +544,7 @@ function buildMenu(s) {
   if (s.alive) {
     const on = s.auto === true
     const auto = menuItem({
-      icon: '⚡',
+      icon: 'bolt',
       label: 'auto mode',
       onClick: () => {
         closeMenu()
@@ -573,7 +573,7 @@ function buildMenu(s) {
 
   menuMain.append(
     menuItem({
-      icon: '✕',
+      icon: 'delete',
       label: s.alive ? 'encerrar sessão' : 'remover da lista',
       danger: true,
       onClick: () => {
@@ -590,7 +590,7 @@ function buildMenu(s) {
   menuModels.append(note)
   for (const m of MODELS) {
     const item = menuItem({
-      icon: s.model?.name === m.name ? '✓' : '',
+      icon: s.model?.name === m.name ? 'check' : '',
       label: m.name,
       accent: s.model?.name === m.name,
       onClick: () => {
@@ -750,7 +750,7 @@ function fileRow(f, onToggle) {
   const chev = document.createElement('span')
   chev.className = 'file-chev'
   chev.setAttribute('aria-hidden', 'true')
-  chev.textContent = f.open ? '▾' : '▸'
+  chev.append(f.open ? icon('keyboard_arrow_down', 20) : icon('chevron_right', 20))
 
   row.append(mark, path)
   if (f.add > 0) {
@@ -981,6 +981,20 @@ function openDir(path) {
 
 const lastSegment = path => path.split('/').filter(Boolean).pop() ?? path
 
+const SVG_NS = 'http://www.w3.org/2000/svg'
+
+function icon(name, size = 24) {
+  const svg = document.createElementNS(SVG_NS, 'svg')
+  svg.setAttribute('class', 'icon')
+  svg.setAttribute('width', String(size))
+  svg.setAttribute('height', String(size))
+  svg.setAttribute('aria-hidden', 'true')
+  const use = document.createElementNS(SVG_NS, 'use')
+  use.setAttribute('href', `/icons.svg#i-${name}`)
+  svg.append(use)
+  return svg
+}
+
 function el(tag, className, text) {
   const node = document.createElement(tag)
   if (className) node.className = className
@@ -988,8 +1002,9 @@ function el(tag, className, text) {
   return node
 }
 
-function iconButton(className, label, glyph, onClick) {
-  const btn = el('button', `dir-action ${className}`, glyph)
+function iconButton(className, label, iconName, onClick) {
+  const btn = el('button', `dir-action ${className}`)
+  btn.append(icon(iconName))
   btn.type = 'button'
   btn.setAttribute('aria-label', label)
   btn.addEventListener('click', onClick)
@@ -1018,7 +1033,7 @@ function renderFavorites(needle) {
   spawnEmpty.textContent =
     needle !== '' && hubConfig.projects.length > 0
       ? 'nenhum favorito com esse nome.'
-      : 'nenhum favorito — abra uma pasta e toque em ☆.'
+      : 'nenhum favorito — abra uma pasta e toque na estrela.'
   for (const dir of favs) {
     const li = el('li', 'fav-chip')
     const btn = el('button', 'fav-chip-btn', lastSegment(dir))
@@ -1056,7 +1071,7 @@ function renderHead() {
 
   const isFav = hubConfig.projects.includes(browse.path)
   browseFav.dataset.on = String(isFav)
-  browseFav.textContent = isFav ? '★' : '☆'
+  browseFav.replaceChildren(isFav ? icon('star-fill') : icon('star'))
   browseFav.setAttribute('aria-label', isFav ? 'Remover dos favoritos' : 'Marcar como favorito')
   browseSpawn.setAttribute('aria-label', `Nova sessão em ${tilde(browse.path)}`)
 }
@@ -1085,7 +1100,7 @@ function renderSpawn() {
         onOpen: () => openDir(d.path),
         actions: [
           copyButton(d.path, d.name),
-          iconButton('dir-spawn', `Nova sessão em ${tilde(d.path)}`, '+', () => confirmSpawn(d.path)),
+          iconButton('dir-spawn', `Nova sessão em ${tilde(d.path)}`, 'play_arrow', () => confirmSpawn(d.path)),
         ],
       }),
     )
@@ -1159,7 +1174,7 @@ function findRow(r) {
         openDir(r.path)
       },
       actions: [
-        iconButton('dir-spawn', `Nova sessão em ${tilde(r.path)}`, '+', () => confirmSpawn(r.path)),
+        iconButton('dir-spawn', `Nova sessão em ${tilde(r.path)}`, 'play_arrow', () => confirmSpawn(r.path)),
       ],
     }),
   )
@@ -1170,7 +1185,7 @@ function copyButton(path, name) {
   btn.type = 'button'
   btn.className = 'dir-action dir-copy'
   btn.setAttribute('aria-label', `Copiar ${name}`)
-  btn.textContent = '⧉'
+  btn.append(icon('content_copy'))
   btn.addEventListener('click', () => {
     clip = { path, name }
     renderClip()
@@ -1377,7 +1392,7 @@ function renderSessions() {
       drop.type = 'button'
       drop.className = 'session-drop'
       drop.setAttribute('aria-label', `Remover ${s.label} da lista`)
-      drop.textContent = '✕'
+      drop.append(icon('close', 20))
       drop.addEventListener('click', ev => {
         ev.stopPropagation()
         if (!confirmKill(s)) return
@@ -1447,7 +1462,7 @@ function turnNode(who, text, kind, ts) {
     const again = document.createElement('button')
     again.type = 'button'
     again.className = 'turn-again'
-    again.textContent = '↻ reenviar'
+    again.append(icon('replay', 16), 'reenviar')
     again.addEventListener('click', () => {
       input.value = text
       resize()
@@ -1517,7 +1532,8 @@ function actsNode(key, items) {
     const mark = document.createElement('span')
     mark.className = 'act-mark'
     mark.setAttribute('aria-hidden', 'true')
-    mark.textContent = item.status === 'end' ? '✓' : item.status === 'start' ? '…' : '·'
+    if (item.status === 'end') mark.append(icon('check', 16))
+    else mark.textContent = item.status === 'start' ? '…' : '·'
 
     const tool = document.createElement('span')
     tool.className = 'act-tool'
@@ -1576,8 +1592,11 @@ function permNode(e) {
   if (e.resolved) {
     const verdict = document.createElement('p')
     verdict.className = 'perm-verdict'
-    const label = e.resolved === 'allow' ? '✓ permitido' : '✕ negado'
-    verdict.textContent = e.auto === true ? `${label} (auto)` : label
+    const label = e.resolved === 'allow' ? 'permitido' : 'negado'
+    verdict.append(
+      e.resolved === 'allow' ? icon('check', 18) : icon('close', 18),
+      e.auto === true ? `${label} (auto)` : label,
+    )
     inner.append(verdict)
     box.append(inner)
     return box
@@ -1795,7 +1814,7 @@ let attached = null
 
 function renderAttach() {
   attachState.hidden = attached === null
-  if (attached) attachState.textContent = `📎 ${attached.split('/').at(-1)} — vai junto no envio`
+  if (attached) attachState.replaceChildren(icon('attach_file', 16), `${attached.split('/').at(-1)} — vai junto no envio`)
 }
 
 function clearAttach() {
