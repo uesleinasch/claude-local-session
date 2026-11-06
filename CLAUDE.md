@@ -431,6 +431,13 @@ em canvas, repete os hex em `web/terminal-panel.js`. Mudar uma cor é mudar os t
 
 ## Onde ler mais
 
+Open source sob MIT: `CONTRIBUTING.md`, `SECURITY.md` e `CODE_OF_CONDUCT.md` na raiz, templates
+de issue e PR em `.github/`. A página do projeto (GitHub Pages) é o `site/`, estático, publicado
+pelo workflow `pages` a cada push em `Production` que toque nele. O workflow copia a fonte de
+`web/fonts/` e o ícone de `desktop/icon.svg` em vez de manter cópias, e as cores de
+`site/style.css` repetem as de `web/tokens.css`. O `ci` roda `bun test`, `tsc` e os testes do
+app em todo PR para `Development` e `Production`.
+
 `README.md` cobre instalação, uso e diagnóstico com detalhe; `ROADMAP.md` diz o que vem e por
 quê (inclusive o que foi descartado); `docs/superpowers/specs/2026-08-07-*.md` tem o design
 original e o do instalador.
