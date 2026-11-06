@@ -35,3 +35,21 @@ describe('ajustes do app pela página', () => {
     expect(SESSAO).not.toContain('appBar:')
   })
 })
+
+describe('área segura dentro do app', () => {
+  const SESSAO = readFileSync(join(import.meta.dir, '..', 'mobile', 'lib', 'tela', 'sessao.dart'), 'utf8')
+  const WEB = join(import.meta.dir, '..', 'web')
+  const TOKENS = readFileSync(join(WEB, 'tokens.css'), 'utf8')
+  const STYLE = readFileSync(join(WEB, 'style.css'), 'utf8')
+
+  test('o app marca a página antes de ela pintar, e a página zera os recuos nesse caso', () => {
+    expect(SESSAO).toContain("document.documentElement.dataset.shell = 'app'")
+    expect(SESSAO).toContain('UserScriptInjectionTime.AT_DOCUMENT_START')
+    const bloco = TOKENS.match(/:root\[data-shell="app"\]\s*\{([^}]*)\}/)?.[1] ?? ''
+    for (const lado of ['top', 'right', 'bottom']) expect(bloco).toMatch(new RegExp(`--ls-safe-${lado}:\\s*0px`))
+  })
+
+  test('style.css só usa os recuos pelo token — env() direto somaria ao SafeArea do app', () => {
+    expect(STYLE).not.toContain('env(safe-area-inset')
+  })
+})

@@ -167,7 +167,7 @@ body {
   align-items: center;
   gap: var(--sp-4);
   min-height: 64px;
-  padding: env(safe-area-inset-top) var(--sp-4) 0 var(--sp-16);
+  padding: var(--ls-safe-top) var(--sp-4) 0 var(--sp-16);
   background: var(--md-sys-color-surface);
   position: sticky;
   top: 0;
@@ -641,8 +641,8 @@ body {
 
 #fab {
   position: fixed;
-  right: calc(var(--sp-16) + env(safe-area-inset-right));
-  bottom: calc(var(--sp-16) + env(safe-area-inset-bottom));
+  right: calc(var(--sp-16) + var(--ls-safe-right));
+  bottom: calc(var(--sp-16) + var(--ls-safe-bottom));
   z-index: 5;
   display: inline-flex;
   align-items: center;
@@ -886,7 +886,7 @@ body {
 #clip-bar {
   position: fixed;
   left: 50%;
-  bottom: calc(var(--sp-16) + env(safe-area-inset-bottom));
+  bottom: calc(var(--sp-16) + var(--ls-safe-bottom));
   transform: translateX(-50%);
   z-index: 25;
   display: flex;
@@ -1674,7 +1674,7 @@ body {
   flex-direction: column;
   gap: var(--sp-8);
   padding: var(--sp-8) var(--sp-12);
-  padding-bottom: max(var(--sp-12), env(safe-area-inset-bottom));
+  padding-bottom: max(var(--sp-12), var(--ls-safe-bottom));
   background: var(--md-sys-color-surface);
 }
 
@@ -1822,7 +1822,7 @@ body {
 
 #menu-panel {
   position: absolute;
-  top: calc(env(safe-area-inset-top) + 60px);
+  top: calc(var(--ls-safe-top) + 60px);
   right: var(--sp-8);
   width: 248px;
   max-width: calc(100vw - var(--sp-24));
@@ -2064,7 +2064,7 @@ body {
 #sheet-body {
   flex: 1;
   min-width: 0;
-  padding-bottom: calc(var(--sp-16) + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--sp-16) + var(--ls-safe-bottom));
   overflow: auto;
 }
 
@@ -2218,7 +2218,7 @@ body {
   align-items: center;
   gap: var(--sp-4);
   min-height: 64px;
-  padding: env(safe-area-inset-top) var(--sp-4) 0 var(--sp-16);
+  padding: var(--ls-safe-top) var(--sp-4) 0 var(--sp-16);
   background: var(--md-sys-color-surface-container-low);
 }
 
@@ -2309,7 +2309,7 @@ body {
   align-items: center;
   gap: var(--sp-8);
   min-width: 0;
-  padding: var(--sp-8) var(--sp-12) calc(var(--sp-8) + env(safe-area-inset-bottom));
+  padding: var(--sp-8) var(--sp-12) calc(var(--sp-8) + var(--ls-safe-bottom));
   background: var(--md-sys-color-surface);
 }
 
@@ -2354,7 +2354,7 @@ body {
 #outdated {
   position: fixed;
   left: 50%;
-  top: calc(var(--sp-8) + env(safe-area-inset-top));
+  top: calc(var(--sp-8) + var(--ls-safe-top));
   transform: translateX(-50%);
   z-index: 30;
   display: flex;
@@ -2392,7 +2392,7 @@ body {
   right: 0;
   z-index: 30;
   margin: 0;
-  padding: calc(var(--sp-8) + env(safe-area-inset-top)) var(--sp-16) var(--sp-8);
+  padding: calc(var(--sp-8) + var(--ls-safe-top)) var(--sp-16) var(--sp-8);
   background: var(--md-sys-color-error-container);
   color: var(--md-sys-color-on-error-container);
   font-size: var(--md-sys-typescale-body-medium-size);
@@ -2403,7 +2403,7 @@ body {
 #toast {
   position: fixed;
   left: 50%;
-  bottom: calc(132px + env(safe-area-inset-bottom));
+  bottom: calc(132px + var(--ls-safe-bottom));
   transform: translateX(-50%);
   z-index: 30;
   width: calc(100vw - var(--sp-24));
@@ -2609,5 +2609,5 @@ body {
 }
 
 #app:has(#offline:not([hidden])) {
-  padding-top: calc(36px + env(safe-area-inset-top));
+  padding-top: calc(36px + var(--ls-safe-top));
 }

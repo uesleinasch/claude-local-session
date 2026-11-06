@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_inappwebview/flutter_inappwebview.dart';
 import 'package:local_session/download/baixar.dart';
@@ -65,6 +67,12 @@ class _TelaSessaoState extends State<TelaSessao> {
         body: SafeArea(
           child: InAppWebView(
             initialUrlRequest: URLRequest(url: WebUri(widget.url)),
+            initialUserScripts: UnmodifiableListView([
+              UserScript(
+                source: "document.documentElement.dataset.shell = 'app'",
+                injectionTime: UserScriptInjectionTime.AT_DOCUMENT_START,
+              ),
+            ]),
             initialSettings: InAppWebViewSettings(
               supportZoom: false,
               useHybridComposition: true,
