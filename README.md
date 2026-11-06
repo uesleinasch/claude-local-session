@@ -199,8 +199,8 @@ Ao entrar numa sessão você vê:
 
 - **você / claude** — o que foi mandado e o que o Claude respondeu pela tool `reply`,
   renderizada como markdown (código, listas, links).
-- **régua de atividade** — a ferramenta e o alvo de cada passo, com `…` enquanto roda.
-- **card de permissão** — em fundo âmbar, com `permitir` e `negar`. Para `Edit`, `Write` e
+- **régua de atividade** — a ferramenta e o alvo de cada passo, com um indicador girando enquanto roda.
+- **card de permissão** — com o ícone de escudo, `negar` e `permitir`. Para `Edit`, `Write` e
   `Bash` o card mostra a operação inteira: diff colorido, conteúdo do arquivo ou comando
   completo, capturados pelo hook `PreToolUse`.
 - **card de pergunta** — quando o Claude usa `AskUserQuestion`, as perguntas e opções
@@ -208,7 +208,7 @@ Ao entrar numa sessão você vê:
   tmux). Suporta multiseleção e resposta livre.
 
 **Janela de contexto.** Uma barra fina abaixo do header mostra o uso da janela de
-contexto da sessão (verde <50%, âmbar 50-79%, vermelha ≥80%), com percentual e tokens;
+contexto da sessão (âmbar até 79%, vermelha a partir de 80%), com percentual e tokens;
 na lista, cada sessão exibe o percentual. A fonte é o statusline do Claude Code — o
 único lugar com o percentual exato calculado para o modelo em uso: o script de
 statusline repassa o JSON que já recebe para `hooks/context-report.ts`, que faz um POST
@@ -230,7 +230,7 @@ faz deploy. Para trocar a lista, a chave `quickPrompts` no `config.json`:
 ```
 
 Até 8 chips, 200 caracteres cada; lista vazia ou ausente cai nos padrões. E cada prompt seu
-no feed ganha um `↻ reenviar`, que devolve o texto ao composer para editar e mandar de novo
+no feed ganha um botão **reenviar**, que devolve o texto ao composer para editar e mandar de novo
 — o histórico de prompts mais barato que existe.
 
 **O que mudou.** O botão `⑂ mudanças` no rodapé abre o estado do repositório da sessão:
@@ -249,11 +249,11 @@ direto na tela.
 O terminal pertence ao **diretório**, não à sessão do Claude: ele sobrevive ao fechar da
 página, ao restart do hub e ao fim da sessão. Você inicia um build, sai, volta depois e
 encontra tudo rolando — e do terminal da máquina dá para anexar no mesmo shell com
-`tmux attach -t lst-…`. Só o `✕ encerrar` mata a sessão de verdade. A fronteira é a mesma da
+`tmux attach -t lst-…`. Só o **encerrar** mata a sessão de verdade. A fronteira é a mesma da
 nova sessão (sua home mais os `projectsRoot`), e as teclas de controle são uma allowlist:
 o navegador não escolhe o que vai para a linha de comando do `tmux`.
 
-**Mandar foto.** O botão 📎 no composer abre a câmera ou a galeria. A imagem sobe para
+**Mandar foto.** O clipe no campo de mensagem abre a câmera ou a galeria. A imagem sobe para
 `~/.claude/local-session/uploads/` e o prompt sai com o caminho — o canal só transporta
 texto, então o Claude abre o arquivo com `Read` como faria com qualquer arquivo do projeto.
 O hub valida pelos **bytes**, não pelo nome ou content-type: PNG, JPEG, GIF e WebP passam,
@@ -261,7 +261,7 @@ o resto é recusado com 400. Teto de 8 MB. Os arquivos ficam no disco até você
 
 **Auto mode.** O botão `auto` no topo do feed liga a aprovação automática de permissões
 daquela sessão: cada pedido que chegar é aprovado pelo hub na hora e o card entra no feed
-já resolvido como `✓ permitido (auto)` — rastro completo, zero toque. Ligar o auto também
+já resolvido como **permitido (auto)** — rastro completo, zero toque. Ligar o auto também
 aprova o pedido que estiver pendente. Vale por sessão, pede confirmação ao ligar (aprova
 QUALQUER coisa, inclusive comandos destrutivos) e volta ao normal se o hub reiniciar.
 Perguntas do `AskUserQuestion` nunca são auto-respondidas.
@@ -284,8 +284,8 @@ das últimas 48h reaparecem na lista após um reboot.
 Dois recursos dependem do `tmux` estar instalado:
 
 **Nova sessão pelo celular.** A lista de sessões ganha a seção **nova sessão**: um
-navegador de diretórios que parte da sua home (`~`) — o nome navega, o `+` abre uma
-sessão ali, e a `★` marca o diretório como favorito. Favoritos ficam no topo como
+navegador de diretórios que parte da sua home (`~`) — o nome navega, o botão de play abre uma
+sessão ali, e a estrela marca o diretório como favorito. Favoritos ficam no topo como
 atalho de um toque e são persistidos na chave `projects` do
 `~/.claude/local-session/config.json` (dá para editá-la à mão também). A navegação e o
 spawn ficam confinados à sua home; a chave opcional `projectsRoot` adiciona outras
@@ -308,8 +308,8 @@ um tmux seu, sobrevive ao hub e ao navegador, e você pode anexá-la depois no t
 caminho arbitrário. Sem `projects`, o recurso fica desligado.
 
 **Arquivos pelo celular.** Os favoritos viram uma faixa de atalhos no topo: tocar num deles
-abre a pasta, e **▶ sessão aqui** inicia a sessão na pasta aberta. O caminho no alto é
-clicável e a `☆` ao lado favorita a pasta. A lista ordena por nome, data ou tamanho, e a
+abre a pasta, e **sessão aqui** inicia a sessão na pasta aberta. O caminho no alto é
+clicável e a estrela ao lado favorita a pasta. A lista ordena por nome, data ou tamanho, e a
 busca filtra a pasta aberta e, a partir de 2 letras, procura também nas subpastas (até 6
 níveis, sem entrar em pastas ocultas nem `node_modules`). Os arquivos aparecem com o tamanho.
 `+ pasta` cria uma pasta no diretório aberto; `⧉` copia uma pasta ou um arquivo, e a
@@ -398,10 +398,10 @@ livre) e traduz sua escolha em teclas no pane do tmux, como o botão de interrom
 Respondida no terminal ou na página, o card se resolve com as respostas; fora de tmux ele
 fica somente leitura.
 
-**Encerrar a sessão.** O `✕` de cada item da lista finaliza a sessão e a remove da lista
-(apagando o histórico dela): dentro de tmux, via `tmux kill-session`; fora, via `SIGTERM`
-no processo do `claude` — o mesmo que fechá-lo no terminal. Em sessões já encerradas o
-`✕` apenas limpa o item da lista.
+**Encerrar a sessão.** O item **encerrar** do menu da sessão finaliza a sessão e a remove da
+lista (apagando o histórico dela): dentro de tmux, via `tmux kill-session`; fora, via
+`SIGTERM` no processo do `claude` — o mesmo que fechá-lo no terminal. Numa sessão já
+encerrada, o × do item na lista apenas limpa o item.
 
 ## O app de Android
 
@@ -488,7 +488,7 @@ As duas primeiras exigem reiniciar a sessão depois de corrigir: managed setting
 na inicialização.
 
 **O Claude recebe o prompt, trabalha, mas a resposta não chega.** Ele está parado no pedido de
-permissão da tool `reply` — o card aparece na própria página, em âmbar. Aprove ali, ou libere
+permissão da tool `reply` — o card aparece na própria página, com o ícone de escudo. Aprove ali, ou libere
 a tool de vez pelo passo 3 do pré-requisito.
 
 **A sessão não aparece na lista.** O MCP server não subiu. Rode `/mcp` e veja se
