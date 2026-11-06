@@ -141,9 +141,9 @@ describe('tailscaleAddress', () => {
   test('encontra o IPv4 da faixa CGNAT em qualquer interface', () => {
     const nets = {
       wlp0s20f3: [iface('192.168.1.5')],
-      tailscale0: [iface('fe80::1', 'IPv6'), iface('100.113.47.75')],
+      tailscale0: [iface('fe80::1', 'IPv6'), iface('100.101.102.103')],
     }
-    expect(tailscaleAddress(nets)).toBe('100.113.47.75')
+    expect(tailscaleAddress(nets)).toBe('100.101.102.103')
   })
 
   test('ignora 100.x fora da faixa CGNAT e interfaces internas', () => {

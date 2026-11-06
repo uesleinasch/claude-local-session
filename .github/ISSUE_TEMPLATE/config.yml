@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Falha de segurança
+    url: https://github.com/uesleinasch/claude-local-session/security/advisories/new
+    about: Relate em privado — nunca numa issue pública.
+  - name: Dúvida de instalação ou uso
+    url: https://github.com/uesleinasch/claude-local-session#se-algo-n%C3%A3o-aparecer
+    about: A seção "Se algo não aparecer" do README resolve a maior parte dos "o prompt não chega".

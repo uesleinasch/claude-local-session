@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: bun
+    directory: /
+    target-branch: Development
+    schedule:
+      interval: weekly
+  - package-ecosystem: npm
+    directory: /desktop
+    target-branch: Development
+    schedule:
+      interval: monthly
+  - package-ecosystem: pub
+    directory: /mobile
+    target-branch: Development
+    schedule:
+      interval: monthly
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: Development
+    schedule:
+      interval: monthly

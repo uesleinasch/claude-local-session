@@ -1,0 +1,28 @@
+name: Sugerir melhoria
+description: Uma ideia ou um recurso novo. (Feature request.)
+title: "ideia: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qual problema isso resolve
+      description: Conte o momento em que você sentiu falta disso. O problema importa mais que a solução.
+    validations:
+      required: true
+  - type: textarea
+    id: proposta
+    attributes:
+      label: Como você imagina
+      description: Pode ser um rascunho. Se tiver interface, um esboço ajuda.
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas que você considerou
+  - type: checkboxes
+    id: roadmap
+    attributes:
+      label: Antes de enviar
+      options:
+        - label: Li o [ROADMAP.md](https://github.com/uesleinasch/claude-local-session/blob/Production/ROADMAP.md), que também lista o que já foi descartado e por quê.
+          required: true

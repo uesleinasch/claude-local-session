@@ -681,7 +681,7 @@ describe('ciclo completo', () => {
     const browser = await connect('browser')
     await browser.wait(m => m.type === 'sessions' && m.sessions.some((s: any) => s.id === 'it-3'))
     browser.socket.send(JSON.stringify({ type: 'subscribe', sessionId: 'it-3' }))
-    await Bun.sleep(50)
+    await browser.wait(m => m.type === 'history' && m.sessionId === 'it-3')
 
     session.socket.send(JSON.stringify({ type: 'reply', text: '3 testes falharam' }))
 
@@ -704,7 +704,7 @@ describe('ciclo completo', () => {
     const browser = await connect('browser')
     await browser.wait(m => m.type === 'sessions' && m.sessions.some((s: any) => s.id === 'it-4'))
     browser.socket.send(JSON.stringify({ type: 'subscribe', sessionId: 'it-4' }))
-    await Bun.sleep(50)
+    await browser.wait(m => m.type === 'history' && m.sessionId === 'it-4')
 
     session.socket.send(
       JSON.stringify({
@@ -753,7 +753,7 @@ describe('ciclo completo', () => {
     const browser = await connect('browser')
     await browser.wait(m => m.type === 'sessions' && m.sessions.some((s: any) => s.id === 'it-5'))
     browser.socket.send(JSON.stringify({ type: 'subscribe', sessionId: 'it-5' }))
-    await Bun.sleep(50)
+    await browser.wait(m => m.type === 'history' && m.sessionId === 'it-5')
 
     const res = await fetch(`${base()}/_activity`, {
       method: 'POST',
@@ -778,7 +778,7 @@ describe('ciclo completo', () => {
     const browser = await connect('browser')
     await browser.wait(m => m.type === 'sessions' && m.sessions.some((s: any) => s.id === 'it-q'))
     browser.socket.send(JSON.stringify({ type: 'subscribe', sessionId: 'it-q' }))
-    await Bun.sleep(50)
+    await browser.wait(m => m.type === 'history' && m.sessionId === 'it-q')
 
     const questions = [
       {
@@ -904,6 +904,7 @@ describe('ciclo completo', () => {
     const browser = await connect('browser')
     await browser.wait(m => m.type === 'sessions' && m.sessions.some((s: any) => s.id === 'it-a2'))
     browser.socket.send(JSON.stringify({ type: 'subscribe', sessionId: 'it-a2' }))
+    await browser.wait(m => m.type === 'history' && m.sessionId === 'it-a2')
 
     session.socket.send(
       JSON.stringify({
