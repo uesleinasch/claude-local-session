@@ -29,6 +29,10 @@ const tabs = document.getElementById('tabs')
 const tabActive = document.getElementById('tab-active')
 const tabBrowse = document.getElementById('tab-browse')
 const fab = document.getElementById('fab')
+const homeTitle = document.getElementById('home-title')
+const findToggle = document.getElementById('find-toggle')
+const appSettings = document.getElementById('app-settings')
+const dirSearchRow = document.getElementById('dir-search-row')
 const menu = document.getElementById('menu')
 const menuMain = document.getElementById('menu-main')
 const menuModels = document.getElementById('menu-models')
@@ -411,9 +415,42 @@ function showPane(pane) {
   app.dataset.pane = pane
   tabActive.setAttribute('aria-selected', String(pane === 'active'))
   tabBrowse.setAttribute('aria-selected', String(pane === 'browse'))
+  homeTitle.textContent = pane === 'browse' ? 'Abrir pasta' : 'Local Session'
+  findToggle.hidden = pane !== 'browse'
 }
 
-document.getElementById('back').addEventListener('click', showSessions)
+function toggleFind() {
+  const open = dirSearchRow.hidden
+  dirSearchRow.hidden = !open
+  findToggle.setAttribute('aria-expanded', String(open))
+  if (open) {
+    dirSearch.focus()
+    return
+  }
+  if (dirSearch.value !== '') {
+    dirSearch.value = ''
+    dirSearch.dispatchEvent(new Event('input'))
+  }
+}
+
+// O app Android (flutter_inappwebview) injeta este objeto: os ajustes do app são
+// nativos, e a página só pede que eles abram.
+function nativeBridge() {
+  return window.flutter_inappwebview?.callHandler ? window.flutter_inappwebview : null
+}
+
+function syncAppSettings() {
+  appSettings.hidden = nativeBridge() === null
+}
+
+document.getElementById('back').addEventListener('click', () => {
+  if (app.dataset.view === 'feed') showSessions()
+  else showPane('active')
+})
+findToggle.addEventListener('click', toggleFind)
+appSettings.addEventListener('click', () => nativeBridge()?.callHandler('abrirAjustes'))
+window.addEventListener('flutterInAppWebViewPlatformReady', syncAppSettings)
+syncAppSettings()
 tabActive.addEventListener('click', () => showPane('active'))
 tabBrowse.addEventListener('click', () => showPane('browse'))
 fab.addEventListener('click', () => showPane('browse'))
@@ -1043,7 +1080,7 @@ function renderFavorites(needle) {
   for (const dir of favs) {
     const li = el('li', 'fav-chip')
     const btn = el('button', 'fav-chip-btn')
-    btn.append(icon('star-fill', 18), lastSegment(dir))
+    btn.append(icon('star-fill', 18), el('span', 'fav-chip-name', lastSegment(dir)))
     btn.type = 'button'
     btn.title = tilde(dir)
     btn.setAttribute('aria-label', `Abrir ${tilde(dir)}`)

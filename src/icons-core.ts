@@ -32,6 +32,7 @@ export const WEB_ICONS: readonly string[] = [
   'schedule',
   'search',
   'send',
+  'settings',
   'shield_lock',
   'sort',
   'star',

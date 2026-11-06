@@ -22,3 +22,16 @@ describe('ponte com o cliente Android', () => {
     expect(APP_JS).toMatch(/sessaoAtual\s*\(/)
   })
 })
+
+describe('ajustes do app pela página', () => {
+  const SESSAO = readFileSync(join(import.meta.dir, '..', 'mobile', 'lib', 'tela', 'sessao.dart'), 'utf8')
+
+  test('o botão da página chama o handler que o app registra', () => {
+    expect(APP_JS).toContain("callHandler('abrirAjustes')")
+    expect(SESSAO).toContain("handlerName: 'abrirAjustes'")
+  })
+
+  test('o app não desenha barra própria sobre a página — o cabeçalho é o da página', () => {
+    expect(SESSAO).not.toContain('appBar:')
+  })
+})
