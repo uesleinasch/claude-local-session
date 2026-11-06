@@ -189,8 +189,23 @@ describe('gate de token', () => {
     expect(app.headers.get('cache-control')).toBe('no-store')
   })
 
+  test('fonte servida com token é woff2 imutável', async () => {
+    const res = await fetch(`${base()}/fonts/inter-latin-opsz-normal.woff2?t=${token}`)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('font/woff2')
+    expect(res.headers.get('cache-control')).toContain('immutable')
+  })
+
   test('responde 404 sem token, sem revelar o serviço', async () => {
-    for (const path of ['/', '/app.js', '/style.css', '/_ws', '/_activity']) {
+    for (const path of [
+      '/',
+      '/app.js',
+      '/style.css',
+      '/tokens.css',
+      '/fonts/inter-latin-opsz-normal.woff2',
+      '/_ws',
+      '/_activity',
+    ]) {
       const res = await fetch(base() + path)
       expect(res.status).toBe(404)
     }
