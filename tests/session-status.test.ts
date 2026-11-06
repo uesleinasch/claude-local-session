@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 // @ts-expect-error módulo JS do front, sem tipos — o texto do badge é puro e testável aqui.
-import { SECTION_TITLES, sessionSection, sessionStatus, TONE_ICONS } from '../web/session-status.js'
+import { controlaPeloTmux, SECTION_TITLES, sessionSection, sessionStatus, TONE_ICONS } from '../web/session-status.js'
 import { WEB_ICONS } from '../src/icons-core'
 
 const NOW = 1_000_000
@@ -64,5 +64,21 @@ describe('agrupamento da lista', () => {
   test('todo tom tem ícone que existe no sprite', () => {
     expect(TONE_ICONS).toEqual({ waiting: 'shield_lock', busy: 'bolt', idle: 'schedule', dead: 'terminal' })
     for (const nome of Object.values(TONE_ICONS)) expect(WEB_ICONS).toContain(nome as string)
+  })
+})
+
+describe('controlaPeloTmux', () => {
+  test('sessão viva dentro de um pane do tmux aceita resposta, interrupção e troca de modelo', () => {
+    expect(controlaPeloTmux({ alive: true, tmux: true })).toBe(true)
+  })
+
+  test('tmux instalado na máquina não basta: a sessão precisa rodar dentro dele', () => {
+    expect(controlaPeloTmux({ alive: true, tmux: false })).toBe(false)
+    expect(controlaPeloTmux({ alive: true })).toBe(false)
+  })
+
+  test('sessão encerrada não tem o que controlar', () => {
+    expect(controlaPeloTmux({ alive: false, tmux: true })).toBe(false)
+    expect(controlaPeloTmux(undefined)).toBe(false)
   })
 })
