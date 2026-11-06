@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { copyFileSync, existsSync, readFileSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { jaPublicada, nomeDoApk, tagDaVersao, versaoDoPubspec } from '../src/release-core'
+import { jaPublicada, nomeDoApk, tagParaPublicar, versaoDoPubspec } from '../src/release-core'
 
 const REPO = join(import.meta.dir, '..')
 const MOBILE = join(REPO, 'mobile')
@@ -42,7 +42,8 @@ if (!DRY && !LOCAL && process.env.GITHUB_ACTIONS !== 'true') {
 const versao = versaoDoPubspec(readFileSync(join(MOBILE, 'pubspec.yaml'), 'utf8'))
 if (versao === null) die('mobile/pubspec.yaml sem versão semver na chave `version:`')
 
-const tag = tagDaVersao(versao)
+const tag = tagParaPublicar(versao, process.env.GITHUB_REF_NAME)
+const prerelease = tag.includes('-rc.')
 ok(`versão ${versao} · tag ${tag}`)
 
 // Release tem de corresponder a um commit: APK de árvore suja é impossível de
@@ -116,10 +117,11 @@ try {
       'create',
       tag,
       '--title',
-      `App ${versao}`,
+      prerelease ? `App ${versao} (pre-release ${tag.split('-').at(-1)})` : `App ${versao}`,
       '--notes',
       notas,
       '--latest=false',
+      ...(prerelease ? ['--prerelease'] : []),
       apk,
     ],
     { cwd: REPO, stdio: 'inherit' },

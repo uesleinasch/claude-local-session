@@ -561,6 +561,34 @@ Estrutura:
 
 O design completo está em `docs/superpowers/specs/2026-08-07-claude-local-session-design.md`.
 
+### Fluxo de branches
+
+O código anda por duas branches fixas, como no TickTask:
+
+| branch | o que é |
+| --- | --- |
+| `Production` | o que está publicado. As releases saem daqui, e só entra por PR de `release/*` |
+| `Development` | homologação. Recebe as tasks por PR e gera as pre-releases `-rc.N` |
+| `main` | backup do código. Não recebe trabalho direto |
+
+1. **Início da task:** crie a branch a partir de `Production` (`feat/…`, `fix/…`, `chore/…`) e
+   faça commits pequenos ao longo do trabalho.
+2. **Homologação:** atualize `Development` com `Production` por rebase e abra o PR da task
+   para `Development`. Depois do merge, crie a pre-release (`v0.16.0-rc.1` e, se o app mudou,
+   `app-v1.3.0-rc.1`) no commit mesclado em `Development`. Ela sai publicada como
+   **pre-release**: dá para instalar e testar, e o `/releases/latest` não muda.
+3. **Promoção:**
+   1. crie `release/v<versão>` a partir de `Production`;
+   2. abra o PR da task para a release, com **squash**;
+   3. abra o PR da release para `Production`, com **merge**;
+   4. crie a tag de produção (`v<versão>` e, se for o caso, `app-v<versão>`) no commit
+      mesclado em `Production`;
+   5. apague a branch da task e a da release;
+   6. sincronize `Development` com `Production` por rebase.
+
+`Production` nunca recebe nada direto de `Development`: o que vai para produção passa por uma
+`release/*` e por um PR.
+
 ### Lançar uma versão
 
 Release é **por tag**: quem compila e publica é o GitHub Actions
@@ -571,6 +599,7 @@ cada uma com a própria contagem:
 | --- | --- | --- |
 | `v0.13.1` | o `.deb`, marcado como **Latest** | `.claude-plugin/plugin.json` **e** `package.json` |
 | `app-v1.1.1` | o `.apk`, fora do Latest | `mobile/pubspec.yaml` |
+| `v0.13.1-rc.2`, `app-v1.1.1-rc.1` | o mesmo artefato, como **pre-release** | a versão base, nos mesmos arquivos |
 
 O APK fica fora do Latest de propósito: o comando de instalação acima baixa o `.deb` de
 `/releases/latest`, e um APK ali deixaria esse comando sem pacote para achar.
@@ -578,7 +607,7 @@ O APK fica fora do Latest de propósito: o comando de instalação acima baixa o
 O passo a passo, para o pacote:
 
 ```bash
-# 1. suba a versão nos dois manifestos, commite e envie a main
+# 1. suba a versão nos dois manifestos na branch da task (ver Fluxo de branches)
 bun scripts/conferir-tag.ts v0.13.1     # confere se a tag bate com o código
 # 2. crie a tag anotada: a 1ª linha vira o título, o resto vira as notas
 git tag -a v0.13.1 -m "correção do setup instalado pelo pacote" -m "## O que mudou ..."

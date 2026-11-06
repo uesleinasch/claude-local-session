@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'tag a ensaiar (v0.13.0 ou app-v1.1.0) — roda tudo menos a publicação'
+        description: 'tag a ensaiar (v0.13.0, v0.13.0-rc.1 ou app-v1.1.0) — roda tudo menos a publicação'
         required: true
 
 permissions:
@@ -29,6 +29,7 @@ jobs:
     outputs:
       alvo: ${{ steps.tag.outputs.alvo }}
       versao: ${{ steps.tag.outputs.versao }}
+      prerelease: ${{ steps.tag.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
@@ -71,15 +72,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           VERSAO: ${{ needs.conferir.outputs.versao }}
+          PRERELEASE: ${{ needs.conferir.outputs.prerelease }}
         run: |
           titulo="$GITHUB_REF_NAME"
           if [ -s titulo.txt ]; then titulo="$GITHUB_REF_NAME — $(cat titulo.txt)"; fi
           if [ -s notas.md ]; then notas=(--notes-file notas.md); else notas=(--generate-notes); fi
+          # Pre-release de Development nunca vira latest: o README baixa o .deb de /releases/latest.
+          if [ "$PRERELEASE" = true ]; then canal=(--prerelease --latest=false); else canal=(--latest); fi
           gh release create "$GITHUB_REF_NAME" \
             --verify-tag \
             --title "$titulo" \
             "${notas[@]}" \
-            --latest \
+            "${canal[@]}" \
             "dist/local-session_${VERSAO}_amd64.deb"
 
   app:
