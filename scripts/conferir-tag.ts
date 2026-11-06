@@ -18,7 +18,8 @@ if (!r.ok) {
   process.exit(1)
 }
 
-console.log(`  \x1b[32m✓\x1b[0m ${tag} confere com o código — release do ${r.alvo} ${r.versao}`)
+const tipo = r.prerelease ? 'pre-release' : 'release'
+console.log(`  \x1b[32m✓\x1b[0m ${tag} confere com o código — ${tipo} do ${r.alvo} ${r.versao}`)
 if (process.env.GITHUB_OUTPUT) {
-  appendFileSync(process.env.GITHUB_OUTPUT, `alvo=${r.alvo}\nversao=${r.versao}\n`)
+  appendFileSync(process.env.GITHUB_OUTPUT, `alvo=${r.alvo}\nversao=${r.versao}\nprerelease=${r.prerelease}\n`)
 }
