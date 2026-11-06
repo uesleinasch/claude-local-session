@@ -1,0 +1,59 @@
+name: Relatar bug
+description: Algo não funciona como deveria. (Something is broken.)
+title: "bug: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Obrigado por relatar! Falha de **segurança** não vem aqui: use o [relato privado](https://github.com/uesleinasch/claude-local-session/security/advisories/new).
+        Antes de abrir, veja se o diagnóstico do README já resolve (`local-session status` e a seção "Se algo não aparecer").
+  - type: textarea
+    id: o-que
+    attributes:
+      label: O que aconteceu
+      description: O que você fez, o que esperava e o que aconteceu de fato.
+    validations:
+      required: true
+  - type: textarea
+    id: passos
+    attributes:
+      label: Como reproduzir
+      placeholder: |
+        1. abro a sessão com `claude` dentro do tmux
+        2. mando um prompt pela página
+        3. ...
+    validations:
+      required: true
+  - type: dropdown
+    id: onde
+    attributes:
+      label: Onde
+      multiple: true
+      options:
+        - página no navegador do celular
+        - página no navegador do computador
+        - app Android
+        - janela de status (Electron)
+        - hub / plugin / hooks
+        - instalação (.deb / setup)
+    validations:
+      required: true
+  - type: textarea
+    id: status
+    attributes:
+      label: Saída do `local-session status`
+      description: Apague o token, se aparecer.
+      render: text
+  - type: input
+    id: versoes
+    attributes:
+      label: Versões
+      placeholder: "hub 0.15.0, app 1.2.0, Claude Code 2.1.x, Ubuntu 24.04"
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Logs, prints ou contexto
+      description: Captura de tela ajuda muito em problema visual. Confira se nada nela expõe token ou endereço que você não queira publicar.

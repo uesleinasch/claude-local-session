@@ -2,6 +2,10 @@
   "name": "local-session",
   "description": "Expõe cada sessão do Claude Code numa página web da rede local — chat, linha de atividade e aprovação de permissão pelo navegador.",
   "version": "0.15.0",
+  "author": { "name": "Ueslei Nascimento", "url": "https://github.com/uesleinasch" },
+  "homepage": "https://uesleinasch.github.io/claude-local-session/",
+  "repository": "https://github.com/uesleinasch/claude-local-session",
+  "license": "MIT",
   "keywords": [
     "session",
     "lan",

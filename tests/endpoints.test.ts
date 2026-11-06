@@ -32,8 +32,8 @@ describe('montarCandidatos', () => {
 
   test('o mesmo endereço nas duas pontas entra uma vez só', () => {
     expect(
-      montarCandidatos({ lan: '100.113.47.75', tailscale: '100.113.47.75', hostname: null }),
-    ).toEqual([{ rotulo: 'lan', host: '100.113.47.75' }])
+      montarCandidatos({ lan: '100.101.102.103', tailscale: '100.101.102.103', hostname: null }),
+    ).toEqual([{ rotulo: 'lan', host: '100.101.102.103' }])
   })
 
   test('sem endereço nenhum a lista é vazia', () => {
