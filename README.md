@@ -1,8 +1,23 @@
 # claude-local-session
 
+[![release](https://img.shields.io/github/v/release/uesleinasch/claude-local-session?label=release)](https://github.com/uesleinasch/claude-local-session/releases/latest)
+[![ci](https://github.com/uesleinasch/claude-local-session/actions/workflows/ci.yml/badge.svg?branch=Development)](https://github.com/uesleinasch/claude-local-session/actions/workflows/ci.yml)
+[![licença MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-f5a524)](LICENSE)
+
 Expõe cada sessão do Claude Code numa página web da sua rede local. Pelo navegador do
 celular você manda prompt para a sessão, acompanha o que ela está executando e aprova ou
 nega os pedidos de permissão.
+
+**Página do projeto:** <https://uesleinasch.github.io/claude-local-session/>
+
+> **In English:** a Claude Code plugin that puts every session on a web page in your local
+> network. From your phone you can send prompts, follow what the session is running, answer its
+> questions and approve or deny permission requests. It also ships a Linux package with a tray
+> app and an Android client. The project is documented in Brazilian Portuguese; issues and pull
+> requests in English are welcome.
+
+> Projeto independente da comunidade, **sem afiliação com a Anthropic**. "Claude" e "Claude
+> Code" são marcas da Anthropic.
 
 ```
 navegador (celular / notebook na LAN)
@@ -169,8 +184,8 @@ devolve o endereço da tailnet — com o app logado no celular, a página funcio
 lugar (4G, outra rede), sem expor a porta 7777 à internet. É também a saída quando a própria
 LAN bloqueia tráfego entre clientes (firewall de endpoint corporativo, isolamento de mesh).
 
-O endereço vem pelo nome do MagicDNS quando ele está ligado — `jacpontnx23.tail95d3bd.ts.net`
-é bem mais fácil de digitar no celular que `100.113.47.75`, e não muda. E se o Tailscale não
+O endereço vem pelo nome do MagicDNS quando ele está ligado — `estacao.tail1234.ts.net`
+é bem mais fácil de digitar no celular que `100.101.102.103`, e não muda. E se o Tailscale não
 estiver ali, a tool não fica calada: ela diz em que pé está e o que fazer.
 
 | Estado                            | O que a `link` responde                           |
@@ -609,3 +624,14 @@ gh run watch
 
 `bun scripts/release-apk.ts` recusa publicar fora do CI; `--local` força, como saída de
 emergência quando o Actions estiver fora do ar.
+
+## Contribuindo
+
+Contribuições são bem-vindas: o [CONTRIBUTING.md](CONTRIBUTING.md) mostra como montar o ambiente
+e por onde os pull requests entram. Falha de segurança vai pelo canal privado descrito no
+[SECURITY.md](SECURITY.md), nunca numa issue. Quem participa segue o
+[Código de Conduta](CODE_OF_CONDUCT.md).
+
+## Licença
+
+[MIT](LICENSE) © Ueslei Nascimento

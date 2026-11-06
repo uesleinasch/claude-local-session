@@ -14,8 +14,8 @@ function statusJson(over: Record<string, unknown> = {}): Record<string, unknown>
     BackendState: 'Running',
     Self: {
       ID: 'nsZViDgKaH11CNTRL',
-      DNSName: 'jacpontnx23.tail95d3bd.ts.net.',
-      TailscaleIPs: ['100.113.47.75', 'fd7a:115c:a1e0::a537:2f4c'],
+      DNSName: 'estacao.tail1234.ts.net.',
+      TailscaleIPs: ['100.101.102.103', 'fd7a:115c:a1e0::1'],
     },
     ...over,
   }
@@ -25,13 +25,13 @@ describe('parseStatus', () => {
   test('conectado usa o nome MagicDNS e apara o ponto final do FQDN', () => {
     expect(parseStatus(statusJson())).toEqual({
       kind: 'running',
-      host: 'jacpontnx23.tail95d3bd.ts.net',
+      host: 'estacao.tail1234.ts.net',
     })
   })
 
   test('sem MagicDNS cai no IPv4', () => {
-    const raw = statusJson({ Self: { TailscaleIPs: ['100.113.47.75', 'fd7a:115c::1'] } })
-    expect(parseStatus(raw)).toEqual({ kind: 'running', host: '100.113.47.75' })
+    const raw = statusJson({ Self: { TailscaleIPs: ['100.101.102.103', 'fd7a:115c::1'] } })
+    expect(parseStatus(raw)).toEqual({ kind: 'running', host: '100.101.102.103' })
   })
 
   /** URL com IPv6 exigiria colchetes e não é endereço que alguém digita no celular. */
@@ -89,8 +89,8 @@ describe('setupSteps', () => {
 
 describe('tailscaleLines', () => {
   test('conectado entrega a URL com host e token', () => {
-    const lines = tailscaleLines({ kind: 'running', host: 'jacpontnx23.tail95d3bd.ts.net' }, 7777, 'abc')
-    expect(lines.join('\n')).toContain('http://jacpontnx23.tail95d3bd.ts.net:7777/?t=abc')
+    const lines = tailscaleLines({ kind: 'running', host: 'estacao.tail1234.ts.net' }, 7777, 'abc')
+    expect(lines.join('\n')).toContain('http://estacao.tail1234.ts.net:7777/?t=abc')
   })
 
   /** O token é a chave da máquina: não pode aparecer num bloco que não tem endereço. */
@@ -110,15 +110,15 @@ describe('tailscaleLines', () => {
 
 describe('resolveState', () => {
   test('o que o CLI disse manda', () => {
-    expect(resolveState({ kind: 'stopped' }, '100.113.47.75')).toEqual({ kind: 'stopped' })
+    expect(resolveState({ kind: 'stopped' }, '100.101.102.103')).toEqual({ kind: 'stopped' })
     expect(resolveState({ kind: 'absent' }, null)).toEqual({ kind: 'absent' })
   })
 
   /** CLI mudo mas existe IP na faixa CGNAT: está conectado, só não deu para confirmar pelo CLI. */
   test('sem resposta do CLI, o IP da interface vira o host', () => {
-    expect(resolveState(null, '100.113.47.75')).toEqual({
+    expect(resolveState(null, '100.101.102.103')).toEqual({
       kind: 'running',
-      host: '100.113.47.75',
+      host: '100.101.102.103',
     })
   })
 
@@ -132,9 +132,9 @@ describe('resolveState', () => {
    * que a detecção por interface já sabia dar.
    */
   test('binário invisível mas interface com IP da tailnet é conexão viva', () => {
-    expect(resolveState({ kind: 'absent' }, '100.113.47.75')).toEqual({
+    expect(resolveState({ kind: 'absent' }, '100.101.102.103')).toEqual({
       kind: 'running',
-      host: '100.113.47.75',
+      host: '100.101.102.103',
     })
   })
 })
@@ -159,7 +159,7 @@ describe('probeTailscale', () => {
     const json = JSON.stringify(statusJson())
     expect(await probeTailscale(async () => ({ found: true, json }))).toEqual({
       kind: 'running',
-      host: 'jacpontnx23.tail95d3bd.ts.net',
+      host: 'estacao.tail1234.ts.net',
     })
   })
 })
