@@ -7,7 +7,7 @@ import {
 } from './connection.js'
 import { crumbs, parseSort, relativeTime, SORT_OPTIONS, sortEntries } from './browse-core.js'
 import { renderMarkdown } from './markdown.js'
-import { sessionStatus } from './session-status.js'
+import { SECTION_TITLES, sessionSection, sessionStatus, TONE_ICONS } from './session-status.js'
 import { createTerminalPanel } from './terminal-panel.js'
 
 const app = document.getElementById('app')
@@ -28,6 +28,7 @@ const quickBar = document.getElementById('quick')
 const tabs = document.getElementById('tabs')
 const tabActive = document.getElementById('tab-active')
 const tabBrowse = document.getElementById('tab-browse')
+const fab = document.getElementById('fab')
 const menu = document.getElementById('menu')
 const menuMain = document.getElementById('menu-main')
 const menuModels = document.getElementById('menu-models')
@@ -415,6 +416,7 @@ function showPane(pane) {
 document.getElementById('back').addEventListener('click', showSessions)
 tabActive.addEventListener('click', () => showPane('active'))
 tabBrowse.addEventListener('click', () => showPane('browse'))
+fab.addEventListener('click', () => showPane('browse'))
 
 /* ---------- render ---------- */
 
@@ -905,6 +907,7 @@ function renderBar() {
   renderQuick()
   tabs.hidden = !hubConfig.canSpawn
   tabBrowse.hidden = !hubConfig.canSpawn
+  fab.hidden = !hubConfig.canSpawn
   if (!hubConfig.canSpawn) showPane('active')
 
   if (app.dataset.view === 'sessions' || !s) {
@@ -921,6 +924,7 @@ function renderBar() {
   if (s.model?.name) bits.push(s.model.name)
   if (s.context) bits.push(`${Math.round(s.context.pct)}%`)
   stateEl.textContent = bits.join(' · ')
+  stateEl.dataset.tone = status.tone
   stateEl.dataset.alive = String(s.alive)
   stateEl.dataset.busy = String(s.busy === true)
   stopBtn.hidden = !(s.alive && s.busy === true && hubConfig.canInterrupt)
@@ -1295,113 +1299,80 @@ function permButtons(sessionId, requestId) {
   return wrap
 }
 
+function sessionAvatar(tone) {
+  const avatar = el('span', 'session-avatar')
+  avatar.append(icon(TONE_ICONS[tone] ?? 'schedule', 20))
+  return avatar
+}
+
+function sessionItem(s) {
+  const status = sessionStatus(s, Date.now())
+  const li = el('li', 'session-item')
+  li.dataset.tone = status.tone
+
+  const btn = el('button', 'session')
+  btn.type = 'button'
+  btn.addEventListener('click', () => open(s.id))
+
+  const body = el('span', 'session-body')
+  const top = el('span', 'session-top')
+  top.append(el('span', 'session-name', s.label))
+  if (s.auto === true) top.append(el('span', 'session-auto', 'auto'))
+  const meta = s.alive ? s.model?.name : clock(s.endedAt)
+  if (meta) top.append(el('span', 'session-meta', meta))
+
+  const state = el('span', 'session-state')
+  state.textContent = s.pending
+    ? `permissão · ${toolLabel(s.pending.toolName)}${s.pending.description ? `: ${s.pending.description}` : ''}`
+    : status.label
+
+  body.append(top, state)
+  if (s.alive && s.context) {
+    const meter = el('span', 'session-meter')
+    const track = el('span', 'session-track')
+    track.dataset.level = ctxLevel(Math.round(s.context.pct))
+    const fill = el('span', 'session-fill')
+    fill.style.width = `${Math.min(100, Math.max(0, s.context.pct))}%`
+    track.append(fill)
+    meter.append(track, el('span', 'session-meter-label', `${Math.round(s.context.pct)}%`))
+    body.append(meter)
+  } else {
+    body.append(el('span', 'session-path', tilde(s.cwd)))
+  }
+
+  btn.append(sessionAvatar(status.tone), body)
+  li.append(btn)
+  if (s.pending) li.append(permButtons(s.id, s.pending.requestId))
+
+  // Sessão viva se encerra pelo menu de dentro dela; da lista só se remove o
+  // que já morreu.
+  if (!s.alive) {
+    const drop = el('button', 'session-drop')
+    drop.type = 'button'
+    drop.setAttribute('aria-label', `Remover ${s.label} da lista`)
+    drop.append(icon('close', 20))
+    drop.addEventListener('click', ev => {
+      ev.stopPropagation()
+      if (!confirmKill(s)) return
+      if (!send({ type: 'kill', sessionId: s.id })) showToast('sem conexão com o hub')
+    })
+    li.append(drop)
+  }
+  return li
+}
+
 function renderSessions() {
   list.replaceChildren()
   sessionsEmpty.hidden = sessions.length > 0
   const live = sessions.filter(s => s.alive).length
-  tabActive.textContent = live > 0 ? `ativas · ${live}` : 'ativas'
+  tabActive.textContent = live > 0 ? `sessões · ${live}` : 'sessões'
 
-  for (const s of sessions) {
-    const status = sessionStatus(s, Date.now())
-    const li = document.createElement('li')
-    li.className = 'session-item'
-    li.dataset.tone = status.tone
-
-    const btn = document.createElement('button')
-    btn.type = 'button'
-    btn.className = 'session'
-    btn.addEventListener('click', () => open(s.id))
-
-    const top = document.createElement('div')
-    top.className = 'session-top'
-    if (status.tone === 'waiting') {
-      const badge = document.createElement('span')
-      badge.className = 'session-badge'
-      badge.textContent = status.label
-      top.append(badge)
-    } else {
-      const dot = document.createElement('span')
-      dot.className = 'session-dot'
-      const state = document.createElement('span')
-      state.className = 'session-state'
-      state.textContent = status.label
-      top.append(dot, state)
-    }
-    if (s.auto === true) {
-      const auto = document.createElement('span')
-      auto.className = 'session-auto'
-      auto.textContent = 'auto'
-      top.append(auto)
-    }
-    if (s.context) {
-      const ctx = document.createElement('span')
-      ctx.className = 'session-ctx'
-      ctx.textContent = `${Math.round(s.context.pct)}%`
-      top.append(ctx)
-    }
-
-    const id = document.createElement('div')
-    id.className = 'session-id'
-    const name = document.createElement('span')
-    name.className = 'session-name'
-    name.textContent = s.label
-    const path = document.createElement('span')
-    path.className = 'session-path'
-    path.textContent = tilde(s.cwd)
-    id.append(name, path)
-
-    btn.append(top, id)
-
-    // O que a sessão pede fica legível na própria lista — decidir daqui não
-    // exige abrir o feed.
-    if (s.pending) {
-      const ask = document.createElement('div')
-      ask.className = 'session-ask'
-      const tool = document.createElement('span')
-      tool.className = 'session-ask-tool'
-      tool.textContent = toolLabel(s.pending.toolName)
-      const detail = document.createElement('span')
-      detail.className = 'session-ask-detail'
-      detail.textContent = s.pending.description
-      ask.append(tool, detail)
-      btn.append(ask)
-    } else if (status.tone === 'busy' && s.context) {
-      const meter = document.createElement('div')
-      meter.className = 'session-meter'
-      const track = document.createElement('div')
-      track.className = 'session-track'
-      track.dataset.level = ctxLevel(Math.round(s.context.pct))
-      const fill = document.createElement('div')
-      fill.className = 'session-fill'
-      fill.style.width = `${Math.min(100, Math.max(0, s.context.pct))}%`
-      track.append(fill)
-      const label = document.createElement('span')
-      label.className = 'session-meter-label'
-      label.textContent = `${Math.round(s.context.pct)}% ctx`
-      meter.append(track, label)
-      btn.append(meter)
-    }
-
-    li.append(btn)
-    if (s.pending) li.append(permButtons(s.id, s.pending.requestId))
-
-    // Sessão viva se encerra pelo menu de dentro dela; da lista só se remove o
-    // que já morreu.
-    if (!s.alive) {
-      const drop = document.createElement('button')
-      drop.type = 'button'
-      drop.className = 'session-drop'
-      drop.setAttribute('aria-label', `Remover ${s.label} da lista`)
-      drop.append(icon('close', 20))
-      drop.addEventListener('click', ev => {
-        ev.stopPropagation()
-        if (!confirmKill(s)) return
-        if (!send({ type: 'kill', sessionId: s.id })) showToast('sem conexão com o hub')
-      })
-      li.append(drop)
-    }
-
-    list.append(li)
+  const groups = { waiting: [], active: [], ended: [] }
+  for (const s of sessions) groups[sessionSection(sessionStatus(s, Date.now()).tone)].push(s)
+  for (const [section, items] of Object.entries(groups)) {
+    if (items.length === 0) continue
+    list.append(el('li', 'session-group', SECTION_TITLES[section]))
+    for (const s of items) list.append(sessionItem(s))
   }
 }
 

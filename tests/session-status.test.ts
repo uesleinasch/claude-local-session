@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 // @ts-expect-error módulo JS do front, sem tipos — o texto do badge é puro e testável aqui.
-import { sessionStatus } from '../web/session-status.js'
+import { SECTION_TITLES, sessionSection, sessionStatus, TONE_ICONS } from '../web/session-status.js'
+import { WEB_ICONS } from '../src/icons-core'
 
 const NOW = 1_000_000
 
@@ -42,5 +43,26 @@ describe('sessionStatus', () => {
   test('relógio atrasado não produz tempo negativo', () => {
     const s = { alive: true, lastEventAt: NOW + 60_000 }
     expect(sessionStatus(s, NOW).label).toBe('ociosa')
+  })
+})
+
+describe('agrupamento da lista', () => {
+  test('sessionSection agrupa por tom: quem espera você, as vivas e as encerradas', () => {
+    expect(sessionSection('waiting')).toBe('waiting')
+    expect(sessionSection('busy')).toBe('active')
+    expect(sessionSection('idle')).toBe('active')
+    expect(sessionSection('dead')).toBe('ended')
+  })
+
+  test('toda sessão cai numa seção com título', () => {
+    for (const tom of ['waiting', 'busy', 'idle', 'dead']) {
+      expect(SECTION_TITLES[sessionSection(tom)]).toBeTruthy()
+    }
+    expect(SECTION_TITLES).toEqual({ waiting: 'esperando você', active: 'ativas', ended: 'encerradas' })
+  })
+
+  test('todo tom tem ícone que existe no sprite', () => {
+    expect(TONE_ICONS).toEqual({ waiting: 'shield_lock', busy: 'bolt', idle: 'schedule', dead: 'terminal' })
+    for (const nome of Object.values(TONE_ICONS)) expect(WEB_ICONS).toContain(nome as string)
   })
 })

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { readdirSync } from 'node:fs'
+import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { assetPath, EMBEDDED_FILES } from '../src/web-assets'
 
@@ -40,5 +40,14 @@ describe('assetPath', () => {
 
   test('arquivo fora do manifesto não inventa caminho', () => {
     expect(assetPath('nao-existe.js', '')).toBeNull()
+  })
+})
+
+describe('ícone do app', () => {
+  test('a página usa o mesmo ícone do desktop — dois arquivos, uma identidade', () => {
+    const raiz = join(import.meta.dir, '..')
+    expect(readFileSync(join(raiz, 'web', 'icon.svg'), 'utf8')).toBe(
+      readFileSync(join(raiz, 'desktop', 'icon.svg'), 'utf8'),
+    )
   })
 })

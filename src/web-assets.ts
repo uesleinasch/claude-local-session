@@ -3,6 +3,7 @@ import appJs from '../web/app.js' with { type: 'file' }
 import browseCoreJs from '../web/browse-core.js' with { type: 'file' }
 import connectionJs from '../web/connection.js' with { type: 'file' }
 import interWoff2 from '../web/fonts/inter-latin-opsz-normal.woff2' with { type: 'file' }
+import iconSvg from '../web/icon.svg' with { type: 'file' }
 import iconsSvg from '../web/icons.svg' with { type: 'file' }
 import indexHtml from '../web/index.html' with { type: 'file' }
 import markdownJs from '../web/markdown.js' with { type: 'file' }
@@ -32,6 +33,7 @@ const EMBEDDED: Record<string, string> = {
   'style.css': styleCss,
   'tokens.css': tokensCss,
   'icons.svg': iconsSvg,
+  'icon.svg': iconSvg,
   'fonts/inter-latin-opsz-normal.woff2': interWoff2,
   'vendor/xterm.js': xtermJs,
   'vendor/addon-fit.js': addonFitJs,

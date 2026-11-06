@@ -151,7 +151,7 @@ describe('gate de token', () => {
     const res = await fetch(`${base()}/?t=${token}`)
     expect(res.status).toBe(200)
     expect(res.headers.get('set-cookie')).toContain('ls_token=')
-    expect(await res.text()).toContain('local-session')
+    expect(await res.text()).toContain('Local Session')
   })
 
   test('aceita o cookie no lugar da query', async () => {

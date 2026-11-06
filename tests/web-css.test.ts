@@ -72,7 +72,7 @@ describe('nada pode empurrar a largura da página', () => {
    * encolhe, empurra a caixa da atividade e a página inteira rola na horizontal.
    */
   test('os campos que mostram nome de ferramenta têm teto e truncam', () => {
-    for (const selector of ['.act-tool', '.perm-tool', '.session-ask-tool']) {
+    for (const selector of ['.act-tool', '.perm-tool', '.session-state']) {
       const regra = rules().find(r => r.selector.split(',').some(s => s.trim() === selector))
       expect(regra, `${selector} precisa existir`).toBeDefined()
       expect(regra!.body, `${selector} precisa de max-width`).toMatch(/max-width\s*:/)
@@ -128,6 +128,13 @@ describe('atributo hidden versus display por id', () => {
       .filter(id => !guarded.has(id))
 
     expect(desprotegidos).toEqual([])
+  })
+
+  test('nome de sessão longo corta com reticências, numa linha só', () => {
+    const regra = rules().find(r => r.selector === '.session-name')
+    expect(regra?.body).toMatch(/min-width:\s*0/)
+    expect(regra?.body).toMatch(/overflow:\s*hidden/)
+    expect(regra?.body).toMatch(/text-overflow:\s*ellipsis/)
   })
 
   test('há bloco prefers-reduced-motion que zera transições', () => {

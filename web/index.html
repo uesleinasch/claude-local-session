@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="dark" />
     <meta name="theme-color" content="#151311" />
-    <title>local-session</title>
+    <title>Local Session</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="preload" href="/fonts/inter-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin />
     <link rel="stylesheet" href="/vendor/xterm.css" />
     <link rel="stylesheet" href="/tokens.css" />
@@ -17,12 +18,13 @@
         <button id="back" type="button" aria-label="Voltar para a lista de sessões">
           <svg class="icon" width="24" height="24" aria-hidden="true"><use href="/icons.svg#i-arrow_back"></use></svg>
         </button>
-        <h1 id="home-title">sessões</h1>
+        <img id="app-icon" src="/icon.svg" width="32" height="32" alt="" />
+        <h1 id="home-title">Local Session</h1>
         <div id="ident">
           <span id="title"></span>
           <span id="state"></span>
         </div>
-        <button id="stop" type="button" hidden>parar</button>
+        <button id="stop" type="button" hidden><svg class="icon" width="20" height="20" aria-hidden="true"><use href="/icons.svg#i-stop_circle"></use></svg>parar</button>
         <button id="more" type="button" hidden aria-haspopup="menu" aria-expanded="false" aria-label="Mais ações desta sessão">
           <svg class="icon" width="24" height="24" aria-hidden="true"><use href="/icons.svg#i-more_vert"></use></svg>
         </button>
@@ -30,8 +32,8 @@
 
 
       <div id="tabs" role="tablist" aria-label="Sessões e projetos">
-        <button id="tab-active" type="button" role="tab" aria-selected="true">ativas</button>
-        <button id="tab-browse" type="button" role="tab" aria-selected="false" hidden>abrir projeto</button>
+        <button id="tab-active" type="button" role="tab" aria-selected="true">sessões</button>
+        <button id="tab-browse" type="button" role="tab" aria-selected="false" hidden>abrir pasta</button>
       </div>
 
       <div id="context" hidden aria-label="Uso da janela de contexto">
@@ -45,6 +47,11 @@
           abra o Claude Code num projeto e ela aparece aqui.
         </p>
       </section>
+
+      <button id="fab" type="button" hidden>
+        <svg class="icon" width="24" height="24" aria-hidden="true"><use href="/icons.svg#i-add"></use></svg>
+        nova sessão
+      </button>
 
       <section id="spawn" hidden aria-label="Abrir projeto">
         <div id="dir-search-row">

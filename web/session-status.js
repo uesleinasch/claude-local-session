@@ -17,3 +17,14 @@ export function sessionStatus(session, now) {
   if (session.busy === true) return { tone: 'busy', label: 'trabalhando' }
   return { tone: 'idle', label: idleLabel(session, now) }
 }
+
+export const SECTION_TITLES = { waiting: 'esperando você', active: 'ativas', ended: 'encerradas' }
+
+export const TONE_ICONS = { waiting: 'shield_lock', busy: 'bolt', idle: 'schedule', dead: 'terminal' }
+
+/** Em que bloco da lista a sessão aparece: quem espera você, as vivas, as encerradas. */
+export function sessionSection(tone) {
+  if (tone === 'waiting') return 'waiting'
+  if (tone === 'dead') return 'ended'
+  return 'active'
+}
