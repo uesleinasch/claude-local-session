@@ -21,10 +21,12 @@ describe('sprite de ícones', () => {
 
   test('todo ícone citado na página existe no sprite — senão o botão fica vazio, sem erro', () => {
     const js = ler('app.js') + ler('terminal-panel.js')
+    const literais = (trecho: string) => [...trecho.matchAll(/'([\w-]+)'/g)].map(m => m[1]!)
     const citados = new Set([
-      ...[...js.matchAll(/\bicon\('([\w-]+)'/g)].map(m => m[1]!),
+      ...[...js.matchAll(/\bicon\(([^)]*)\)/g)].flatMap(m => literais(m[1]!)),
+      ...[...js.matchAll(/\bicon:\s*([^,\n]*)/g)].flatMap(m => literais(m[1]!)),
+      ...[...js.matchAll(/\bcardHead\('([\w-]+)'/g)].map(m => m[1]!),
       ...[...js.matchAll(/\biconButton\([^,]+,[^,]+,\s*'([\w-]+)'/g)].map(m => m[1]!),
-      ...[...js.matchAll(/\bicon:\s*'([\w-]+)'/g)].map(m => m[1]!),
       ...[...ler('index.html').matchAll(/#i-([\w-]+)/g)].map(m => m[1]!),
     ])
     expect(citados.size).toBeGreaterThan(10)

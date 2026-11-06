@@ -72,7 +72,7 @@ describe('nada pode empurrar a largura da página', () => {
    * encolhe, empurra a caixa da atividade e a página inteira rola na horizontal.
    */
   test('os campos que mostram nome de ferramenta têm teto e truncam', () => {
-    for (const selector of ['.act-tool', '.perm-tool', '.session-state']) {
+    for (const selector of ['.act-tool', '.perm-tool', '.session-state', '.fav-chip-name']) {
       const regra = rules().find(r => r.selector.split(',').some(s => s.trim() === selector))
       expect(regra, `${selector} precisa existir`).toBeDefined()
       expect(regra!.body, `${selector} precisa de max-width`).toMatch(/max-width\s*:/)
@@ -186,6 +186,11 @@ describe('atributo hidden versus display por id', () => {
       r.selector.split(',').some(x => x.trim() === '#app[data-view="sessions"][data-pane="browse"] #back'),
     )
     expect(volta?.body).toMatch(/display:\s*grid/)
+  })
+
+  test('a faixa de sem conexão empurra a página em vez de cobrir o cabeçalho', () => {
+    const regra = rules().find(r => r.selector === '#app:has(#offline:not([hidden]))')
+    expect(regra?.body).toMatch(/padding-top\s*:/)
   })
 
   test('há bloco prefers-reduced-motion que zera transições', () => {

@@ -2607,3 +2607,7 @@ body {
 #app[data-pane="browse"] #app-settings {
   display: none;
 }
+
+#app:has(#offline:not([hidden])) {
+  padding-top: calc(36px + env(safe-area-inset-top));
+}
