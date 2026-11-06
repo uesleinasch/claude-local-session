@@ -10,6 +10,11 @@ declare module '*.css' {
   export default path
 }
 
+declare module '*/web/icon.svg' {
+  const path: string
+  export default path
+}
+
 declare module '*/web/icons.svg' {
   const path: string
   export default path
