@@ -137,6 +137,21 @@ describe('atributo hidden versus display por id', () => {
     expect(regra?.body).toMatch(/text-overflow:\s*ellipsis/)
   })
 
+  test('balão do seu prompt usa secondary-container', () => {
+    const regra = rules().find(r => r.selector === '.turn[data-kind="prompt"] .bubble')
+    expect(regra?.body).toContain('var(--md-sys-color-secondary-container)')
+  })
+
+  test('prompt vindo do terminal tem balão próprio, sem a cor do seu', () => {
+    const regra = rules().find(r => r.selector === '.turn[data-origin="terminal"] .bubble')
+    expect(regra?.body).toContain('var(--md-sys-color-surface-container-high)')
+  })
+
+  test('campo do composer tem 16px — menos que isso o celular dá zoom ao focar', () => {
+    const regra = rules().find(r => r.selector === '#input')
+    expect(regra?.body).toMatch(/font-size:\s*var\(--md-sys-typescale-body-large-size\)/)
+  })
+
   test('há bloco prefers-reduced-motion que zera transições', () => {
     const tokens = readFileSync(join(WEB, 'tokens.css'), 'utf8')
     expect(tokens).toMatch(

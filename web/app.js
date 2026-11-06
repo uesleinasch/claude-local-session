@@ -1412,10 +1412,11 @@ function group(all) {
   return out
 }
 
-function turnNode(who, text, kind, ts) {
+function turnNode(who, text, kind, ts, origin) {
   const wrap = document.createElement('div')
   wrap.className = 'turn'
   wrap.dataset.kind = kind
+  if (origin === 'terminal') wrap.dataset.origin = 'terminal'
 
   if (kind === 'prompt') {
     const bubble = document.createElement('div')
@@ -1427,7 +1428,8 @@ function turnNode(who, text, kind, ts) {
     meta.className = 'turn-meta'
     const time = document.createElement('span')
     time.className = 'turn-time'
-    time.textContent = who === 'você' ? clock(ts) : who
+    if (origin === 'terminal') time.append(icon('computer', 16), `${clock(ts)} · no terminal`)
+    else time.textContent = who === 'você' ? clock(ts) : who
     // Reaproveitar o que você já escreveu é o histórico de prompts mais barato:
     // um toque devolve o texto ao composer, pronto para editar e reenviar.
     const again = document.createElement('button')
@@ -1454,6 +1456,7 @@ function turnNode(who, text, kind, ts) {
   label.className = 'who-name'
   label.textContent = who
   head.append(avatar, label)
+  if (origin === 'terminal') head.append(el('span', 'who-origin', '· no terminal'))
 
   const body = document.createElement('div')
   body.className = 'text'
@@ -1491,7 +1494,9 @@ function actsNode(key, items) {
   tools.className = 'acts-tools'
   const names = [...new Set(items.map(i => toolLabel(i.tool)).filter(Boolean))]
   tools.textContent = names.length > 0 ? `· ${names.join(', ')}` : ''
-  sum.append(count, tools)
+  const chev = el('span', 'acts-chev')
+  chev.append(icon('keyboard_arrow_down', 24))
+  sum.append(count, tools, chev)
 
   const ul = document.createElement('ul')
   ul.className = 'acts-list'
@@ -1504,7 +1509,8 @@ function actsNode(key, items) {
     mark.className = 'act-mark'
     mark.setAttribute('aria-hidden', 'true')
     if (item.status === 'end') mark.append(icon('check', 16))
-    else mark.textContent = item.status === 'start' ? '…' : '·'
+    else if (item.status === 'start') mark.append(el('span', 'spinner'))
+    else mark.textContent = '·'
 
     const tool = document.createElement('span')
     tool.className = 'act-tool'
@@ -1753,13 +1759,8 @@ function renderFeed() {
 
   for (const g of group(events)) {
     if (g.type === 'acts') feed.append(actsNode(g.key, g.items))
-    else if (g.type === 'prompt') {
-      const who = g.event.origin === 'terminal' ? `${clock(g.event.ts)} · no terminal` : 'você'
-      feed.append(turnNode(who, g.event.text, 'prompt', g.event.ts))
-    } else if (g.type === 'reply') {
-      const who = g.event.origin === 'terminal' ? 'claude · no terminal' : 'claude'
-      feed.append(turnNode(who, g.event.text, 'reply', g.event.ts))
-    }
+    else if (g.type === 'prompt') feed.append(turnNode('você', g.event.text, 'prompt', g.event.ts, g.event.origin))
+    else if (g.type === 'reply') feed.append(turnNode('claude', g.event.text, 'reply', g.event.ts, g.event.origin))
     else if (g.type === 'permission') feed.append(permNode(g.event))
     else if (g.type === 'question') feed.append(askNode(g.event))
   }
@@ -1773,7 +1774,7 @@ function renderFeed() {
   const s = current()
   const alive = Boolean(s?.alive)
   input.disabled = !alive
-  sendBtn.disabled = !alive
+  syncSend()
   input.placeholder = alive ? 'mensagem' : 'sessão encerrada'
 
   if (atBottom) feed.scrollTop = feed.scrollHeight
@@ -1784,6 +1785,7 @@ function renderFeed() {
 let attached = null
 
 function renderAttach() {
+  syncSend()
   attachState.hidden = attached === null
   if (attached) attachState.replaceChildren(icon('attach_file', 16), `${attached.split('/').at(-1)} — vai junto no envio`)
 }
@@ -1846,6 +1848,11 @@ function submit() {
 function resize() {
   input.style.height = 'auto'
   input.style.height = `${input.scrollHeight}px`
+  syncSend()
+}
+
+function syncSend() {
+  sendBtn.disabled = !current()?.alive || (input.value.trim() === '' && attached === null)
 }
 
 input.addEventListener('input', resize)
