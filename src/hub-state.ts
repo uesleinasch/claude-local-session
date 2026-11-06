@@ -17,6 +17,8 @@ type SessionEntry = {
   summary: SessionSummary
   sink: Sink | null
   events: FeedEvent[]
+  /** A tool reply já falou neste turno — o texto final do terminal seria repetição. */
+  replied?: boolean
 }
 
 export type RegisterInfo = {
@@ -137,6 +139,15 @@ export class Registry {
     this.broadcastSessions()
   }
 
+  mirrorTerminalPrompt(sessionId: string, text: string, ts = Date.now()): void {
+    this.push(sessionId, { kind: 'prompt', ts, text, origin: 'terminal' })
+  }
+
+  mirrorTerminalReply(sessionId: string, text: string, ts = Date.now()): void {
+    if (this.sessions.get(sessionId)?.replied === true) return
+    this.push(sessionId, { kind: 'reply', ts, text, origin: 'terminal' })
+  }
+
   push(sessionId: string, event: FeedEvent): void {
     const entry = this.sessions.get(sessionId)
     if (!entry) return
@@ -152,6 +163,11 @@ export class Registry {
       entry.summary.busy = true
     } else if (event.kind === 'activity' && event.status === 'idle') {
       entry.summary.busy = false
+    }
+    if (event.kind === 'prompt' || (event.kind === 'activity' && event.status === 'idle')) {
+      entry.replied = false
+    } else if (event.kind === 'reply' && event.origin === undefined) {
+      entry.replied = true
     }
 
     let replaced = false

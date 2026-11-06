@@ -7,9 +7,11 @@ export const HOOK_TIMEOUT_MS = 300
 export type ActivityStatus = 'start' | 'end' | 'idle'
 export type PermissionBehavior = 'allow' | 'deny'
 
+export type TurnOrigin = 'terminal'
+
 export type FeedEvent =
-  | { kind: 'prompt'; ts: number; text: string }
-  | { kind: 'reply'; ts: number; text: string }
+  | { kind: 'prompt'; ts: number; text: string; origin?: TurnOrigin }
+  | { kind: 'reply'; ts: number; text: string; origin?: TurnOrigin }
   | { kind: 'activity'; ts: number; tool: string; detail: string; status: ActivityStatus }
   | {
       kind: 'permission'
@@ -211,6 +213,8 @@ export type ActivityPost = {
   status: ActivityStatus
   preview?: string
   question?: QuestionPayload
+  terminalPrompt?: string
+  terminalReply?: string
 }
 
 export function isPermissionBehavior(v: unknown): v is PermissionBehavior {
@@ -244,6 +248,7 @@ export function parseQuickPrompts(raw: unknown): string[] | null {
 }
 
 export const MAX_PREVIEW = 4_000
+export const MAX_TERMINAL_TEXT = 20_000
 export const MAX_QUESTIONS = 4
 export const MAX_OPTIONS = 8
 
@@ -312,5 +317,9 @@ export function parseActivityPost(raw: unknown): ActivityPost | null {
     const question = parseQuestionPayload(o.question)
     if (question !== null) post.question = question
   }
+  const terminalPrompt = clip(o.terminalPrompt, MAX_TERMINAL_TEXT)
+  if (terminalPrompt !== null) post.terminalPrompt = terminalPrompt
+  const terminalReply = clip(o.terminalReply, MAX_TERMINAL_TEXT)
+  if (terminalReply !== null) post.terminalReply = terminalReply
   return post
 }

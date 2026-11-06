@@ -74,7 +74,7 @@ não é expandido e o server morre no boot com
 pelo campo `mcpServers`, e `scripts/update.ts` apaga o `.mcp.json` que tenha sobrado no cache.
 
 Pelo mesmo motivo o `mcp.json` roda `sh -c` em vez de chamar o shim direto: só há prova de que
-`${CLAUDE_PLUGIN_ROOT}` é expandido **dentro de uma linha de comando** — é o que os quatro hooks
+`${CLAUDE_PLUGIN_ROOT}` é expandido **dentro de uma linha de comando** — é o que os hooks
 fazem desde sempre. No campo `command`, um harness que não expanda deixaria o caminho literal e
 a sessão subiria sem MCP, falha que só apareceria na próxima sessão nova.
 
@@ -99,15 +99,18 @@ navegador ──HTTP/WS :7777──► hub (daemon único, desanexado)
 
 - **`src/server.ts`** — MCP stdio, um processo por sessão do Claude Code. É a única via de mão
   dupla com o modelo: recebe prompt do hub e o injeta como `notifications/claude/channel`;
-  expõe as tools `reply` e `link`. Nada que o Claude escreve no terminal chega ao navegador —
-  **só o texto passado para `reply`**.
+  expõe as tools `reply` e `link`. Do que o Claude escreve no terminal, só o **texto final do
+  turno** chega ao navegador, pelo hook `Stop` (`last_assistant_message`), e não as mensagens
+  intermediárias. Turno que já usou `reply` não repete esse texto (`replied`, em `hub-state.ts`).
 - **`src/hub.ts`** — daemon HTTP/WebSocket em `0.0.0.0:7777`, um por máquina. Sobrevive à morte
   de qualquer sessão; se autoencerra 60s depois da última sair, a menos que haja navegador
   conectado ou spawn configurado. Se perder a corrida pela porta, `Bun.serve` lança e o processo
   sai com 0 — o vencedor atende por todos.
 - **`hooks/report.ts`** — registrado em `hooks/hooks.json` para `PreToolUse`, `PostToolUse`,
-  `Stop` e `SessionEnd`. É a origem da régua de atividade, dos previews de permissão e dos cards
-  de `AskUserQuestion`.
+  `UserPromptSubmit`, `Stop` e `SessionEnd`. É a origem da régua de atividade, dos previews de
+  permissão, dos cards de `AskUserQuestion` e do espelho dos turnos digitados no terminal
+  (`origin: 'terminal'` no feed). O prompt que veio da página chega ao `UserPromptSubmit`
+  embrulhado em `<channel source="local-session"`, e o hook o descarta porque o hub já o registrou.
 - **`hooks/context-report.ts`** — **não** está em `hooks.json`: roda no pipeline do *statusline*
   do usuário, a única fonte com o percentual de janela de contexto já calculado para o modelo em
   uso. Sem statusline configurado, a barra de contexto simplesmente não existe.

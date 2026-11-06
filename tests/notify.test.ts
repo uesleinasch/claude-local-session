@@ -50,6 +50,10 @@ describe('notificationFor', () => {
     expect(n?.key).toBe('reply:3')
   })
 
+  test('texto espelhado do terminal não gera aviso além do turno encerrado', () => {
+    expect(notificationFor('p', { kind: 'reply', ts: 3, text: 'oi', origin: 'terminal' })).toBeNull()
+  })
+
   test('reply gigante é cortado para caber na notificação', () => {
     const n = notificationFor('p', { kind: 'reply', ts: 3, text: 'x'.repeat(1000) })
     expect(n!.message.length).toBeLessThanOrEqual(400)

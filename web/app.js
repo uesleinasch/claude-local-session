@@ -1763,8 +1763,13 @@ function renderFeed() {
 
   for (const g of group(events)) {
     if (g.type === 'acts') feed.append(actsNode(g.key, g.items))
-    else if (g.type === 'prompt') feed.append(turnNode('você', g.event.text, 'prompt', g.event.ts))
-    else if (g.type === 'reply') feed.append(turnNode('claude', g.event.text, 'reply', g.event.ts))
+    else if (g.type === 'prompt') {
+      const who = g.event.origin === 'terminal' ? `${clock(g.event.ts)} · no terminal` : 'você'
+      feed.append(turnNode(who, g.event.text, 'prompt', g.event.ts))
+    } else if (g.type === 'reply') {
+      const who = g.event.origin === 'terminal' ? 'claude · no terminal' : 'claude'
+      feed.append(turnNode(who, g.event.text, 'reply', g.event.ts))
+    }
     else if (g.type === 'permission') feed.append(permNode(g.event))
     else if (g.type === 'question') feed.append(askNode(g.event))
   }

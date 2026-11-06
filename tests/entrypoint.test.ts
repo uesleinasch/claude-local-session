@@ -28,7 +28,7 @@ describe('shim bin/local-session', () => {
 })
 
 describe('manifestos apontam para o ponto de entrada único', () => {
-  test('os quatro hooks chamam o shim com o subcomando hook', () => {
+  test('os cinco hooks chamam o shim com o subcomando hook', () => {
     const cfg = lerJson('hooks/hooks.json') as {
       hooks: Record<string, { hooks: { command: string }[] }[]>
     }
@@ -36,7 +36,7 @@ describe('manifestos apontam para o ponto de entrada único', () => {
       .flat()
       .flatMap(h => h.hooks.map(x => x.command))
 
-    expect(comandos).toHaveLength(4)
+    expect(comandos).toHaveLength(5)
     for (const cmd of comandos) {
       expect(cmd).toContain('bin/local-session')
       expect(cmd).toEndWith(' hook')

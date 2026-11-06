@@ -648,6 +648,13 @@ async function handleActivity(req: Request): Promise<Response> {
     }
     return new Response('ok')
   }
+  if (post.terminalPrompt !== undefined) {
+    registry.mirrorTerminalPrompt(post.sessionId, post.terminalPrompt)
+    return new Response('ok')
+  }
+  if (post.terminalReply !== undefined) {
+    registry.mirrorTerminalReply(post.sessionId, post.terminalReply)
+  }
   // O preview não entra na régua de atividade — ele existe para enriquecer o
   // card de permissão da mesma tool, que chega pelo WebSocket da sessão.
   if (post.status === 'start' && post.preview !== undefined) {

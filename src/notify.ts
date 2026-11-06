@@ -48,6 +48,8 @@ export function notificationFor(label: string, event: FeedEvent): Notification |
       }
     }
     case 'reply':
+      // O Stop que traz o texto do terminal já gera o aviso de turno encerrado.
+      if (event.origin === 'terminal') return null
       return {
         key: `reply:${event.ts}`,
         title: label,

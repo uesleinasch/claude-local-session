@@ -718,3 +718,71 @@ describe('limpeza', () => {
     expect(reg.hasAlive()).toBe(false)
   })
 })
+
+describe('turnos digitados no terminal', () => {
+  function feed(reg: Registry): FeedEvent[] {
+    const browser = spy()
+    reg.addBrowser(browser)
+    reg.subscribe(browser, 's1')
+    return browser.sent.at(-1).events
+  }
+
+  const idle: FeedEvent = { kind: 'activity', ts: 9, tool: '', detail: '', status: 'idle' }
+
+  test('prompt e texto final do terminal entram no feed marcados', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.mirrorTerminalPrompt('s1', 'rode os testes', 1)
+    reg.mirrorTerminalReply('s1', 'tudo verde', 2)
+
+    expect(feed(reg)).toEqual([
+      { kind: 'prompt', ts: 1, text: 'rode os testes', origin: 'terminal' },
+      { kind: 'reply', ts: 2, text: 'tudo verde', origin: 'terminal' },
+    ])
+  })
+
+  test('prompt do terminal liga o turno em andamento', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.mirrorTerminalPrompt('s1', 'oi', 1)
+    expect(reg.summaries()[0]?.busy).toBe(true)
+  })
+
+  test('turno que já respondeu pela tool reply não repete o texto do terminal', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', { kind: 'prompt', ts: 1, text: 'da página' })
+    reg.push('s1', { kind: 'reply', ts: 2, text: 'resposta na página' })
+    reg.mirrorTerminalReply('s1', 'Respondi pela página.', 3)
+
+    expect(feed(reg).map(e => e.kind)).toEqual(['prompt', 'reply'])
+  })
+
+  test('o turno seguinte, digitado no terminal, volta a espelhar', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', { kind: 'reply', ts: 1, text: 'na página' })
+    reg.push('s1', idle)
+    reg.mirrorTerminalPrompt('s1', 'e agora?', 10)
+    reg.mirrorTerminalReply('s1', 'agora no terminal', 11)
+
+    expect(feed(reg).at(-1)).toEqual({ kind: 'reply', ts: 11, text: 'agora no terminal', origin: 'terminal' })
+  })
+
+  test('fim de turno zera a marca mesmo sem prompt registrado', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.push('s1', { kind: 'reply', ts: 1, text: 'na página' })
+    reg.push('s1', idle)
+    reg.mirrorTerminalReply('s1', 'turno sem prompt visto', 10)
+
+    expect(feed(reg).at(-1)).toMatchObject({ kind: 'reply', origin: 'terminal' })
+  })
+
+  test('sessão desconhecida é ignorada', () => {
+    const reg = new Registry()
+    reg.mirrorTerminalPrompt('nada', 'oi')
+    reg.mirrorTerminalReply('nada', 'oi')
+    expect(reg.summaries()).toEqual([])
+  })
+})

@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import { toActivityPost } from '../src/hook-event'
+import { MAX_TERMINAL_TEXT } from '../src/protocol'
 
 const base = { session_id: 'sess-1', cwd: '/home/u/proj' }
 
@@ -91,6 +92,62 @@ describe('toActivityPost', () => {
         status: 'idle',
       })
     }
+  })
+
+  test('Stop leva o texto final do turno para a página acompanhar o terminal', () => {
+    expect(
+      toActivityPost({ ...base, hook_event_name: 'Stop', last_assistant_message: '  Pronto, testes verdes.\n' }),
+    ).toEqual({
+      sessionId: 'sess-1',
+      tool: '',
+      detail: '',
+      status: 'idle',
+      terminalReply: 'Pronto, testes verdes.',
+    })
+  })
+
+  test('Stop sem texto final não inventa resposta', () => {
+    expect(toActivityPost({ ...base, hook_event_name: 'Stop', last_assistant_message: '   ' })).toEqual({
+      sessionId: 'sess-1',
+      tool: '',
+      detail: '',
+      status: 'idle',
+    })
+  })
+
+  test('SessionEnd não espelha texto mesmo que venha um', () => {
+    const post = toActivityPost({ ...base, hook_event_name: 'SessionEnd', last_assistant_message: 'x' })
+    expect(post?.terminalReply).toBeUndefined()
+  })
+
+  test('UserPromptSubmit espelha o que foi digitado no terminal', () => {
+    expect(toActivityPost({ ...base, hook_event_name: 'UserPromptSubmit', prompt: 'rode os testes\n' })).toEqual({
+      sessionId: 'sess-1',
+      tool: '',
+      detail: '',
+      status: 'start',
+      terminalPrompt: 'rode os testes',
+    })
+  })
+
+  test('UserPromptSubmit ignora prompt vazio e o que chegou pela página', () => {
+    expect(toActivityPost({ ...base, hook_event_name: 'UserPromptSubmit', prompt: '  ' })).toBeNull()
+    expect(
+      toActivityPost({
+        ...base,
+        hook_event_name: 'UserPromptSubmit',
+        prompt: '<channel source="local-session" session_id="x" ts="1">oi</channel>',
+      }),
+    ).toBeNull()
+  })
+
+  test('texto do terminal é cortado no limite do protocolo', () => {
+    const post = toActivityPost({
+      ...base,
+      hook_event_name: 'Stop',
+      last_assistant_message: 'a'.repeat(MAX_TERMINAL_TEXT + 50),
+    })
+    expect(post?.terminalReply).toHaveLength(MAX_TERMINAL_TEXT)
   })
 
   test('descarta payload sem session_id', () => {

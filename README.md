@@ -266,8 +266,13 @@ aprova o pedido que estiver pendente. Vale por sessão, pede confirmação ao li
 QUALQUER coisa, inclusive comandos destrutivos) e volta ao normal se o hub reiniciar.
 Perguntas do `AskUserQuestion` nunca são auto-respondidas.
 
-O que o Claude escreve no terminal **não** chega na página: só o texto passado para `reply`.
-Isso é do protocolo de canal, e as instruções do MCP server já orientam o Claude a usá-lo.
+**Começar no computador e seguir no celular.** O que você digita no terminal e o texto final
+de cada resposta também aparecem no feed, marcados como "no terminal". Dá para sair do
+computador no meio da tarefa e continuar pelo celular: a próxima mensagem enviada pela página
+cai na mesma sessão, e daí em diante o Claude responde pelo `reply`. As mensagens
+intermediárias do terminal e a saída das ferramentas não vêm para a página, só a régua de
+atividade com o nome de cada uma. Os hooks são lidos quando a sessão começa, então sessões
+abertas antes da atualização não espelham nada.
 
 Prompt escrito sem conexão não se perde: entra numa fila local ("na fila", no feed) e é
 entregue quando a página reconecta. O histórico de cada sessão também sobrevive a restarts

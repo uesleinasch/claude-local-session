@@ -294,6 +294,37 @@ describe('notificações', () => {
   })
 })
 
+describe('acompanhar no celular o que acontece no terminal', () => {
+  test('prompt e resposta do terminal chegam ao feed da página', async () => {
+    const session = await connect('session')
+    session.socket.send(
+      JSON.stringify({ type: 'register', sessionId: 'term-1', cwd: '/home/u/proj', label: 'proj', pid: 0 }),
+    )
+    const browser = await connect('browser')
+    await browser.wait(m => m.type === 'sessions' && m.sessions.some((s: any) => s.id === 'term-1'))
+    browser.socket.send(JSON.stringify({ type: 'subscribe', sessionId: 'term-1' }))
+    await browser.wait(m => m.type === 'history' && m.sessionId === 'term-1')
+
+    const post = (body: object) =>
+      fetch(`${base()}/_activity?t=${token}`, {
+        method: 'POST',
+        body: JSON.stringify({ sessionId: 'term-1', tool: '', detail: '', ...body }),
+      })
+
+    await post({ status: 'start', terminalPrompt: 'rode os testes' })
+    const prompt = await browser.wait(m => m.type === 'event' && m.event.kind === 'prompt')
+    expect(prompt.event).toMatchObject({ text: 'rode os testes', origin: 'terminal' })
+
+    await post({ status: 'idle', terminalReply: 'tudo verde' })
+    const reply = await browser.wait(m => m.type === 'event' && m.event.kind === 'reply')
+    expect(reply.event).toMatchObject({ text: 'tudo verde', origin: 'terminal' })
+    await browser.wait(m => m.type === 'event' && m.event.kind === 'activity' && m.event.status === 'idle')
+
+    session.socket.close()
+    browser.socket.close()
+  })
+})
+
 describe('o que mudou', () => {
   test('o hub devolve o estado do repositório da sessão', async () => {
     const repo = mkdtempSync(join(tmpdir(), 'ls-repo-'))

@@ -1,7 +1,16 @@
 import { relative } from 'node:path'
-import { parseQuestionSpecs, type ActivityPost, type QuestionPayload } from './protocol'
+import {
+  MAX_TERMINAL_TEXT,
+  parseQuestionSpecs,
+  type ActivityPost,
+  type QuestionPayload,
+} from './protocol'
 
 const MAX_DETAIL = 80
+
+// O prompt que veio da página chega ao modelo embrulhado pelo protocolo de canal;
+// o hub já o pôs no feed ao repassá-lo, então espelhá-lo de novo duplicaria.
+const PAGE_PROMPT_MARK = '<channel source="local-session"'
 
 function truncate(s: string): string {
   const flat = s.replace(/\s+/g, ' ').trim()
@@ -139,7 +148,23 @@ export function toActivityPost(raw: unknown): ActivityPost | null {
       }
       return post
     }
-    case 'Stop':
+    case 'UserPromptSubmit': {
+      const prompt = str(p.prompt).trim()
+      if (prompt === '' || prompt.includes(PAGE_PROMPT_MARK)) return null
+      return {
+        sessionId,
+        tool: '',
+        detail: '',
+        status: 'start',
+        terminalPrompt: prompt.slice(0, MAX_TERMINAL_TEXT),
+      }
+    }
+    case 'Stop': {
+      const post: ActivityPost = { sessionId, tool: '', detail: '', status: 'idle' }
+      const reply = str(p.last_assistant_message).trim()
+      if (reply !== '') post.terminalReply = reply.slice(0, MAX_TERMINAL_TEXT)
+      return post
+    }
     case 'SessionEnd':
       return { sessionId, tool: '', detail: '', status: 'idle' }
     default:
