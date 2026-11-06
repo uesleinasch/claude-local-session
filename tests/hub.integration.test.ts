@@ -619,6 +619,41 @@ describe('gerenciador de arquivos', () => {
   })
 })
 
+describe.if(Bun.which('tmux') !== null)('sessão dentro ou fora do tmux', () => {
+  const nome = `ls-teste-pane-${process.pid}`
+
+  afterAll(() => {
+    Bun.spawnSync(['tmux', 'kill-session', '-t', `=${nome}`])
+  })
+
+  async function tmuxDe(sessionId: string, pid: number): Promise<boolean> {
+    const session = await connect('session')
+    session.socket.send(JSON.stringify({ type: 'register', sessionId, cwd: '/p', label: 'p', pid }))
+    const browser = await connect('browser')
+    const msg = await browser.wait(
+      m =>
+        m.type === 'sessions' &&
+        m.sessions.some((s: any) => s.id === sessionId && typeof s.tmux === 'boolean'),
+    )
+    session.socket.close()
+    browser.socket.close()
+    return msg.sessions.find((s: any) => s.id === sessionId).tmux
+  }
+
+  test('processo num pane do tmux chega à página como controlável', async () => {
+    Bun.spawnSync(['tmux', 'new-session', '-d', '-s', nome, 'sleep 300'])
+    const pid = Number(
+      Bun.spawnSync(['tmux', 'list-panes', '-t', `=${nome}`, '-F', '#{pane_pid}']).stdout.toString().trim(),
+    )
+    expect(pid).toBeGreaterThan(1)
+    expect(await tmuxDe('tmux-dentro', pid)).toBe(true)
+  })
+
+  test('processo fora de qualquer pane chega como não controlável, mesmo com tmux na máquina', async () => {
+    expect(await tmuxDe('tmux-fora', 999_999_999)).toBe(false)
+  })
+})
+
 describe('ciclo completo', () => {
   test('sessão registrada aparece para o browser', async () => {
     const session = await connect('session')

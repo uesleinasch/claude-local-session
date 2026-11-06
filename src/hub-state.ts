@@ -119,6 +119,7 @@ export class Registry {
     entry.summary.busy = false
     entry.summary.waiting = false
     delete entry.summary.pending
+    delete entry.summary.tmux
     entry.summary.endedAt = now
     this.broadcastSessions()
   }
@@ -321,6 +322,13 @@ export class Registry {
     entry.summary.auto = on
     this.broadcastSessions()
     return true
+  }
+
+  setTmux(sessionId: string, inside: boolean): void {
+    const entry = this.sessions.get(sessionId)
+    if (!entry || entry.summary.tmux === inside) return
+    entry.summary.tmux = inside
+    this.broadcastSessions()
   }
 
   isAuto(sessionId: string): boolean {

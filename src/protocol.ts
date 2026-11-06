@@ -54,6 +54,8 @@ export type SessionSummary = {
   context?: SessionContext
   /** Modelo ativo, reportado pelo statusline. */
   model?: SessionModel
+  /** Roda num pane do tmux: só assim a página responde pergunta, interrompe e troca o modelo. */
+  tmux?: boolean
   endedAt?: number
 }
 
@@ -158,7 +160,6 @@ export type HubToBrowser =
       type: 'config'
       projects: string[]
       canSpawn: boolean
-      canInterrupt: boolean
       canTerminal: boolean
       quickPrompts: string[]
       home?: string

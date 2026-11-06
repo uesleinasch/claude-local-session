@@ -106,7 +106,6 @@ const ROOTS = (cfg.projectsRoot ?? []).filter(p => typeof p === 'string' && p.st
 const IDENTITY = pluginIdentity(ROOT)
 const HAS_TMUX = Bun.which('tmux') !== null
 const CAN_SPAWN = HAS_TMUX && Bun.which('claude') !== null && IDENTITY !== null
-const CAN_INTERRUPT = HAS_TMUX
 const CAN_TERMINAL = HAS_TMUX && Bun.which('mkfifo') !== null
 const MAX_DIRS = 400
 const QUICK_PROMPTS = parseQuickPrompts(cfg.quickPrompts) ?? DEFAULT_QUICK_PROMPTS
@@ -291,7 +290,6 @@ function configMsg(): string {
     type: 'config',
     projects: favorites,
     canSpawn: CAN_SPAWN,
-    canInterrupt: CAN_INTERRUPT,
     canTerminal: CAN_TERMINAL,
     quickPrompts: QUICK_PROMPTS,
     home: HOME,
@@ -745,6 +743,7 @@ function onSessionMessage(ws: Ws, msg: SessionToHub): void {
       }
       registry.registerSession(ws as Sink, info)
       store.appendMeta(info)
+      void findPane(info.pid).then(pane => registry.setTmux(info.sessionId, typeof pane === 'object'))
       return
     }
     case 'reply': {
