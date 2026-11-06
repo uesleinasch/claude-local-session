@@ -256,6 +256,7 @@ const STATIC: Record<string, { file: string; type: string; immutable?: true }> =
   '/terminal-panel.js': { file: 'terminal-panel.js', type: 'text/javascript; charset=utf-8' },
   '/style.css': { file: 'style.css', type: 'text/css; charset=utf-8' },
   '/tokens.css': { file: 'tokens.css', type: 'text/css; charset=utf-8' },
+  '/icons.svg': { file: 'icons.svg', type: 'image/svg+xml; charset=utf-8' },
   '/fonts/inter-latin-opsz-normal.woff2': {
     file: 'fonts/inter-latin-opsz-normal.woff2',
     type: 'font/woff2',

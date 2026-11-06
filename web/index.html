@@ -15,7 +15,7 @@
     <div id="app" data-view="sessions" data-pane="active">
       <header id="bar">
         <button id="back" type="button" aria-label="Voltar para a lista de sessões">
-          <span aria-hidden="true">←</span>
+          <svg class="icon" width="24" height="24" aria-hidden="true"><use href="/icons.svg#i-arrow_back"></use></svg>
         </button>
         <h1 id="home-title">sessões</h1>
         <div id="ident">
@@ -24,7 +24,7 @@
         </div>
         <button id="stop" type="button" hidden>parar</button>
         <button id="more" type="button" hidden aria-haspopup="menu" aria-expanded="false" aria-label="Mais ações desta sessão">
-          <span aria-hidden="true">⋯</span>
+          <svg class="icon" width="24" height="24" aria-hidden="true"><use href="/icons.svg#i-more_vert"></use></svg>
         </button>
       </header>
 
@@ -62,17 +62,17 @@
         <div id="fav-strip">
           <p class="group-title">favoritos</p>
           <ul id="spawn-list" aria-label="Pastas favoritas"></ul>
-          <p id="spawn-empty" hidden>nenhum favorito — abra uma pasta e toque em ☆.</p>
+          <p id="spawn-empty" hidden>nenhum favorito — abra uma pasta e toque na estrela.</p>
         </div>
 
         <div id="browse-head">
           <div id="browse-where">
             <nav id="browse-crumbs" aria-label="Caminho da pasta aberta"></nav>
-            <button id="browse-fav" type="button" data-on="false" aria-label="Marcar como favorito">☆</button>
+            <button id="browse-fav" type="button" data-on="false" aria-label="Marcar como favorito"><svg class="icon" width="24" height="24" aria-hidden="true"><use href="/icons.svg#i-star"></use></svg></button>
           </div>
           <div id="browse-tools">
-            <button id="browse-spawn" type="button">▶ sessão aqui</button>
-            <button id="browse-mkdir" type="button" aria-label="Nova pasta aqui">+ pasta</button>
+            <button id="browse-spawn" type="button"><svg class="icon" width="24" height="24" aria-hidden="true"><use href="/icons.svg#i-play_arrow"></use></svg>sessão aqui</button>
+            <button id="browse-mkdir" type="button" aria-label="Nova pasta aqui"><svg class="icon" width="24" height="24" aria-hidden="true"><use href="/icons.svg#i-create_new_folder"></use></svg>pasta</button>
             <label class="sr-only" for="browse-sort">Ordenar por</label>
             <select id="browse-sort"></select>
           </div>
@@ -80,7 +80,7 @@
         <div id="clip-bar" hidden>
           <span id="clip-name"></span>
           <button id="clip-paste" type="button">colar aqui</button>
-          <button id="clip-cancel" type="button" aria-label="Cancelar cópia">✕</button>
+          <button id="clip-cancel" type="button" aria-label="Cancelar cópia"><svg class="icon" width="24" height="24" aria-hidden="true"><use href="/icons.svg#i-close"></use></svg></button>
         </div>
         <ul id="browse-list"></ul>
         <p id="browse-empty" hidden>nada aqui com esse nome.</p>
@@ -100,7 +100,7 @@
         <p id="attach-state" hidden></p>
         <div id="composer-row">
           <input id="attach-input" type="file" accept="image/*" hidden />
-          <button id="attach" type="button" aria-label="Anexar imagem">📎</button>
+          <button id="attach" type="button" aria-label="Anexar imagem"><svg class="icon" width="24" height="24" aria-hidden="true"><use href="/icons.svg#i-attach_file"></use></svg></button>
           <label class="sr-only" for="input">Prompt para a sessão</label>
           <textarea
             id="input"
@@ -111,7 +111,7 @@
             enterkeyhint="send"
           ></textarea>
           <button id="send" type="button" aria-label="Enviar">
-            <span aria-hidden="true">↑</span>
+            <svg class="icon" width="24" height="24" aria-hidden="true"><use href="/icons.svg#i-arrow_upward"></use></svg>
           </button>
         </div>
       </footer>
@@ -130,7 +130,7 @@
             <h2 id="sheet-title">mudanças</h2>
             <span id="sheet-branch"></span>
             <span id="sheet-total"></span>
-            <button id="sheet-close" type="button" aria-label="Fechar">✕</button>
+            <button id="sheet-close" type="button" aria-label="Fechar"><svg class="icon" width="24" height="24" aria-hidden="true"><use href="/icons.svg#i-close"></use></svg></button>
           </header>
           <div id="sheet-ratio" hidden aria-hidden="true">
             <div id="sheet-ratio-add"></div>
@@ -143,8 +143,8 @@
       <div id="term" hidden role="dialog" aria-modal="true" aria-labelledby="term-title">
         <header id="term-bar">
           <h2 id="term-title">terminal</h2>
-          <button id="term-kill" type="button">✕ encerrar</button>
-          <button id="term-close" type="button" aria-label="Fechar o terminal">▾</button>
+          <button id="term-kill" type="button"><svg class="icon" width="24" height="24" aria-hidden="true"><use href="/icons.svg#i-delete"></use></svg>encerrar</button>
+          <button id="term-close" type="button" aria-label="Fechar o terminal"><svg class="icon" width="24" height="24" aria-hidden="true"><use href="/icons.svg#i-keyboard_arrow_down"></use></svg></button>
         </header>
         <div id="term-screen"></div>
         <div id="term-keys" aria-label="Teclas de controle"></div>
