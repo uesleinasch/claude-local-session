@@ -152,6 +152,19 @@ describe('atributo hidden versus display por id', () => {
     expect(regra?.body).toMatch(/font-size:\s*var\(--md-sys-typescale-body-large-size\)/)
   })
 
+  test('cards de permissão e pergunta usam surface-container-high e cantos medium', () => {
+    for (const seletor of ['.perm', '.ask']) {
+      const regra = rules().find(r => r.selector.split(',').some(s => s.trim() === seletor))
+      expect(regra?.body, seletor).toContain('var(--md-sys-color-surface-container-high)')
+      expect(regra?.body, seletor).toContain('var(--md-sys-shape-corner-medium)')
+    }
+  })
+
+  test('opção de pergunta tem 56px de altura mínima', () => {
+    const regra = rules().find(r => r.selector === '.ask-opt')
+    expect(regra?.body).toMatch(/min-height:\s*56px/)
+  })
+
   test('há bloco prefers-reduced-motion que zera transições', () => {
     const tokens = readFileSync(join(WEB, 'tokens.css'), 'utf8')
     expect(tokens).toMatch(

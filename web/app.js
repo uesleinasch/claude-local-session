@@ -1530,6 +1530,16 @@ function actsNode(key, items) {
   return box
 }
 
+function cardHead(iconName, label, title) {
+  const head = el('div', 'card-head')
+  const avatar = el('span', 'card-avatar')
+  avatar.append(icon(iconName))
+  const text = el('div', 'card-head-text')
+  text.append(label, title)
+  head.append(avatar, text)
+  return head
+}
+
 function permNode(e) {
   const box = document.createElement('div')
   box.className = 'perm'
@@ -1538,17 +1548,10 @@ function permNode(e) {
   const inner = document.createElement('div')
   inner.className = 'perm-in'
 
-  const head = document.createElement('div')
-  head.className = 'perm-head'
-  const tool = document.createElement('p')
-  tool.className = 'perm-tool'
-  tool.textContent = `permissão · ${toolLabel(e.toolName)}`
+  const tool = el('p', 'perm-tool', toolLabel(e.toolName))
   tool.title = e.toolName
-  const target = document.createElement('p')
-  target.className = 'perm-target'
-  target.textContent = e.description
-  head.append(tool, target)
-  inner.append(head)
+  inner.append(cardHead('shield_lock', el('p', 'card-label', 'pedido de permissão'), tool))
+  if (e.description) inner.append(el('p', 'perm-target', e.description))
 
   // O preview do hook mostra a operação inteira (diff, conteúdo, comando);
   // o inputPreview do protocolo é o fallback resumido.
@@ -1569,11 +1572,8 @@ function permNode(e) {
   if (e.resolved) {
     const verdict = document.createElement('p')
     verdict.className = 'perm-verdict'
-    const label = e.resolved === 'allow' ? 'permitido' : 'negado'
-    verdict.append(
-      e.resolved === 'allow' ? icon('check', 18) : icon('close', 18),
-      e.auto === true ? `${label} (auto)` : label,
-    )
+    const label = e.auto === true ? 'permitido (auto)' : e.resolved === 'allow' ? 'permitido por você' : 'negado por você'
+    verdict.append(e.resolved === 'allow' ? icon('check', 20) : icon('close', 20), label)
     inner.append(verdict)
     box.append(inner)
     return box
@@ -1622,24 +1622,26 @@ function askQuestionBlock(q, a, draft, canAnswer, rerender) {
 
   const options = document.createElement('div')
   options.className = 'ask-options'
+  options.setAttribute('role', q.multiSelect ? 'group' : 'radiogroup')
+  options.setAttribute('aria-label', q.question)
   q.options.forEach((opt, oi) => {
     const btn = document.createElement('button')
     btn.type = 'button'
     btn.className = 'ask-opt'
-    btn.dataset.on = String(a.chosen.has(oi))
+    const on = a.chosen.has(oi)
+    btn.dataset.on = String(on)
+    btn.setAttribute('role', q.multiSelect ? 'checkbox' : 'radio')
+    btn.setAttribute('aria-checked', String(on))
     btn.disabled = !canAnswer || draft.sent
 
-    const label = document.createElement('span')
-    label.className = 'ask-opt-label'
-    label.textContent = opt.label
-    btn.append(label)
+    const mark = el('span', 'ask-opt-mark')
+    if (q.multiSelect) mark.append(on ? icon('check_box') : icon('check_box_outline_blank'))
+    else mark.append(on ? icon('radio_button_checked') : icon('radio_button_unchecked'))
 
-    if (opt.description) {
-      const desc = document.createElement('span')
-      desc.className = 'ask-opt-desc'
-      desc.textContent = opt.description
-      btn.append(desc)
-    }
+    const text = el('span', 'ask-opt-text')
+    text.append(el('span', 'ask-opt-label', opt.label))
+    if (opt.description) text.append(el('span', 'ask-opt-desc', opt.description))
+    btn.append(mark, text)
 
     btn.addEventListener('click', () => {
       if (q.multiSelect) {
@@ -1685,10 +1687,7 @@ function askNode(e) {
   box.className = 'ask'
   if (e.resolved !== undefined) box.dataset.resolved = 'true'
 
-  const tool = document.createElement('p')
-  tool.className = 'ask-tool'
-  tool.textContent = 'pergunta do claude'
-  box.append(tool)
+  box.append(cardHead('help', el('p', 'card-label ask-tool', 'pergunta do claude'), el('p', 'card-title', e.questions[0]?.header ?? '')))
 
   if (e.resolved !== undefined) {
     const answered = Object.entries(e.resolved)
@@ -1725,7 +1724,7 @@ function askNode(e) {
   const sendAnswer = document.createElement('button')
   sendAnswer.type = 'button'
   sendAnswer.className = 'ask-send'
-  sendAnswer.textContent = draft.sent ? 'resposta enviada…' : 'responder'
+  sendAnswer.textContent = draft.sent ? 'resposta enviada' : 'enviar resposta'
   draft.onValidity = () => {
     sendAnswer.disabled = draft.sent || !draftValid(e.questions, draft)
   }
