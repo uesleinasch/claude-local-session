@@ -165,6 +165,20 @@ describe('atributo hidden versus display por id', () => {
     expect(regra?.body).toMatch(/min-height:\s*56px/)
   })
 
+  test('avisos flutuantes são snackbars: inverse-surface, fixos e com teto de largura', () => {
+    for (const seletor of ['#clip-bar', '#toast']) {
+      const regra = rules().find(r => r.selector === seletor)
+      expect(regra?.body, seletor).toContain('var(--md-sys-color-inverse-surface)')
+      expect(regra?.body, seletor).toMatch(/position:\s*fixed/)
+      expect(regra?.body, seletor).toMatch(/max-width\s*:/)
+    }
+  })
+
+  test('sem conexão vira faixa de erro no topo', () => {
+    const regra = rules().find(r => r.selector === '#offline')
+    expect(regra?.body).toContain('var(--md-sys-color-error-container)')
+  })
+
   test('há bloco prefers-reduced-motion que zera transições', () => {
     const tokens = readFileSync(join(WEB, 'tokens.css'), 'utf8')
     expect(tokens).toMatch(

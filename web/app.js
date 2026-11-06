@@ -1022,10 +1022,12 @@ function entryRow({ name, meta, onOpen, actions, isFile }) {
     main.type = 'button'
     main.addEventListener('click', onOpen)
   }
+  const glyph = isFile ? icon('description') : icon('folder')
+  glyph.classList.add('dir-icon')
   const text = el('span', 'dir-text')
   text.append(el('span', 'dir-label', name))
   if (meta) text.append(el('span', 'dir-meta', meta))
-  main.append(text)
+  main.append(glyph, text)
   li.append(main, ...actions)
   return li
 }
@@ -1040,7 +1042,8 @@ function renderFavorites(needle) {
       : 'nenhum favorito — abra uma pasta e toque na estrela.'
   for (const dir of favs) {
     const li = el('li', 'fav-chip')
-    const btn = el('button', 'fav-chip-btn', lastSegment(dir))
+    const btn = el('button', 'fav-chip-btn')
+    btn.append(icon('star-fill', 18), lastSegment(dir))
     btn.type = 'button'
     btn.title = tilde(dir)
     btn.setAttribute('aria-label', `Abrir ${tilde(dir)}`)
@@ -1063,7 +1066,12 @@ function renderHead() {
   }
   const parts = crumbs(browse.path, hubConfig.home)
   parts.forEach((part, i) => {
-    if (i > 0) browseCrumbs.append(el('span', 'crumb-sep', '›'))
+    if (i > 0) {
+      const sep = el('span', 'crumb-sep')
+      sep.setAttribute('aria-hidden', 'true')
+      sep.append(icon('chevron_right', 18))
+      browseCrumbs.append(sep)
+    }
     const last = i === parts.length - 1
     const btn = el('button', 'crumb', part.label)
     btn.type = 'button'
@@ -1115,7 +1123,8 @@ function renderSpawn() {
   }
 
   for (const f of files) {
-    const down = el('a', 'dir-action dir-download', '↓')
+    const down = el('a', 'dir-action dir-download')
+    down.append(icon('download'))
     down.href = `/_download?path=${encodeURIComponent(f.path)}`
     down.download = f.name
     down.setAttribute('aria-label', `Baixar ${f.name}`)
