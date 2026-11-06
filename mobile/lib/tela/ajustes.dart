@@ -3,7 +3,7 @@ import 'package:local_session/descoberta/candidatos.dart';
 
 const _nomeDoModo = {
   ModoRede.automatico: 'Automático',
-  ModoRede.apenasLan: 'Só rede local',
+  ModoRede.apenasLan: 'Só LAN',
   ModoRede.apenasVpn: 'Só VPN',
 };
 
@@ -88,27 +88,25 @@ class _AjustesState extends State<_Ajustes> {
           children: [
             Text('Por onde procurar', style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 12),
-            RadioGroup<ModoRede>(
-              groupValue: _modo,
-              onChanged: (escolhido) {
-                if (escolhido == null) return;
+            SegmentedButton<ModoRede>(
+              segments: [
+                for (final opcao in ModoRede.values)
+                  ButtonSegment(value: opcao, label: Text(_nomeDoModo[opcao]!)),
+              ],
+              selected: {_modo},
+              showSelectedIcon: true,
+              onSelectionChanged: (escolhidos) {
+                final escolhido = escolhidos.first;
                 setState(() => _modo = escolhido);
                 widget.aoTrocarModo(escolhido);
               },
-              child: Column(
-                children: [
-                  for (final opcao in ModoRede.values)
-                    RadioListTile<ModoRede>(
-                      value: opcao,
-                      contentPadding: EdgeInsets.zero,
-                      title: Text(_nomeDoModo[opcao]!),
-                      subtitle: Text(
-                        _explicacaoDoModo[opcao]!,
-                        style: const TextStyle(fontSize: 12),
-                      ),
-                    ),
-                ],
-              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              _explicacaoDoModo[_modo]!,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
             const Divider(height: 28),
             Text('Avisar com o app fechado', style: Theme.of(context).textTheme.titleMedium),

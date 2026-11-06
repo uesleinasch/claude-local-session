@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:local_session/tela/raiz.dart';
+import 'package:local_session/tema.dart';
 
 void main() => runApp(const AppLocalSession());
 
@@ -11,11 +12,7 @@ class AppLocalSession extends StatelessWidget {
     return MaterialApp(
       title: 'Local Session',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        colorSchemeSeed: const Color(0xFF7C5CFF),
-      ),
+      theme: temaDoApp(),
       home: const TelaRaiz(),
     );
   }

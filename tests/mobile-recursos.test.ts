@@ -77,3 +77,23 @@ describe('splash', () => {
     expect(existsSync(join(RES, 'drawable', 'splash_icone.xml'))).toBe(true)
   })
 })
+
+describe('design system no app', () => {
+  const MOBILE = join(import.meta.dir, '..', 'mobile')
+
+  test('splash usa o fundo do design system', () => {
+    expect(texto('values', 'cores.xml')).toContain('<color name="fundo_splash">#151311</color>')
+  })
+
+  test('pubspec declara a Inter nos três pesos, como asset local', () => {
+    const pubspec = readFileSync(join(MOBILE, 'pubspec.yaml'), 'utf8')
+    expect(pubspec).toContain('family: Inter')
+    for (const arquivo of ['Inter-Regular.ttf', 'Inter-Medium.ttf', 'Inter-SemiBold.ttf']) {
+      expect(pubspec).toContain(`assets/fonts/${arquivo}`)
+      expect(existsSync(join(MOBILE, 'assets', 'fonts', arquivo))).toBe(true)
+    }
+    expect(pubspec).toMatch(/weight:\s*500/)
+    expect(pubspec).toMatch(/weight:\s*600/)
+    expect(pubspec).not.toContain('google_fonts')
+  })
+})

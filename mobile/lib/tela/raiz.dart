@@ -281,12 +281,26 @@ class _SemHub extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const Icon(Icons.wifi_find_outlined, size: 48),
-              const SizedBox(height: 20),
+              Center(
+                child: Container(
+                  width: 96,
+                  height: 96,
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.errorContainer,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    Icons.wifi_find_outlined,
+                    size: 48,
+                    color: Theme.of(context).colorScheme.onErrorContainer,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
               Text(
                 'Não encontrei o hub',
                 textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.titleLarge,
+                style: Theme.of(context).textTheme.headlineSmall,
               ),
               const SizedBox(height: 12),
               // O hub responde 404 a quem não tem o token certo, então "fora do ar"
@@ -295,7 +309,6 @@ class _SemHub extends StatelessWidget {
                 'Ou a máquina está fora do ar, ou este aparelho não está na mesma '
                 'rede, ou o token mudou — nesse caso, escaneie o QR de novo.',
                 textAlign: TextAlign.center,
-                style: TextStyle(height: 1.4),
               ),
               if (modo != ModoRede.automatico) ...[
                 const SizedBox(height: 12),
