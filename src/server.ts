@@ -48,6 +48,8 @@ const mcp = new Server(
       'A tool `link` devolve o endereço da página. Use quando perguntarem como acessar.',
       '',
       'A página já mostra sozinha o que você está executando (ferramenta e alvo) — não precisa narrar cada passo por `reply`.',
+      '',
+      'Depois de responder por `reply`, não repita a resposta no terminal: encerre o turno com no máximo uma linha curta. A pessoa já leu tudo na página, e repetir só gasta token.',
     ].join('\n'),
   },
 )
