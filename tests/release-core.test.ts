@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test'
-import { conferirTag, jaPublicada, nomeDoApk, tagDaVersao, versaoDoPubspec } from '../src/release-core'
+import { conferirTag, jaPublicada, nomeDoApk, tagDaVersao, tagParaPublicar, versaoDoPubspec } from '../src/release-core'
 
 describe('versaoDoPubspec', () => {
   test('lê a versão ignorando o build number', () => {
@@ -58,11 +58,11 @@ describe('conferirTag', () => {
   const versoes = { plugin: '0.13.1', pacote: '0.13.1', app: '1.1.1' }
 
   test('tag do plugin que bate com plugin.json e package.json', () => {
-    expect(conferirTag('v0.13.1', versoes)).toEqual({ ok: true, alvo: 'plugin', versao: '0.13.1' })
+    expect(conferirTag('v0.13.1', versoes)).toEqual({ ok: true, alvo: 'plugin', versao: '0.13.1', prerelease: false })
   })
 
   test('tag do app que bate com o pubspec', () => {
-    expect(conferirTag('app-v1.1.1', versoes)).toEqual({ ok: true, alvo: 'app', versao: '1.1.1' })
+    expect(conferirTag('app-v1.1.1', versoes)).toEqual({ ok: true, alvo: 'app', versao: '1.1.1', prerelease: false })
   })
 
   test('versão divergente reprova e diz qual arquivo', () => {
@@ -77,9 +77,32 @@ describe('conferirTag', () => {
     if (!app.ok) expect(app.erro).toContain('pubspec.yaml')
   })
 
+  test('pre-release de Development confere com a versão base e sai marcada', () => {
+    expect(conferirTag('v0.13.1-rc.2', versoes)).toEqual({ ok: true, alvo: 'plugin', versao: '0.13.1', prerelease: true })
+    expect(conferirTag('app-v1.1.1-rc.1', versoes)).toEqual({ ok: true, alvo: 'app', versao: '1.1.1', prerelease: true })
+  })
+
+  test('pre-release de outra versão também reprova', () => {
+    expect(conferirTag('v0.13.2-rc.1', versoes).ok).toBe(false)
+    expect(conferirTag('app-v1.2.0-rc.1', versoes).ok).toBe(false)
+  })
+
   test('tag fora do padrão reprova', () => {
-    for (const t of ['0.13.1', 'v0.13', 'v0.13.1-rc1', 'app-1.1.1', 'refs/tags/v0.13.1', '']) {
+    for (const t of ['0.13.1', 'v0.13', 'v0.13.1-rc1', 'v0.13.1-rc.', 'v0.13.1-beta.1', 'v0.13.1-rc.x', 'app-1.1.1', 'refs/tags/v0.13.1', '']) {
       expect(conferirTag(t, versoes).ok).toBe(false)
     }
+  })
+})
+
+describe('tagParaPublicar', () => {
+  test('no CI publica sob a tag que disparou, inclusive a de pre-release', () => {
+    expect(tagParaPublicar('1.3.0', 'app-v1.3.0-rc.2')).toBe('app-v1.3.0-rc.2')
+    expect(tagParaPublicar('1.3.0', 'app-v1.3.0')).toBe('app-v1.3.0')
+  })
+
+  test('fora de uma tag do app, ou de outra versão, cai na tag da versão', () => {
+    expect(tagParaPublicar('1.3.0', undefined)).toBe('app-v1.3.0')
+    expect(tagParaPublicar('1.3.0', 'v0.16.0')).toBe('app-v1.3.0')
+    expect(tagParaPublicar('1.3.0', 'app-v1.2.0-rc.1')).toBe('app-v1.3.0')
   })
 })

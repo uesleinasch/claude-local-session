@@ -46,7 +46,29 @@ bun scripts/conferir-tag.ts v0.13.1              # a tag bate com o código?
 git tag -a v0.13.1 -m "título" -m "notas em markdown" && git push origin v0.13.1
 git tag -a app-v1.1.1 -m "app 1.1.1" && git push origin app-v1.1.1
 gh workflow run release -f tag=v0.13.1           # ensaio: tudo menos publicar
+git tag -a v0.13.1-rc.1 -m "rc" && git push origin v0.13.1-rc.1  # pre-release, em Development
 ```
+
+## Fluxo de branches
+
+Igual ao do TickTask. `Production` é o que está publicado, `Development` é a homologação e `main`
+fica só como backup do código, sem receber trabalho direto.
+
+- A cada task, crie a branch a partir de `Production` e faça commits granulares. Ao terminar, faça
+  push da branch.
+- **Para `Development`:** atualize `Development` com `Production` por rebase, abra o PR da task
+  para `Development`, faça o merge e crie a tag de pre-release (`v<x.y.z>-rc.N`,
+  `app-v<x.y.z>-rc.N`) no commit mesclado. Ela publica como pre-release, nunca como latest.
+- **Para `Production`:** crie `release/v<x.y.z>` a partir de `Production`, abra o PR da task para
+  a release (squash) e depois o da release para `Production` (merge). Crie a tag de produção no
+  commit mesclado em `Production`, apague a branch da task e a da release e sincronize
+  `Development` com `Production` por rebase.
+- **Nunca** contamine `Production` com itens de `Development`: só entra em produção o que passa
+  por `release/*` e por PR.
+
+`conferirTag` (`src/release-core.ts`) aceita `x.y.z` e `x.y.z-rc.N` contra a mesma versão dos
+manifestos; o `-rc` só muda o canal (`--prerelease --latest=false`). Uma pre-release marcada como
+latest tiraria o `.deb` de produção do `/releases/latest`, que é de onde o README manda baixar.
 
 ## Um ponto de entrada, oito subcomandos
 
@@ -430,6 +452,13 @@ em canvas, repete os hex em `web/terminal-panel.js`. Mudar uma cor é mudar os t
 - Confirmação visual/comportamental na página é do usuário: peça para ele validar no navegador.
 
 ## Onde ler mais
+
+Open source sob MIT: `CONTRIBUTING.md`, `SECURITY.md` e `CODE_OF_CONDUCT.md` na raiz, templates
+de issue e PR em `.github/`. A página do projeto (GitHub Pages) é o `site/`, estático, publicado
+pelo workflow `pages` a cada push em `Production` que toque nele. O workflow copia a fonte de
+`web/fonts/` e o ícone de `desktop/icon.svg` em vez de manter cópias, e as cores de
+`site/style.css` repetem as de `web/tokens.css`. O `ci` roda `bun test`, `tsc` e os testes do
+app em todo PR para `Development` e `Production`.
 
 `README.md` cobre instalação, uso e diagnóstico com detalhe; `ROADMAP.md` diz o que vem e por
 quê (inclusive o que foi descartado); `docs/superpowers/specs/2026-08-07-*.md` tem o design

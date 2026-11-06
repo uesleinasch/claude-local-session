@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local Session — suas sessões do Claude Code no celular</title>
+  <meta name="description" content="Plugin do Claude Code que põe cada sessão numa página da sua rede local: mande prompts, acompanhe a atividade e aprove permissões pelo celular.">
+  <meta name="theme-color" content="#151311">
+  <meta property="og:title" content="Local Session">
+  <meta property="og:description" content="Suas sessões do Claude Code no celular: prompts, atividade e aprovação de permissões pela rede local.">
+  <meta property="og:type" content="website">
+  <link rel="icon" href="icon.svg" type="image/svg+xml">
+  <link rel="preload" href="inter-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+
+  <header class="topo">
+    <div class="largura topo-linha">
+      <a class="marca" href="./">
+        <img src="icon.svg" width="32" height="32" alt="">
+        <span>Local Session</span>
+      </a>
+      <nav aria-label="Seções" class="topo-nav">
+        <a href="#recursos">Recursos</a>
+        <a href="#instalar">Instalar</a>
+        <a href="#english" lang="en">English</a>
+        <a class="botao botao-contorno" href="https://github.com/uesleinasch/claude-local-session">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="conteudo">
+    <section class="heroi largura">
+      <div class="heroi-texto">
+        <p class="rotulo">Plugin open source para o Claude Code</p>
+        <h1>Suas sessões do Claude Code no celular.</h1>
+        <p class="lead">
+          Cada sessão vira uma página na sua rede local. Mande prompts, acompanhe o que o Claude
+          está executando, responda às perguntas dele e aprove ou negue comandos, sem voltar para
+          o computador.
+        </p>
+        <div class="acoes">
+          <a class="botao botao-cheio" href="https://github.com/uesleinasch/claude-local-session/releases/latest">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 -960 960 960"><path d="M480-313 287-506l43-43 120 120v-371h60v371l120-120 43 43-193 193ZM220-160q-24 0-42-18t-18-42v-143h60v143h520v-143h60v143q0 24-18 42t-42 18H220Z"/></svg>
+            Baixar a última versão
+          </a>
+          <a class="botao botao-tonal" href="#instalar">Como instalar</a>
+        </div>
+        <p class="nota">Linux (.deb ou instalador) · app Android opcional · licença MIT</p>
+      </div>
+
+      <figure class="celular" aria-label="Exemplo da lista de sessões no celular">
+        <div class="tela">
+          <div class="tela-barra">
+            <img src="icon.svg" width="24" height="24" alt="">
+            <span>Local Session</span>
+          </div>
+          <div class="tela-abas"><span class="ativa">sessões · 3</span><span>abrir pasta</span></div>
+          <p class="tela-grupo">esperando você</p>
+          <div class="sessao" data-tom="espera">
+            <span class="avatar"><svg aria-hidden="true" width="18" height="18" viewBox="0 -960 960 960"><path d="M480-81q-140-35-230-162.5T160-523v-238l320-120 320 120v238q0 152-90 279.5T480-81Zm0-62q115-38 187.5-143.5T740-523v-196l-260-98-260 98v196q0 131 72.5 236.5T480-143Z"/></svg></span>
+            <span class="sessao-texto"><b>escola60</b><span class="estado">permissão · Bash: bun run migrate</span></span>
+          </div>
+          <div class="sessao-acoes"><span class="mini contorno">negar</span><span class="mini cheio">permitir</span></div>
+          <p class="tela-grupo">ativas</p>
+          <div class="sessao" data-tom="trabalhando">
+            <span class="avatar"><svg aria-hidden="true" width="18" height="18" viewBox="0 -960 960 960"><path d="m393-165 279-335H492l36-286-253 366h154l-36 255Zm-73 85 40-280H160l360-520h80l-40 320h240L400-80h-80Z"/></svg></span>
+            <span class="sessao-texto"><b>claude-local-session</b><span class="estado">trabalhando · Edit hub.ts</span><span class="trilho"><span style="width:42%"></span></span></span>
+          </div>
+          <div class="sessao">
+            <span class="avatar"><svg aria-hidden="true" width="18" height="18" viewBox="0 -960 960 960"><path d="m627-287 45-45-159-160v-201h-60v225l174 181ZM480-80q-82 0-155-31.5t-127.5-86Q143-252 111.5-325T80-480q0-82 31.5-155t86-127.5Q252-817 325-848.5T480-880q82 0 155 31.5t127.5 86Q817-708 848.5-635T880-480q0 82-31.5 155t-86 127.5Q708-143 635-111.5T480-80Z"/></svg></span>
+            <span class="sessao-texto"><b>teleprompter-show</b><span class="estado">ociosa há 12 min</span></span>
+          </div>
+          <span class="fab">+ nova sessão</span>
+        </div>
+      </figure>
+    </section>
+
+    <section id="recursos" class="largura secao">
+      <h2>O que dá para fazer pelo celular</h2>
+      <ul class="grade">
+        <li class="cartao">
+          <h3>Conversar com a sessão</h3>
+          <p>Mande prompts para qualquer sessão aberta e leia as respostas em markdown. O que você digita no terminal também aparece, então dá para começar no computador e continuar no celular.</p>
+        </li>
+        <li class="cartao">
+          <h3>Aprovar com contexto</h3>
+          <p>Os pedidos de permissão chegam com a operação inteira: o comando, o diff ou o arquivo. Você permite ou nega de onde estiver, e o auto mode aprova sozinho quando você confia na tarefa.</p>
+        </li>
+        <li class="cartao">
+          <h3>Responder perguntas</h3>
+          <p>Quando o Claude pergunta, as opções aparecem como cartão na página. A resposta volta para a sessão como se você tivesse digitado.</p>
+        </li>
+        <li class="cartao">
+          <h3>Ver o que está rodando</h3>
+          <p>Uma régua mostra cada ferramenta e o alvo, enquanto roda. Ao lado ficam o uso da janela de contexto e o modelo ativo.</p>
+        </li>
+        <li class="cartao">
+          <h3>Abrir sessão nova</h3>
+          <p>Navegue pelas pastas, marque favoritas, copie, baixe arquivos e inicie uma sessão do Claude no projeto que quiser.</p>
+        </li>
+        <li class="cartao">
+          <h3>Terminal de verdade</h3>
+          <p>Um shell no diretório do projeto, pelo navegador. Ele roda num tmux, então sobrevive se a página ou o hub caírem.</p>
+        </li>
+        <li class="cartao">
+          <h3>Avisos e fotos</h3>
+          <p>Notificações pelo ntfy quando uma sessão pede você ou termina. Também dá para mandar foto da câmera direto para o prompt.</p>
+        </li>
+        <li class="cartao">
+          <h3>De qualquer lugar</h3>
+          <p>Funciona na rede local e, com o Tailscale, de qualquer lugar. O app Android acha o hub sozinho depois de parear uma vez pelo QR code.</p>
+        </li>
+      </ul>
+    </section>
+
+    <section class="largura secao duas">
+      <div>
+        <h2>Como funciona</h2>
+        <p>
+          Um <strong>hub</strong> roda na sua máquina e atende a página na porta 7777. Cada sessão
+          do Claude Code se conecta a ele por um servidor MCP do plugin, e os hooks contam ao hub
+          o que está acontecendo. O canal oficial do Claude Code leva os seus prompts até o modelo.
+        </p>
+        <p>
+          Nada sai da sua rede: não há servidor na nuvem nem conta para criar. Quem tem o link com
+          o token entra; sem o token, o hub responde 404, como se não existisse.
+        </p>
+      </div>
+      <pre class="diagrama" aria-label="Diagrama: o navegador fala com o hub, que fala com cada sessão do Claude Code"><code>navegador (celular / notebook)
+        │  HTTP + WebSocket :7777
+        ▼
+┌───────────────────────────────┐
+│  hub — um por máquina         │
+└───────────────────────────────┘
+   ▲ MCP        ▲ MCP      ▲ hooks
+ sessão A     sessão B    atividade
+   ▲            ▲
+Claude Code  Claude Code</code></pre>
+    </section>
+
+    <section id="instalar" class="largura secao">
+      <h2>Instalar</h2>
+      <ol class="passos">
+        <li>
+          <h3>Baixe e instale o pacote</h3>
+          <p>No Debian ou no Ubuntu, pegue o <code>.deb</code> da <a href="https://github.com/uesleinasch/claude-local-session/releases/latest">última release</a>:</p>
+          <pre><code>gh release download --repo uesleinasch/claude-local-session --pattern '*.deb'
+sudo apt install ./local-session_*_amd64.deb</code></pre>
+        </li>
+        <li>
+          <h3>Configure a sua conta</h3>
+          <p>Registra o plugin no Claude Code, liga o canal e sobe o serviço do hub:</p>
+          <pre><code>local-session setup</code></pre>
+        </li>
+        <li>
+          <h3>Abra o link no celular</h3>
+          <p>Inicie o <code>claude</code> num projeto e abra o link com o token. Ele aparece na janela do Local Session, no menu de aplicativos, junto com um QR code.</p>
+        </li>
+      </ol>
+      <p class="nota">Em outra distribuição Linux, use o <a href="https://github.com/uesleinasch/claude-local-session#pelo-instalador-qualquer-linux">instalador</a>. O app Android sai em cada release como <code>.apk</code>.</p>
+    </section>
+
+    <section class="largura secao aviso">
+      <h2>Segurança, sem rodeio</h2>
+      <p>
+        A página aprova comandos <code>Bash</code>, então o link vale tanto quanto uma senha. Toda
+        requisição exige o token, os caminhos são conferidos contra a sua home e as pastas
+        permitidas, e as teclas enviadas ao terminal passam por uma lista fechada. O tráfego na
+        rede local é HTTP: para usar de fora, use a tailnet. Os detalhes estão no
+        <a href="https://github.com/uesleinasch/claude-local-session/blob/Production/SECURITY.md">SECURITY.md</a>.
+      </p>
+    </section>
+
+    <section id="english" class="largura secao" lang="en">
+      <h2>In English</h2>
+      <p>
+        <strong>Local Session</strong> is a Claude Code plugin that puts every session on a web page in
+        your local network. From your phone you can send prompts, follow what each session is running,
+        answer its questions and approve or deny permission requests. It ships as a Linux package with
+        a tray app, plus an optional Android client, and works over Tailscale when you are away. The
+        project is written and documented in Brazilian Portuguese, but issues and pull requests in
+        English are welcome. MIT licensed.
+      </p>
+    </section>
+  </main>
+
+  <footer class="rodape">
+    <div class="largura rodape-linha">
+      <p>© 2026 Ueslei Nascimento · <a href="https://github.com/uesleinasch/claude-local-session/blob/Production/LICENSE">licença MIT</a></p>
+      <p>Projeto independente, sem afiliação com a Anthropic. "Claude" e "Claude Code" são marcas da Anthropic.</p>
+    </div>
+  </footer>
+</body>
+</html>

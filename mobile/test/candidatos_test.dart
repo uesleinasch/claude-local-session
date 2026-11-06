@@ -56,7 +56,7 @@ void main() {
   group('rotuloDoHost', () {
     /// Mesma faixa CGNAT que `isCgnat` reconhece em `src/config.ts`.
     test('endereço da tailnet é VPN', () {
-      expect(rotuloDoHost('100.113.47.75'), Rotulo.vpn);
+      expect(rotuloDoHost('100.101.102.103'), Rotulo.vpn);
       expect(rotuloDoHost('estacao.tailnet.ts.net'), Rotulo.vpn);
     });
 

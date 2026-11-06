@@ -1,0 +1,570 @@
+@font-face {
+  font-family: "Inter";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 100 900;
+  src: url("inter-latin-opsz-normal.woff2") format("woff2");
+}
+
+/* Os mesmos valores de web/tokens.css: a página do projeto tem a cara do app. */
+:root {
+  --primary: #ffc77f;
+  --on-primary: #462b00;
+  --primary-container: #f5a524;
+  --secondary-container: #624315;
+  --on-secondary-container: #ffddb4;
+  --tertiary: #9ad9ff;
+  --tertiary-container: #36c2ff;
+  --on-tertiary-container: #004d69;
+  --surface: #151311;
+  --lowest: #100e0c;
+  --low: #1e1b19;
+  --high: #2c2927;
+  --highest: #373432;
+  --busy: #643f00;
+  --on-surface: #e8e1dd;
+  --on-surface-variant: #cec5bd;
+  --outline: #978f88;
+  --outline-variant: #4b4640;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  color-scheme: dark;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--on-surface);
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 1rem;
+  line-height: 1.5;
+  font-feature-settings: "liga" 1, "calt" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--primary);
+}
+
+a:focus-visible,
+.botao:focus-visible {
+  outline: 3px solid var(--primary);
+  outline-offset: 2px;
+}
+
+code,
+pre {
+  font-family: var(--mono);
+}
+
+code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--high);
+  font-size: 0.875em;
+}
+
+pre {
+  margin: 12px 0 0;
+  padding: 16px;
+  border-radius: 8px;
+  background: var(--lowest);
+  overflow-x: auto;
+  font-size: 0.875rem;
+  line-height: 1.5rem;
+}
+
+pre code {
+  padding: 0;
+  background: none;
+  font-size: inherit;
+}
+
+.largura {
+  width: min(100% - 32px, 1120px);
+  margin-inline: auto;
+}
+
+.pular {
+  position: absolute;
+  left: -9999px;
+}
+
+.pular:focus {
+  left: 16px;
+  top: 16px;
+  z-index: 10;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+/* ---------- topo ---------- */
+
+.topo {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--outline-variant);
+}
+
+.topo-linha {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 64px;
+}
+
+.marca {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--on-surface);
+  font-size: 1.125rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.topo-nav {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.topo-nav a:not(.botao) {
+  color: var(--on-surface-variant);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.topo-nav a:not(.botao):hover {
+  color: var(--on-surface);
+}
+
+/* ---------- botões ---------- */
+
+.botao {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 24px;
+  border-radius: 9999px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.botao svg {
+  fill: currentColor;
+}
+
+.botao-cheio {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.botao-tonal {
+  background: var(--secondary-container);
+  color: var(--on-secondary-container);
+}
+
+.botao-contorno {
+  border: 1px solid var(--outline);
+  color: var(--primary);
+}
+
+.botao-cheio:hover {
+  background: color-mix(in srgb, var(--on-primary) 8%, var(--primary));
+}
+
+/* ---------- herói ---------- */
+
+.heroi {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  align-items: center;
+  gap: 48px;
+  padding-block: 72px 48px;
+}
+
+.rotulo {
+  margin: 0 0 12px;
+  color: var(--tertiary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2rem, 5vw, 3.25rem);
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.lead {
+  margin: 20px 0 0;
+  max-width: 60ch;
+  color: var(--on-surface-variant);
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+
+.acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 32px;
+}
+
+.nota {
+  margin: 16px 0 0;
+  color: var(--on-surface-variant);
+  font-size: 0.875rem;
+}
+
+/* ---------- celular de exemplo ---------- */
+
+.celular {
+  margin: 0;
+  justify-self: center;
+  width: min(100%, 340px);
+  padding: 12px;
+  border-radius: 40px;
+  background: var(--lowest);
+  box-shadow: 0 0 0 1px var(--outline-variant), 0 24px 64px rgb(0 0 0 / 0.5);
+}
+
+.tela {
+  position: relative;
+  min-height: 560px;
+  padding-bottom: 72px;
+  border-radius: 30px;
+  background: var(--surface);
+  overflow: hidden;
+  font-size: 0.875rem;
+}
+
+.tela-barra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 16px 12px;
+  font-size: 1.125rem;
+  font-weight: 500;
+}
+
+.tela-abas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--outline-variant);
+  color: var(--on-surface-variant);
+  font-weight: 500;
+  text-align: center;
+}
+
+.tela-abas span {
+  padding: 10px 0 12px;
+}
+
+.tela-abas .ativa {
+  color: var(--primary);
+  box-shadow: inset 0 -3px 0 var(--primary);
+}
+
+.tela-grupo {
+  margin: 0;
+  padding: 16px 16px 6px;
+  color: var(--on-surface-variant);
+  font-weight: 500;
+}
+
+.sessao {
+  display: flex;
+  gap: 12px;
+  padding: 8px 16px;
+}
+
+.avatar {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  background: var(--highest);
+  color: var(--on-surface-variant);
+}
+
+.avatar svg {
+  fill: currentColor;
+}
+
+.sessao[data-tom="espera"] .avatar {
+  background: var(--tertiary-container);
+  color: var(--on-tertiary-container);
+}
+
+.sessao[data-tom="trabalhando"] .avatar {
+  background: var(--busy);
+  color: var(--primary);
+  box-shadow: inset 0 0 0 3px var(--primary);
+}
+
+.sessao-texto {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.sessao-texto b {
+  font-weight: 500;
+  font-size: 0.9375rem;
+}
+
+.estado {
+  color: var(--on-surface-variant);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sessao[data-tom="espera"] .estado {
+  color: var(--tertiary);
+}
+
+.sessao[data-tom="trabalhando"] .estado {
+  color: var(--primary);
+}
+
+.trilho {
+  display: flex;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 9999px;
+  background: var(--highest);
+  overflow: hidden;
+}
+
+.trilho span {
+  background: var(--primary);
+}
+
+.sessao-acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 2px 16px 8px 64px;
+}
+
+.mini {
+  padding: 6px 16px;
+  border-radius: 9999px;
+  font-weight: 600;
+  font-size: 0.8125rem;
+}
+
+.mini.contorno {
+  border: 1px solid var(--outline);
+}
+
+.mini.cheio {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
+.fab {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  padding: 14px 20px;
+  border-radius: 16px;
+  background: var(--primary-container);
+  color: var(--on-primary);
+  font-weight: 600;
+  box-shadow: 0 3px 6px rgb(0 0 0 / 0.35);
+}
+
+/* ---------- seções ---------- */
+
+.secao {
+  padding-block: 48px;
+}
+
+h2 {
+  margin: 0 0 24px;
+  font-size: clamp(1.5rem, 3vw, 2rem);
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+h3 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 600;
+}
+
+.secao p {
+  max-width: 72ch;
+}
+
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cartao {
+  padding: 20px;
+  border-radius: 12px;
+  background: var(--low);
+  border: 1px solid var(--outline-variant);
+}
+
+.cartao p {
+  margin: 8px 0 0;
+  color: var(--on-surface-variant);
+  font-size: 0.9375rem;
+}
+
+.duas {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+}
+
+.duas p {
+  color: var(--on-surface-variant);
+}
+
+.diagrama {
+  margin: 0;
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+  color: var(--on-surface-variant);
+}
+
+.passos {
+  display: grid;
+  gap: 24px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: passo;
+}
+
+.passos li {
+  position: relative;
+  padding: 20px 20px 20px 72px;
+  border-radius: 12px;
+  background: var(--low);
+  counter-increment: passo;
+}
+
+.passos li::before {
+  content: counter(passo);
+  position: absolute;
+  left: 20px;
+  top: 18px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 9999px;
+  background: var(--secondary-container);
+  color: var(--on-secondary-container);
+  font-weight: 600;
+}
+
+.passos p {
+  margin: 8px 0 0;
+  color: var(--on-surface-variant);
+}
+
+.aviso {
+  border-radius: 12px;
+  background: var(--low);
+  border: 1px solid var(--outline-variant);
+  padding: 32px;
+  margin-block: 24px;
+}
+
+.aviso p {
+  margin: 0;
+  color: var(--on-surface-variant);
+}
+
+/* ---------- rodapé ---------- */
+
+.rodape {
+  margin-top: 48px;
+  border-top: 1px solid var(--outline-variant);
+}
+
+.rodape-linha {
+  padding-block: 24px 40px;
+  color: var(--on-surface-variant);
+  font-size: 0.875rem;
+}
+
+.rodape-linha p {
+  margin: 4px 0;
+}
+
+/* ---------- celular e tablet ---------- */
+
+@media (max-width: 840px) {
+  .heroi,
+  .duas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .heroi {
+    padding-top: 40px;
+  }
+}
+
+@media (max-width: 600px) {
+  .topo-nav a:not(.botao) {
+    display: none;
+  }
+
+  .passos li {
+    padding: 64px 16px 16px;
+  }
+
+  .passos li::before {
+    left: 16px;
+    top: 16px;
+  }
+
+  .aviso {
+    padding: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
