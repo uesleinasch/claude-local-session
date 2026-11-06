@@ -2,6 +2,13 @@
   "name": "claude-local-session",
   "version": "0.15.0",
   "private": true,
+  "license": "MIT",
+  "author": "Ueslei Nascimento",
+  "homepage": "https://uesleinasch.github.io/claude-local-session/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/uesleinasch/claude-local-session.git"
+  },
   "type": "module",
   "scripts": {
     "start": "bun src/cli.ts mcp",
