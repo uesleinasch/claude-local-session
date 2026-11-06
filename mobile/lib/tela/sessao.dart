@@ -62,18 +62,6 @@ class _TelaSessaoState extends State<TelaSessao> {
       canPop: false,
       onPopInvokedWithResult: (jaSaiu, _) => _voltar(jaSaiu),
       child: Scaffold(
-        appBar: AppBar(
-          toolbarHeight: 38,
-          title: Text(widget.host, style: const TextStyle(fontSize: 13)),
-          actions: [
-            IconButton(
-              iconSize: 20,
-              onPressed: widget.aoAbrirAjustes,
-              icon: const Icon(Icons.settings_outlined),
-              tooltip: 'Ajustes',
-            ),
-          ],
-        ),
         body: SafeArea(
           child: InAppWebView(
             initialUrlRequest: URLRequest(url: WebUri(widget.url)),
@@ -92,6 +80,10 @@ class _TelaSessaoState extends State<TelaSessao> {
             onWebViewCreated: (controle) {
               _controle = controle;
               widget.ponte.ligar(controle);
+              controle.addJavaScriptHandler(
+                handlerName: 'abrirAjustes',
+                callback: (_) => widget.aoAbrirAjustes(),
+              );
             },
             // A ponte JS nasce no fim de app.js: antes do load, entregar
             // compartilhamento cairia no vazio.

@@ -179,6 +179,15 @@ describe('atributo hidden versus display por id', () => {
     expect(regra?.body).toContain('var(--md-sys-color-error-container)')
   })
 
+  test('abrir pasta tem cabeçalho próprio: some aba e ícone, aparece o voltar', () => {
+    const some = rules().find(r => r.selector.split(',').some(x => x.trim() === '#app[data-pane="browse"] #tabs'))
+    expect(some?.body).toMatch(/display:\s*none/)
+    const volta = rules().find(r =>
+      r.selector.split(',').some(x => x.trim() === '#app[data-view="sessions"][data-pane="browse"] #back'),
+    )
+    expect(volta?.body).toMatch(/display:\s*grid/)
+  })
+
   test('há bloco prefers-reduced-motion que zera transições', () => {
     const tokens = readFileSync(join(WEB, 'tokens.css'), 'utf8')
     expect(tokens).toMatch(
