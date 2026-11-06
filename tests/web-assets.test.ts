@@ -6,7 +6,7 @@ import { assetPath, EMBEDDED_FILES } from '../src/web-assets'
 const WEB = join(import.meta.dir, '..', 'web')
 
 /** Arquivo de `web/` que o hub não serve por rota própria. */
-const NAO_SERVIDOS = new Set(['vendor/LICENSE'])
+const NAO_SERVIDOS = new Set(['vendor/LICENSE', 'fonts/OFL.txt'])
 
 function arquivosDeWeb(dir = WEB, prefixo = ''): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap(entry => {

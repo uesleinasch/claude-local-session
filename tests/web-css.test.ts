@@ -130,6 +130,13 @@ describe('atributo hidden versus display por id', () => {
     expect(desprotegidos).toEqual([])
   })
 
+  test('há bloco prefers-reduced-motion que zera transições', () => {
+    const tokens = readFileSync(join(WEB, 'tokens.css'), 'utf8')
+    expect(tokens).toMatch(
+      /@media\s*\(prefers-reduced-motion:\s*reduce\)\s*\{[^@]*transition-duration:\s*0/,
+    )
+  })
+
   test('o teste enxerga o html e o css de verdade', () => {
     expect(idsWithHiddenAttribute().length).toBeGreaterThan(0)
     expect(idsWhoseRuleSetsDisplay().size).toBeGreaterThan(0)

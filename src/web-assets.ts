@@ -2,11 +2,13 @@ import { join } from 'node:path'
 import appJs from '../web/app.js' with { type: 'file' }
 import browseCoreJs from '../web/browse-core.js' with { type: 'file' }
 import connectionJs from '../web/connection.js' with { type: 'file' }
+import interWoff2 from '../web/fonts/inter-latin-opsz-normal.woff2' with { type: 'file' }
 import indexHtml from '../web/index.html' with { type: 'file' }
 import markdownJs from '../web/markdown.js' with { type: 'file' }
 import sessionStatusJs from '../web/session-status.js' with { type: 'file' }
 import styleCss from '../web/style.css' with { type: 'file' }
 import terminalPanelJs from '../web/terminal-panel.js' with { type: 'file' }
+import tokensCss from '../web/tokens.css' with { type: 'file' }
 import addonFitJs from '../web/vendor/addon-fit.js' with { type: 'file' }
 import xtermCss from '../web/vendor/xterm.css' with { type: 'file' }
 import xtermJs from '../web/vendor/xterm.js' with { type: 'file' }
@@ -27,6 +29,8 @@ const EMBEDDED: Record<string, string> = {
   'session-status.js': sessionStatusJs,
   'terminal-panel.js': terminalPanelJs,
   'style.css': styleCss,
+  'tokens.css': tokensCss,
+  'fonts/inter-latin-opsz-normal.woff2': interWoff2,
   'vendor/xterm.js': xtermJs,
   'vendor/addon-fit.js': addonFitJs,
   'vendor/xterm.css': xtermCss,

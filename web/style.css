@@ -1,63 +1,66 @@
+/* Apelidos dos tokens de tokens.css: o resto do arquivo ainda usa estes nomes. */
 :root {
-  --bg: #0e0f11;
-  --sunken: #111315;
-  --surface: #141618;
-  --control: #17191c;
-  --raise: #191c1f;
-  --active: #26292e;
+  --bg: var(--md-sys-color-surface);
+  --sunken: var(--md-sys-color-surface-container-lowest);
+  --surface: var(--md-sys-color-surface-container-low);
+  --control: var(--md-sys-color-surface-container);
+  --raise: var(--md-sys-color-surface-container-high);
+  --active: var(--md-sys-color-surface-container-highest);
 
-  --line-faint: #1c1f23;
-  --line: #212429;
-  --line-strong: #2a2e33;
-  --line-contrast: #35393f;
+  --line-faint: var(--md-sys-color-surface-container-highest);
+  --line: var(--md-sys-color-outline-variant);
+  --line-strong: var(--md-sys-color-outline);
+  --line-contrast: var(--md-sys-color-outline);
 
-  --ink: #e6e8ea;
-  --ink-body: #dfe2e5;
-  --ink-2: #c2c7cc;
-  --ink-3: #8b9199;
-  --ink-4: #71767d;
-  --ink-5: #5d6268;
+  --ink: var(--md-sys-color-on-surface);
+  --ink-body: var(--md-sys-color-on-surface);
+  --ink-2: var(--md-sys-color-on-surface-variant);
+  --ink-3: var(--md-sys-color-on-surface-variant);
+  --ink-4: var(--md-sys-color-outline);
+  --ink-5: var(--md-sys-color-outline);
 
-  --amber: #f5a524;
-  --amber-lift: #ffc35c;
-  --amber-tint: #3a2c12;
-  --green: #4ade80;
-  --green-tint: #12301d;
-  --red: #f87171;
-  --red-tint: #2a1417;
+  --amber: var(--md-sys-color-primary);
+  --amber-lift: var(--md-sys-color-primary-container);
+  --amber-tint: var(--md-sys-color-secondary-container);
+  --on-amber: var(--md-sys-color-on-primary);
+  --green: var(--ls-color-success);
+  --green-tint: var(--ls-color-success-container);
+  --red: var(--md-sys-color-error);
+  --red-tint: var(--md-sys-color-error-container);
+  --on-red: var(--md-sys-color-on-error);
 
-  --sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --sans: var(--md-sys-typescale-font);
+  --mono: var(--md-sys-typescale-mono);
 
-  --fs-display: 1.625rem;
-  --fs-title: 1.25rem;
-  --fs-lead: 1.0625rem;
-  --fs-base: 1rem;
-  --fs-body: 0.9375rem;
-  --fs-sm: 0.875rem;
-  --fs-xs: 0.8125rem;
-  --fs-2xs: 0.75rem;
-  --fs-3xs: 0.6875rem;
+  --fs-display: var(--md-sys-typescale-headline-small-size);
+  --fs-title: var(--md-sys-typescale-title-large-size);
+  --fs-lead: var(--md-sys-typescale-body-large-size);
+  --fs-base: var(--md-sys-typescale-body-large-size);
+  --fs-body: var(--md-sys-typescale-body-large-size);
+  --fs-sm: var(--md-sys-typescale-body-medium-size);
+  --fs-xs: var(--md-sys-typescale-body-medium-size);
+  --fs-2xs: var(--md-sys-typescale-body-small-size);
+  --fs-3xs: var(--md-sys-typescale-label-small-size);
 
   --sp-2: 2px;
   --sp-4: 4px;
-  --sp-6: 6px;
+  --sp-6: 8px;
   --sp-8: 8px;
-  --sp-10: 10px;
+  --sp-10: 12px;
   --sp-12: 12px;
-  --sp-14: 14px;
+  --sp-14: 16px;
   --sp-16: 16px;
   --sp-20: 20px;
   --sp-24: 24px;
 
-  --r-xs: 6px;
-  --r-sm: 9px;
-  --r-md: 12px;
-  --r-lg: 16px;
-  --r-xl: 24px;
-  --r-pill: 999px;
+  --r-xs: var(--md-sys-shape-corner-small);
+  --r-sm: var(--md-sys-shape-corner-small);
+  --r-md: var(--md-sys-shape-corner-medium);
+  --r-lg: var(--md-sys-shape-corner-large);
+  --r-xl: var(--md-sys-shape-corner-extra-large);
+  --r-pill: var(--md-sys-shape-corner-full);
 
-  --tap: 44px;
+  --tap: 48px;
 
   color-scheme: dark;
 }
@@ -78,6 +81,7 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: var(--sans);
+  font-feature-settings: "liga" 1, "calt" 1;
   font-size: var(--fs-body);
   line-height: 1.5;
   -webkit-text-size-adjust: 100%;
@@ -657,7 +661,7 @@ body {
   scroll-snap-type: x proximity;
   scroll-padding: 0 var(--sp-16);
   scrollbar-width: none;
-  mask-image: linear-gradient(to right, #000 calc(100% - var(--sp-24)), transparent);
+  mask-image: linear-gradient(to right, black calc(100% - var(--sp-24)), transparent);
 }
 
 #spawn-list::-webkit-scrollbar {
@@ -791,7 +795,7 @@ body {
   border: 0;
   border-radius: var(--r-sm);
   background: var(--amber);
-  color: #0a0b0c;
+  color: var(--on-amber);
   font: inherit;
   font-size: var(--fs-sm);
   font-weight: 600;
@@ -1071,7 +1075,7 @@ body {
   height: 22px;
   border-radius: 7px;
   background: var(--amber);
-  color: #0a0b0c;
+  color: var(--on-amber);
   font-size: var(--fs-3xs);
   font-weight: 700;
 }
@@ -1137,7 +1141,7 @@ body {
   padding: var(--sp-10) var(--sp-12);
   border: 1px solid var(--line-faint);
   border-radius: var(--r-sm);
-  background: #0f1113;
+  background: var(--sunken);
   min-width: 0;
   overflow-x: auto;
   font-family: var(--mono);
@@ -1334,7 +1338,7 @@ body {
   max-height: 16lh;
   padding: var(--sp-10) var(--sp-12);
   border-radius: var(--r-sm);
-  background: #0f1113;
+  background: var(--sunken);
   overflow: auto;
   font-family: var(--mono);
   font-size: 0.72rem;
@@ -1377,7 +1381,7 @@ body {
 .perm-allow {
   border: 0;
   background: var(--amber);
-  color: #0a0b0c;
+  color: var(--on-amber);
   font-weight: 600;
 }
 
@@ -1528,7 +1532,7 @@ body {
   border: 0;
   border-radius: var(--r-md);
   background: var(--amber);
-  color: #0a0b0c;
+  color: var(--on-amber);
   font: inherit;
   font-size: var(--fs-body);
   font-weight: 600;
@@ -1691,7 +1695,7 @@ body {
   border: 0;
   border-radius: var(--r-md);
   background: var(--amber);
-  color: #0a0b0c;
+  color: var(--on-amber);
   font: inherit;
   font-size: var(--fs-lead);
   font-weight: 700;
@@ -1747,7 +1751,7 @@ body {
 }
 
 .menu-item:active {
-  background: #22262a;
+  background: var(--active);
 }
 
 .menu-icon {
@@ -2047,7 +2051,7 @@ body {
   margin: 0 var(--sp-12) var(--sp-14);
   border: 1px solid var(--line-faint);
   border-radius: var(--r-md);
-  background: #0f1113;
+  background: var(--sunken);
   min-width: 0;
   overflow: auto;
   font-family: var(--mono);
@@ -2198,7 +2202,7 @@ body {
 }
 
 .term-key:active {
-  color: #0a0b0c;
+  color: var(--on-amber);
   background: var(--amber);
   border-color: var(--amber);
 }
@@ -2238,7 +2242,7 @@ body {
 }
 
 #term-send:active {
-  color: #0a0b0c;
+  color: var(--on-amber);
   background: var(--amber);
   border-color: var(--amber);
 }
@@ -2264,7 +2268,7 @@ body {
   max-width: min(92vw, 60ch);
   border-radius: var(--r-sm);
   background: var(--amber);
-  color: #0a0b0c;
+  color: var(--on-amber);
   font-size: var(--fs-xs);
   font-weight: 600;
   text-align: center;
@@ -2294,7 +2298,7 @@ body {
   max-width: min(90vw, 60ch);
   border-radius: var(--r-sm);
   background: var(--red);
-  color: #0a0b0c;
+  color: var(--on-red);
   font-size: var(--fs-xs);
   font-weight: 600;
   text-align: center;
@@ -2373,7 +2377,7 @@ body {
   }
 
   .menu-item:hover {
-    background: #22262a;
+    background: var(--active);
   }
 
   .menu-danger:hover {
