@@ -19,11 +19,12 @@ const CONTROL_KEYS = [
   { label: '^Z', key: 'C-z', title: 'Suspender' },
 ]
 
+// Espelha os tokens de web/tokens.css: o xterm pinta em canvas e não lê CSS.
 const THEME = {
-  background: '#0b0c0e',
-  foreground: '#eceae7',
-  cursor: '#ffb02e',
-  selectionBackground: '#333a42',
+  background: '#100e0c',
+  foreground: '#e8e1dd',
+  cursor: '#ffc77f',
+  selectionBackground: '#373432',
 }
 
 /** O capture-pane devolve linhas separadas por \n; o xterm precisa do retorno. */
