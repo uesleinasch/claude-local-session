@@ -323,6 +323,51 @@ describe('auto mode', () => {
   })
 })
 
+describe('pane do tmux', () => {
+  test('setTmux marca a sessão e a lista broadcastada carrega o estado', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    const browser = spy()
+    reg.addBrowser(browser)
+
+    reg.setTmux('s1', true)
+    expect(browser.sent.at(-1).sessions[0].tmux).toBe(true)
+
+    reg.setTmux('s1', false)
+    expect(browser.sent.at(-1).sessions[0].tmux).toBe(false)
+  })
+
+  test('sem mudança não há broadcast', () => {
+    const reg = new Registry()
+    reg.registerSession(spy(), INFO)
+    reg.setTmux('s1', true)
+    const browser = spy()
+    reg.addBrowser(browser)
+    const before = browser.sent.length
+
+    reg.setTmux('s1', true)
+    expect(browser.sent.length).toBe(before)
+  })
+
+  test('sessão desconhecida é ignorada', () => {
+    const reg = new Registry()
+    const browser = spy()
+    reg.addBrowser(browser)
+    const before = browser.sent.length
+    reg.setTmux('fantasma', true)
+    expect(browser.sent.length).toBe(before)
+  })
+
+  test('sessão que cai perde o pane: o pid novo pode estar fora do tmux', () => {
+    const reg = new Registry()
+    const sink = spy()
+    reg.registerSession(sink, INFO)
+    reg.setTmux('s1', true)
+    reg.removeSession(sink)
+    expect(reg.summaries()[0]!.tmux).toBeUndefined()
+  })
+})
+
 describe('contexto da sessão', () => {
   test('noteContext guarda na sessão e broadcasted na lista', () => {
     const reg = new Registry()

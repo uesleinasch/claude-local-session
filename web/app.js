@@ -7,7 +7,7 @@ import {
 } from './connection.js'
 import { crumbs, parseSort, relativeTime, SORT_OPTIONS, sortEntries } from './browse-core.js'
 import { renderMarkdown } from './markdown.js'
-import { SECTION_TITLES, sessionSection, sessionStatus, TONE_ICONS } from './session-status.js'
+import { controlaPeloTmux, SECTION_TITLES, sessionSection, sessionStatus, TONE_ICONS } from './session-status.js'
 import { createTerminalPanel } from './terminal-panel.js'
 
 const app = document.getElementById('app')
@@ -104,7 +104,6 @@ let events = []
 let hubConfig = {
   projects: [],
   canSpawn: false,
-  canInterrupt: false,
   canTerminal: false,
   quickPrompts: [],
   home: '',
@@ -289,6 +288,7 @@ function handle(msg) {
     return
   }
   if (msg.type === 'sessions') {
+    const controlavaAntes = controlaPeloTmux(current())
     sessions = Array.isArray(msg.sessions) ? msg.sessions : []
     // Sessão lembrada que o hub não conhece mais: volta para a lista em vez de
     // deixar o usuário preso num feed vazio e morto.
@@ -305,6 +305,7 @@ function handle(msg) {
     }
     renderSessions()
     renderBar()
+    if (currentId && controlaPeloTmux(current()) !== controlavaAntes) renderFeed()
     return
   }
   if (msg.type === 'history' && msg.sessionId === currentId) {
@@ -343,7 +344,6 @@ function handle(msg) {
     hubConfig = {
       projects: Array.isArray(msg.projects) ? msg.projects : [],
       canSpawn: msg.canSpawn === true,
-      canInterrupt: msg.canInterrupt === true,
       canTerminal: msg.canTerminal === true,
       quickPrompts: Array.isArray(msg.quickPrompts) ? msg.quickPrompts : [],
       home: typeof msg.home === 'string' ? msg.home : '',
@@ -529,7 +529,7 @@ function buildMenu(s) {
   menuMain.hidden = false
   menuModels.hidden = true
 
-  if (s.alive && hubConfig.canInterrupt) {
+  if (controlaPeloTmux(s)) {
     menuMain.append(
       menuItem({
         icon: 'tune',
@@ -964,7 +964,7 @@ function renderBar() {
   stateEl.dataset.tone = status.tone
   stateEl.dataset.alive = String(s.alive)
   stateEl.dataset.busy = String(s.busy === true)
-  stopBtn.hidden = !(s.alive && s.busy === true && hubConfig.canInterrupt)
+  stopBtn.hidden = !(controlaPeloTmux(s) && s.busy === true)
   moreBtn.hidden = false
 }
 
@@ -1750,7 +1750,7 @@ function askNode(e) {
   }
 
   const s = current()
-  const canAnswer = Boolean(s?.alive) && hubConfig.canInterrupt
+  const canAnswer = controlaPeloTmux(s)
   const draft = draftFor(e)
 
   for (let i = 0; i < e.questions.length; i++) {
