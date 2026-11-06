@@ -18,6 +18,10 @@ export function sessionStatus(session, now) {
   return { tone: 'idle', label: idleLabel(session, now) }
 }
 
+export function controlaPeloTmux(session) {
+  return session?.alive === true && session.tmux === true
+}
+
 export const SECTION_TITLES = { waiting: 'esperando você', active: 'ativas', ended: 'encerradas' }
 
 export const TONE_ICONS = { waiting: 'shield_lock', busy: 'bolt', idle: 'schedule', dead: 'terminal' }
