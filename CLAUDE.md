@@ -295,7 +295,7 @@ default — `tailscaleAddress(nets = networkInterfaces())` em `src/config.ts` e
 
 | Núcleo (sem I/O, com teste unitário) | Casca (I/O, integração) |
 | --- | --- |
-| `hub-state.ts` (registro, feed, urgência), `files.ts`, `notify.ts`, `hook-event.ts`, `context-report.ts`, `git-changes.ts`, `question-keys.ts`, `setup-core.ts`, `update-core.ts`, `upload.ts`, `tailscale.ts`, `trust.ts`, `cli-core.ts`, `web-assets.ts`, `plugin-meta.ts`, `package-core.ts`, `status-core.ts`, `endpoints.ts`, `release-core.ts`, `desktop/core.js` | `hub.ts`, `server.ts`, `hub-client.ts`, `history.ts`, `terminal.ts`, `cli.ts`, `scripts/*.ts`, `desktop/main.js` |
+| `hub-state.ts` (registro, feed, urgência), `files.ts`, `notify.ts`, `hook-event.ts`, `context-report.ts`, `git-changes.ts`, `question-keys.ts`, `setup-core.ts`, `update-core.ts`, `upload.ts`, `tailscale.ts`, `trust.ts`, `cli-core.ts`, `web-assets.ts`, `plugin-meta.ts`, `package-core.ts`, `status-core.ts`, `endpoints.ts`, `release-core.ts`, `icons-core.ts`, `desktop/core.js` | `hub.ts`, `server.ts`, `hub-client.ts`, `history.ts`, `terminal.ts`, `cli.ts`, `scripts/*.ts`, `desktop/main.js` |
 | `web/markdown.js`, `web/session-status.js`, `web/connection.js`, `web/browse-core.js` | `web/app.js`, `web/terminal-panel.js` |
 
 ## As três camadas do canal (por que "o prompt não chega")
@@ -399,6 +399,25 @@ aparecem no celular. Ao mexer na UI, cumpra os contratos ou o teste quebra:
 - id com `display` próprio **e** atributo `hidden` no HTML precisa da regra `#id[hidden]` — sem
   ela `el.hidden = true` não tem efeito;
 - controle pequeno cresce no bloco `@media (hover: none)`.
+
+## Design system
+
+A interface segue `docs/design/design-system.md` (Material 3 escuro, semente âmbar, Inter,
+Material Symbols); `docs/design/*-referencias.md` dizem de onde vem cada regra. Na página isso
+vira três arquivos servidos pelo hub, sem nada de fora — o celular pode estar sem internet:
+
+- **`web/tokens.css`** declara todos os `--md-sys-*` e os nossos `--ls-*`. O `:root` de
+  `style.css` só tem apelidos para eles, e `tests/web-tokens.test.ts` reprova cor literal no
+  corpo das regras de `style.css` e confere cada hex do esquema contra o design system.
+- **`web/icons.svg`** é um sprite gerado: a lista mora em `WEB_ICONS` (`src/icons-core.ts`) e
+  `bun scripts/assets-design.ts` regenera o sprite e copia a fonte de `node_modules`.
+  `tests/icons.test.ts` falha se a página citar um ícone que não está no sprite — sem ele o
+  botão fica vazio, sem erro.
+- **`web/fonts/`** traz a Inter variável (latin), com preload no `index.html`.
+
+O app Android repete o esquema em `mobile/lib/tema.dart` (`ColorScheme` literal, porque os
+neutros não saem do `fromSeed`) e a Inter em `mobile/assets/fonts/`. O tema do xterm, que pinta
+em canvas, repete os hex em `web/terminal-panel.js`. Mudar uma cor é mudar os três.
 
 ## Convenções
 
