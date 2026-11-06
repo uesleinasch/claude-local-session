@@ -50,9 +50,9 @@ describe.if(hasTmux)('terminal por tmux', () => {
     const res = await terminals.attach(work, { cols: 80, rows: 24 }, eye)
     expect(res.ok).toBe(true)
 
-    await terminals.write(work, 'echo alo-do-terminal', true)
-    await waitFor(() => eye.text().includes('alo-do-terminal'))
-    expect(eye.text()).toContain('alo-do-terminal')
+    await terminals.write(work, 'echo alo-do-terminal-$((6*7))', true)
+    await waitFor(() => eye.text().includes('alo-do-terminal-42'))
+    expect(eye.text()).toContain('alo-do-terminal-42')
   })
 
   test('a sessão nasce no diretório pedido', async () => {
@@ -65,8 +65,9 @@ describe.if(hasTmux)('terminal por tmux', () => {
     expect(eye.text().slice(before)).toContain(work)
   })
 
-  // O eco do que se digita também viaja pelo pipe, então o comando é escrito de
-  // um jeito que o shell expande: só a saída de verdade produz "fim-42".
+  // O eco do que se digita também viaja pelo pipe, e com o shell ainda ocupado é
+  // o tty quem ecoa, antes de o prompt redesenhar a linha. Por isso todo comando
+  // daqui é escrito de um jeito que o shell expande: só a saída produz o "-42".
   test('tecla de controle interrompe o que está rodando', async () => {
     const eye = collector()
     await terminals.attach(work, { cols: 80, rows: 24 }, eye)
@@ -74,22 +75,22 @@ describe.if(hasTmux)('terminal por tmux', () => {
     await terminals.write(work, 'sleep 30; echo fim-$((6*7))', true)
     await Bun.sleep(300)
     await terminals.key(work, 'C-c')
-    await terminals.write(work, 'echo depois-do-ctrl-c', true)
+    await terminals.write(work, 'echo depois-do-ctrl-c-$((6*7))', true)
 
-    await waitFor(() => eye.text().includes('depois-do-ctrl-c'))
+    await waitFor(() => eye.text().includes('depois-do-ctrl-c-42'))
     expect(eye.text()).not.toContain('fim-42')
   })
 
   test('reabrir traz a tela de volta pela foto do tmux', async () => {
     const primeiro = collector()
     await terminals.attach(work, { cols: 80, rows: 24 }, primeiro)
-    await terminals.write(work, 'echo marca-de-reabertura', true)
-    await waitFor(() => primeiro.text().includes('marca-de-reabertura'))
+    await terminals.write(work, 'echo marca-de-reabertura-$((6*7))', true)
+    await waitFor(() => primeiro.text().includes('marca-de-reabertura-42'))
     await terminals.detach(work, primeiro)
 
     const segundo = collector()
     const res = await terminals.attach(work, { cols: 80, rows: 24 }, segundo)
-    expect(res.ok && res.seed).toContain('marca-de-reabertura')
+    expect(res.ok && res.seed).toContain('marca-de-reabertura-42')
   })
 
   test('o comando continua rodando enquanto ninguém assiste', async () => {
