@@ -205,3 +205,39 @@ describe('atributo hidden versus display por id', () => {
     expect(idsWhoseRuleSetsDisplay().size).toBeGreaterThan(0)
   })
 })
+
+describe('span com tamanho', () => {
+  const js = ['app.js', 'terminal-panel.js'].map(f => readFileSync(join(WEB, f), 'utf8')).join('\n')
+
+  function spanClasses(): Set<string> {
+    const found = new Set<string>()
+    for (const m of js.matchAll(/el\(\s*'span'\s*,\s*'([\w\s-]+)'/g)) {
+      for (const c of m[1]!.split(/\s+/)) if (c) found.add(c)
+    }
+    return found
+  }
+
+  function rulesOf(cls: string) {
+    const own = new RegExp(`\\.${cls}(?![\\w-])`)
+    return rules().filter(r => r.selector.split(',').some(s => own.test(s)))
+  }
+
+  /**
+   * `span` é inline e inline ignora width e height: a barra de contexto da lista
+   * ficou sem cor quando trocou de div para span. Só funciona sem `display` se o
+   * pai for flex ou grid, e isso este teste não enxerga, então a regra é explícita.
+   */
+  test('span criado pela página com width ou height declara display', () => {
+    const semDisplay = [...spanClasses()].filter(c => {
+      const own = rulesOf(c)
+      const sized = own.some(r => /(?:^|[;\s])(?:width|height)\s*:/.test(r.body))
+      const display = own.some(r => /(?:^|[;\s])display\s*:/.test(r.body))
+      return sized && !display
+    })
+    expect(semDisplay).toEqual([])
+  })
+
+  test('o leitor de spans enxerga a barra da lista', () => {
+    expect(spanClasses()).toContain('session-fill')
+  })
+})

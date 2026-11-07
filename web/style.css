@@ -593,6 +593,7 @@ body {
 }
 
 .session-track {
+  display: block;
   flex: 1;
   height: 4px;
   border-radius: var(--md-sys-shape-corner-full);
@@ -601,6 +602,7 @@ body {
 }
 
 .session-fill {
+  display: block;
   height: 100%;
   background: var(--md-sys-color-primary);
 }
@@ -1309,6 +1311,7 @@ body {
 }
 
 .spinner {
+  display: block;
   width: 16px;
   height: 16px;
   border: 2px solid var(--md-sys-color-surface-container-highest);
