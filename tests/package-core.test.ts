@@ -1,5 +1,8 @@
 import { describe, expect, test } from 'bun:test'
 import {
+  APPARMOR_PROFILE,
+  APPARMOR_TARGET,
+  apparmorProfile,
   BIN_PATH,
   compressionArgs,
   controlFile,
@@ -96,6 +99,44 @@ describe('postrm', () => {
 
   test('não chama um binário que já saiu do disco', () => {
     expect(script).toContain(`[ -x /${BIN_PATH} ]`)
+  })
+})
+
+describe('sandbox do Electron no Ubuntu 24.04+', () => {
+  const perfil = apparmorProfile()
+
+  test('libera user namespace só para o executável da interface', () => {
+    expect(perfil).toContain(`profile local-session-ui /${UI_DIR}/${UI_EXEC} flags=(unconfined)`)
+    expect(perfil).toMatch(/^\s*userns,$/m)
+  })
+
+  test('declara a abi 4.0, onde a regra userns existe', () => {
+    expect(perfil).toContain('abi <abi/4.0>,')
+  })
+
+  test('o perfil viaja fora da árvore copiada por usuário', () => {
+    expect(APPARMOR_PROFILE.startsWith(UI_DIR)).toBe(true)
+    expect(APPARMOR_TARGET).toBe('/etc/apparmor.d/local-session-ui')
+  })
+
+  test('o postinst só instala o perfil que o parser da máquina entende', () => {
+    const script = postinstScript()
+    const teste = script.indexOf(`apparmor_parser --skip-kernel-load --debug /${APPARMOR_PROFILE}`)
+    const copia = script.indexOf(`cp -f /${APPARMOR_PROFILE} ${APPARMOR_TARGET}`)
+    expect(teste).toBeGreaterThan(-1)
+    expect(copia).toBeGreaterThan(teste)
+    expect(script).toContain(`apparmor_parser --replace --write-cache --skip-read-cache ${APPARMOR_TARGET}`)
+  })
+
+  test('o postinst não quebra em máquina sem AppArmor', () => {
+    expect(postinstScript()).toContain('command -v apparmor_parser')
+  })
+
+  test('o postrm descarrega e apaga o perfil na remoção, não no upgrade', () => {
+    const script = postrmScript()
+    expect(script).toMatch(/remove\|purge\)/)
+    expect(script).toContain(`apparmor_parser --remove ${APPARMOR_TARGET}`)
+    expect(script).toContain(`rm -f ${APPARMOR_TARGET}`)
   })
 })
 
