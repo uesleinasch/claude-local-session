@@ -214,6 +214,19 @@ async function renderAcesso(status) {
 
 }
 
+let qrDoApp = null
+
+async function renderApp(status) {
+  const img = el('qr-app')
+  const temQrencode = status.dependencies.some(d => d.id === 'qrencode' && d.present)
+  if (!qrDoApp && temQrencode) qrDoApp = await window.ls.qr(await window.ls.appAndroid())
+  img.hidden = !qrDoApp
+  if (qrDoApp) img.src = qrDoApp
+}
+
+el('app-abrir').addEventListener('click', async () => window.ls.abrirLink(await window.ls.appAndroid()))
+el('app-copiar').addEventListener('click', async () => window.ls.copiar(await window.ls.appAndroid()))
+
 function render(status) {
   estado = status
   if (!status) {
@@ -237,6 +250,7 @@ function render(status) {
   renderChecks(status)
   renderDeps(status)
   void renderAcesso(status)
+  void renderApp(status)
 }
 
 async function carregar() {
