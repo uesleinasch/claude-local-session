@@ -5,6 +5,7 @@ const { accessSync, constants, mkdirSync, rmSync, writeFileSync, existsSync } = 
 const { homedir } = require('node:os')
 const { join } = require('node:path')
 const {
+  ANDROID_APP_URL,
   resolveAction,
   resolveBinary,
   trayTooltip,
@@ -162,6 +163,7 @@ async function executarAcao(id) {
 
 ipcMain.handle('status', () => recarregar())
 ipcMain.handle('bin', () => BIN)
+ipcMain.handle('app-android', () => ANDROID_APP_URL)
 ipcMain.handle('acao', async (_ev, id) => {
   const r = await executarAcao(id)
   await recarregar()
@@ -200,7 +202,7 @@ ipcMain.handle('autostart', (_ev, ligar) => {
 })
 
 function linksConhecidos() {
-  return [ultimoStatus?.links?.lan, ultimoStatus?.links?.tailscale].filter(Boolean)
+  return [ultimoStatus?.links?.lan, ultimoStatus?.links?.tailscale, ANDROID_APP_URL].filter(Boolean)
 }
 
 ipcMain.handle('instalar', async (_ev, pacotes) => {
@@ -235,6 +237,11 @@ ipcMain.handle('qr', async (_ev, url) => {
 ipcMain.handle('copiar', (_ev, texto) => {
   if (typeof texto === 'string') clipboard.writeText(texto)
 })
+
+// A trava de instância única mora na pasta de dados. Rodando do repositório
+// (`bun run ui`, executável `electron`), dividir a pasta com o pacote faria a
+// cópia em desenvolvimento só acordar a janela antiga da bandeja e sair.
+if (!app.isPackaged) app.setPath('userData', join(app.getPath('appData'), 'local-session-dev'))
 
 // Segunda invocação traz a janela da primeira em vez de abrir outro ícone.
 if (!app.requestSingleInstanceLock()) {

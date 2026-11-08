@@ -154,7 +154,15 @@ function autostartEntry(comando) {
   ].join('\n')
 }
 
+/**
+ * Endereço fixo de onde baixar o app: a página escolhe o APK mais novo na hora,
+ * então o QR não envelhece a cada versão. README e site citam o mesmo texto, e
+ * `tests/site-apk.test.ts` reprova se divergirem.
+ */
+const ANDROID_APP_URL = 'https://uesleinasch.github.io/claude-local-session/app/'
+
 module.exports = {
+  ANDROID_APP_URL,
   aptInstallCommand,
   autostartCommand,
   autostartEntry,

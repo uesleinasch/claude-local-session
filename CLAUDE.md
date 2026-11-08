@@ -291,6 +291,12 @@ As releases saem do workflow `release`, disparado por tag: `v<semver>` publica o
 `pubspec.yaml`, senão nada é compilado. Tag anotada vira título e notas da release; tag leve
 cai no `--generate-notes`.
 
+Como o APK fica fora do `latest`, o GitHub não tem endereço fixo para ele. Quem tem é
+`site/app/` (`ANDROID_APP_URL`, em `desktop/core.js`): a página consulta a API de releases e
+`escolherApk` fica com a `app-v*` estável mais nova. É esse endereço que a janela mostra em QR
+na seção *acesso*, e o README e o site citam o mesmo texto — `tests/site-apk.test.ts` reprova
+divergência.
+
 O job do app chama o mesmo `scripts/release-apk.ts`, que exige árvore limpa (APK de árvore suja
 não se reproduz), recusa versão já publicada e **recusa publicar fora do CI** — `--local` é a
 saída de emergência. A assinatura continua sendo a **chave de debug desta máquina**, que viaja
