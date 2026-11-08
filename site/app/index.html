@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Local Session para Android</title>
+  <meta name="description" content="Baixe o app Android do Local Session: ele abre direto nas suas sessões do Claude Code e acha o hub sozinho na rede.">
+  <meta name="theme-color" content="#151311">
+  <link rel="icon" href="../icon.svg" type="image/svg+xml">
+  <link rel="preload" href="../inter-latin-opsz-normal.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../style.css">
+</head>
+<body>
+  <a class="pular" href="#conteudo">Pular para o conteúdo</a>
+
+  <header class="topo">
+    <div class="largura topo-linha">
+      <a class="marca" href="../">
+        <img src="../icon.svg" width="32" height="32" alt="">
+        <span>Local Session</span>
+      </a>
+      <nav aria-label="Seções" class="topo-nav">
+        <a class="botao botao-contorno" href="https://github.com/uesleinasch/claude-local-session">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="conteudo">
+    <section class="heroi largura">
+      <div class="heroi-texto">
+        <p class="rotulo">App Android</p>
+        <h1>Local Session no celular.</h1>
+        <p class="lead">
+          O app abre direto nas suas sessões do Claude Code e acha o computador sozinho, na rede
+          local ou na tailnet. Você pareia uma vez e não digita endereço nem token.
+        </p>
+        <div class="acoes">
+          <a id="baixar" class="botao botao-cheio" href="https://github.com/uesleinasch/claude-local-session/releases?q=app-v&amp;expanded=true">
+            <svg aria-hidden="true" width="20" height="20" viewBox="0 -960 960 960"><path d="M480-313 287-506l43-43 120 120v-371h60v371l120-120 43 43-193 193ZM220-160q-24 0-42-18t-18-42v-143h60v143h520v-143h60v143q0 24-18 42t-42 18H220Z"/></svg>
+            <span id="baixar-texto">Ver as versões do app</span>
+          </a>
+        </div>
+        <p class="nota" id="baixar-nota">Android 7 ou mais novo · fora da Play Store</p>
+      </div>
+    </section>
+
+    <section class="largura secao">
+      <h2>Instalar</h2>
+      <ol class="passos">
+        <li>
+          <h3>Baixe o arquivo</h3>
+          <p>Toque no botão acima, aqui no celular. O download é um arquivo <code>.apk</code>.</p>
+        </li>
+        <li>
+          <h3>Permita a instalação</h3>
+          <p>Abra o arquivo baixado. Como o app não vem da Play Store, na primeira vez o Android pede para o navegador poder instalar apps: permita e volte para concluir.</p>
+        </li>
+        <li>
+          <h3>Pareie com o computador</h3>
+          <p>No computador, abra o Local Session pelo menu de aplicativos e vá em <strong>acesso</strong>. No app, aponte a câmera para o QR code de cima, o que leva o token.</p>
+        </li>
+      </ol>
+      <p class="nota">Para atualizar, repita os dois primeiros passos: a versão nova instala por cima e mantém o pareamento.</p>
+    </section>
+  </main>
+
+  <footer class="rodape">
+    <div class="largura rodape-linha">
+      <p>© 2026 Ueslei Nascimento · <a href="https://github.com/uesleinasch/claude-local-session/blob/Production/LICENSE">licença MIT</a></p>
+      <p>Projeto independente, sem afiliação com a Anthropic. "Claude" e "Claude Code" são marcas da Anthropic.</p>
+    </div>
+  </footer>
+
+  <script type="module">
+    import { escolherApk } from './apk.js'
+
+    try {
+      const resposta = await fetch(
+        'https://api.github.com/repos/uesleinasch/claude-local-session/releases?per_page=100',
+        { headers: { Accept: 'application/vnd.github+json' } },
+      )
+      const apk = escolherApk(await resposta.json())
+      if (apk) {
+        document.getElementById('baixar').href = apk.url
+        document.getElementById('baixar-texto').textContent = `Baixar o app ${apk.versao}`
+        const mb = Math.round(apk.tamanho / 1024 / 1024)
+        document.getElementById('baixar-nota').textContent =
+          `local-session-${apk.versao}.apk · ${mb} MB · Android 7 ou mais novo · fora da Play Store`
+      }
+    } catch {}
+  </script>
+</body>
+</html>
