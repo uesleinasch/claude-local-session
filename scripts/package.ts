@@ -13,6 +13,8 @@ import {
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import {
+  APPARMOR_PROFILE,
+  apparmorProfile,
   BIN_PATH,
   controlFile,
   debArchitecture,
@@ -98,6 +100,7 @@ try {
   cpSync(electronDist, join(raiz, UI_DIR), { recursive: true })
   renameSync(join(raiz, UI_DIR, 'electron'), join(raiz, UI_DIR, UI_EXEC))
   chmodSync(join(raiz, UI_DIR, UI_EXEC), 0o755)
+  writeFileSync(join(raiz, APPARMOR_PROFILE), apparmorProfile())
 
   const appDir = join(raiz, UI_DIR, 'resources', 'app')
   mkdirSync(appDir, { recursive: true })

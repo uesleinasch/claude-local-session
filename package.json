@@ -1,6 +1,6 @@
 {
   "name": "claude-local-session",
-  "version": "0.15.3",
+  "version": "0.15.4",
   "private": true,
   "license": "MIT",
   "author": "Ueslei Nascimento",
