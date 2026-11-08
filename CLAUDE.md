@@ -152,6 +152,7 @@ seção seguinte). Os destinos, e o motivo medido da divisão:
 | `/usr/lib/systemd/user/local-session-hub.service` | unit disponível a todo usuário, ativa só para quem der `enable` |
 | `/usr/lib/local-session-ui/` | o Electron renomeado + o app em `resources/app` |
 | `/usr/bin/local-session-ui` | shim que chama o de cima |
+| `/etc/apparmor.d/local-session-ui` | escrito pelo `postinst`, só onde o parser aceita a abi 4.0 (24.04+): sem ele o Chromium aborta no `chrome-sandbox` ao abrir |
 | `/usr/share/applications/`, `/usr/share/icons/…` | entrada de menu e ícone |
 
 **`claude plugin install` a partir de um caminho em disco copia a árvore** para

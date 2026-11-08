@@ -37,6 +37,31 @@ export const ICON_PATH = join(
 )
 
 /**
+ * O Ubuntu 24.04 bloqueia user namespace sem privilégio por AppArmor
+ * (`kernel.apparmor_restrict_unprivileged_userns=1`). Sem ele o Chromium cai
+ * no `chrome-sandbox` setuid, que aqui é 0755, e aborta ao abrir. A saída é a
+ * do próprio Ubuntu para o Chrome e o VS Code: um perfil `unconfined` que só
+ * concede `userns`. A abi 4.0 não existe no 22.04, onde o perfil nem é
+ * necessário — por isso o postinst testa o parse antes de instalar.
+ */
+export const APPARMOR_PROFILE = join(UI_DIR, 'apparmor-profile')
+export const APPARMOR_TARGET = '/etc/apparmor.d/local-session-ui'
+
+export function apparmorProfile(): string {
+  return [
+    'abi <abi/4.0>,',
+    'include <tunables/global>',
+    '',
+    `profile local-session-ui /${UI_DIR}/${UI_EXEC} flags=(unconfined) {`,
+    '  userns,',
+    '',
+    '  include if exists <local/local-session-ui>',
+    '}',
+    '',
+  ].join('\n')
+}
+
+/**
  * O Electron não está em nenhum repositório do Debian/Ubuntu (verificado em
  * 2026-09-21), então viaja dentro do pacote — não dá para declarar `Depends`.
  * As bibliotecas que ele carrega, sim: sem elas o app falha ao abrir numa
@@ -96,6 +121,14 @@ export function postinstScript(): string {
     `  /${BIN_PATH} managed-settings --apply || true`,
     '  systemctl daemon-reload >/dev/null 2>&1 || true',
     '',
+    '  if command -v apparmor_parser >/dev/null 2>&1 &&',
+    `    apparmor_parser --skip-kernel-load --debug /${APPARMOR_PROFILE} >/dev/null 2>&1; then`,
+    `    cp -f /${APPARMOR_PROFILE} ${APPARMOR_TARGET}`,
+    '    if ! { command -v ischroot >/dev/null 2>&1 && ischroot; }; then',
+    `      apparmor_parser --replace --write-cache --skip-read-cache ${APPARMOR_TARGET} || true`,
+    '    fi',
+    '  fi',
+    '',
     '  echo ""',
     '  echo "local-session instalado. falta um passo, por usuário:"',
     '  echo ""',
@@ -118,6 +151,15 @@ export function postrmScript(): string {
     'if [ "$1" = "purge" ] && [ -x /' + BIN_PATH + ' ]; then',
     `  /${BIN_PATH} managed-settings --remove || true`,
     'fi',
+    '',
+    'case "$1" in',
+    '  remove|purge)',
+    `    if [ -f ${APPARMOR_TARGET} ]; then`,
+    `      apparmor_parser --remove ${APPARMOR_TARGET} >/dev/null 2>&1 || true`,
+    `      rm -f ${APPARMOR_TARGET}`,
+    '    fi',
+    '    ;;',
+    'esac',
     '',
     'systemctl daemon-reload >/dev/null 2>&1 || true',
     '',
