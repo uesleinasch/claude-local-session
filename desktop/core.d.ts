@@ -3,6 +3,7 @@ import type { Status } from '../src/status-core'
 export type Action = { bin: string; args: string[]; label: string }
 
 export declare const ACTIONS: Record<string, Action>
+export declare const ANDROID_APP_URL: string
 export declare function actionIds(): string[]
 export declare function actionLabel(id: string): string | null
 export declare function resolveAction(

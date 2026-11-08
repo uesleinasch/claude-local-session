@@ -8,6 +8,7 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('ls', {
   status: () => ipcRenderer.invoke('status'),
   bin: () => ipcRenderer.invoke('bin'),
+  appAndroid: () => ipcRenderer.invoke('app-android'),
   acao: id => ipcRenderer.invoke('acao', id),
   abrirLink: url => ipcRenderer.invoke('abrir-link', url),
   copiar: texto => ipcRenderer.invoke('copiar', texto),
