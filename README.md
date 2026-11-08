@@ -450,10 +450,13 @@ próprio app do ntfy. Por isso vem desligado. Tocar no aviso abre o app, não a 
 o payload do ntfy leva o rótulo, não o id da sessão, e enfiá-lo no campo `click` mandaria um
 endereço com token para um servidor de terceiros.
 
-**Instalar sem cabo.** Cada versão do app sai como release própria, com tag `app-v<versão>`
-(a atual está entre as [releases](https://github.com/uesleinasch/claude-local-session/releases)).
-Abra a release pelo navegador do celular, logado no GitHub, e toque no `.apk`. Ele é assinado
-sempre com a mesma chave, então instala por cima da versão anterior sem perder o pareamento.
+**Instalar sem cabo.** Abra https://uesleinasch.github.io/claude-local-session/app/ no
+navegador do celular e toque em baixar. A página sempre oferece a versão mais nova, e a janela
+do Local Session mostra um QR code dela na seção *acesso*, logo abaixo do de pareamento. Na
+primeira vez o Android pede para o navegador poder instalar apps, porque o app não vem da Play
+Store. Cada versão também sai como release própria, com tag `app-v<versão>`. O `.apk` é
+assinado sempre com a mesma chave, então instala por cima da versão anterior sem perder o
+pareamento.
 
 Para compilar e instalar, com o Flutter e o SDK do Android na máquina:
 
