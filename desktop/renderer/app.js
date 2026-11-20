@@ -298,7 +298,7 @@ document.addEventListener('click', ev => {
   }
 
   const externo = ev.target.closest('[data-externo]')
-  if (externo) return window.ls.copiar(externo.dataset.externo)
+  if (externo) return window.ls.abrirLink(externo.dataset.externo)
 
   const instalar = ev.target.closest('[data-instalar]')
   if (instalar) {

@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test'
 import {
   COMMANDS,
+  claudePath,
   hubSpawnArgs,
   isStandalone,
   parseCommand,
@@ -104,5 +105,22 @@ describe('pluginRoot', () => {
 
   test('env vazio não conta como escolha', () => {
     expect(pluginRoot({ ...base, standalone: false, env: '' })).toBe('/home/u/repo')
+  })
+})
+
+describe('claudePath', () => {
+  const home = '/home/u'
+
+  test('o que está no PATH vence', () => {
+    expect(claudePath(home, () => '/usr/bin/claude', () => true)).toBe('/usr/bin/claude')
+  })
+
+  test('fora do PATH, acha a instalação em ~/.local/bin', () => {
+    const has = (p: string) => p === '/home/u/.local/bin/claude'
+    expect(claudePath(home, () => null, has)).toBe('/home/u/.local/bin/claude')
+  })
+
+  test('sem PATH e sem instalação conhecida, não há claude', () => {
+    expect(claudePath(home, () => null, () => false)).toBeNull()
   })
 })

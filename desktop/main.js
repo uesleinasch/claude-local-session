@@ -6,6 +6,7 @@ const { homedir } = require('node:os')
 const { join } = require('node:path')
 const {
   ANDROID_APP_URL,
+  knownLinks,
   resolveAction,
   resolveBinary,
   trayTooltip,
@@ -202,7 +203,7 @@ ipcMain.handle('autostart', (_ev, ligar) => {
 })
 
 function linksConhecidos() {
-  return [ultimoStatus?.links?.lan, ultimoStatus?.links?.tailscale, ANDROID_APP_URL].filter(Boolean)
+  return knownLinks(ultimoStatus)
 }
 
 ipcMain.handle('instalar', async (_ev, pacotes) => {

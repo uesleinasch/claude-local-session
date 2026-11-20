@@ -88,3 +88,22 @@ export function pluginRoot(src: RootSources): string {
   const candidates = [join(bin, '..'), join(bin, '..', 'share', 'local-session')]
   return candidates.find(c => has(join(c, '.claude-plugin', 'plugin.json'))) ?? join(bin, '..')
 }
+
+/**
+ * O `claude` costuma morar em `~/.local/bin`, que só entra no PATH pelo rc do
+ * shell. Hub subido pelo systemd e janela aberta pelo menu não leem rc: sem os
+ * caminhos conhecidos, a página perde "abrir pasta" numa máquina com tudo
+ * instalado.
+ */
+export function claudePath(
+  home: string,
+  which: (cmd: string) => string | null = Bun.which,
+  has: (path: string) => boolean = existsSync,
+): string | null {
+  const candidates = [
+    join(home, '.local', 'bin', 'claude'),
+    join(home, '.claude', 'local', 'claude'),
+    join(home, '.npm-global', 'bin', 'claude'),
+  ]
+  return which('claude') ?? candidates.find(has) ?? null
+}
