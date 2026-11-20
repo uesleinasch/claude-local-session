@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { isStandalone, pluginRoot } from '../src/cli-core'
+import { claudePath, isStandalone, pluginRoot } from '../src/cli-core'
 import { readConfig } from '../src/config'
 import {
   MANAGED_SETTINGS_PATH,
@@ -102,7 +102,7 @@ export async function main(): Promise<void> {
   } else if (!APPLY) {
     miss(`plugin não registrado — falta \`claude plugin marketplace add ${ROOT}\``)
   } else {
-    const claude = Bun.which('claude')
+    const claude = claudePath(homedir())
     if (claude === null) {
       miss('claude não encontrado no PATH — instale o Claude Code antes')
     } else {

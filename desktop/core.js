@@ -161,8 +161,23 @@ function autostartEntry(comando) {
  */
 const ANDROID_APP_URL = 'https://uesleinasch.github.io/claude-local-session/app/'
 
+/**
+ * O que a janela pode mandar abrir ou virar QR. Tudo sai do `status` do nosso
+ * binário ou é constante daqui: o renderer nunca escolhe endereço.
+ */
+function knownLinks(status) {
+  const deps = Array.isArray(status?.dependencies) ? status.dependencies : []
+  return [
+    status?.links?.lan,
+    status?.links?.tailscale,
+    ANDROID_APP_URL,
+    ...deps.map(d => d?.url).filter(u => typeof u === 'string' && u.startsWith('https://')),
+  ].filter(Boolean)
+}
+
 module.exports = {
   ANDROID_APP_URL,
+  knownLinks,
   aptInstallCommand,
   autostartCommand,
   autostartEntry,
