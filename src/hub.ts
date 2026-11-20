@@ -61,7 +61,7 @@ import {
   type TermListener,
 } from './terminal'
 import { MAX_UPLOAD_BYTES, sniffImage, uploadName } from './upload'
-import { isStandalone, pluginRoot } from './cli-core'
+import { claudePath, isStandalone, pluginRoot } from './cli-core'
 import { BUILT_VERSION, installedVersion, pluginMismatch } from './plugin-meta'
 import { detectPluginIdentity, type PluginIdentity } from './setup-core'
 import { assetPath } from './web-assets'
@@ -105,7 +105,8 @@ const HOME = homedir()
 const ROOTS = (cfg.projectsRoot ?? []).filter(p => typeof p === 'string' && p.startsWith('/'))
 const IDENTITY = pluginIdentity(ROOT)
 const HAS_TMUX = Bun.which('tmux') !== null
-const CAN_SPAWN = HAS_TMUX && Bun.which('claude') !== null && IDENTITY !== null
+const CLAUDE = claudePath(HOME)
+const CAN_SPAWN = HAS_TMUX && CLAUDE !== null && IDENTITY !== null
 const CAN_TERMINAL = HAS_TMUX && Bun.which('mkfifo') !== null
 const MAX_DIRS = 400
 const QUICK_PROMPTS = parseQuickPrompts(cfg.quickPrompts) ?? DEFAULT_QUICK_PROMPTS
@@ -409,6 +410,7 @@ function openTerminal(ws: Ws, dir: string, size: { cols: number; rows: number })
 // TTY e a sobrevivência — a sessão continua viva se o hub ou o navegador caírem.
 async function spawnSession(dir: string): Promise<{ name: string } | { error: string }> {
   if (!IDENTITY) return { error: 'identidade do plugin desconhecida' }
+  if (!CLAUDE) return { error: 'claude não encontrado' }
   const name = `ls-${basename(dir).replace(/[^\w-]/g, '_')}-${Date.now().toString(36)}`
   const args = [
     'new-session',
@@ -417,7 +419,7 @@ async function spawnSession(dir: string): Promise<{ name: string } | { error: st
     name,
     '-c',
     dir,
-    'claude',
+    CLAUDE,
     '--channels',
     `plugin:${IDENTITY.plugin}@${IDENTITY.marketplace}`,
   ]

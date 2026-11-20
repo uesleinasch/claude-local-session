@@ -3,7 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
 import { join } from 'node:path'
-import { isStandalone, pluginRoot } from '../src/cli-core'
+import { claudePath, isStandalone, pluginRoot } from '../src/cli-core'
 import { lanAddress, readConfig, tailscaleAddress } from '../src/config'
 import { BUILT_IDENTITY, BUILT_VERSION, installedVersion } from '../src/plugin-meta'
 import { DEFAULT_PORT } from '../src/protocol'
@@ -118,7 +118,7 @@ export async function collect(): Promise<Status> {
     lanUrl: url(lan),
     tailscaleUrl: tailscale?.kind === 'running' ? url(tailscale.host) : null,
     dependencies: buildDependencies({
-      hasClaude: Bun.which('claude') !== null,
+      hasClaude: claudePath(homedir()) !== null,
       hasTmux: Bun.which('tmux') !== null,
       hasGit: Bun.which('git') !== null,
       hasQrencode: Bun.which('qrencode') !== null,
