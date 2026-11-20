@@ -7,6 +7,7 @@ import {
   autostartCommand,
   autostartEntry,
   healthLabel,
+  knownLinks,
   problemCount,
   resolveAction,
   resolveBinary,
@@ -191,5 +192,28 @@ describe('autostart', () => {
     expect(entrada).toContain('[Desktop Entry]')
     expect(entrada).toContain('Type=Application')
     expect(entrada).toContain('X-GNOME-Autostart-enabled=true')
+  })
+})
+
+describe('knownLinks', () => {
+  const status = {
+    links: { lan: 'http://10.0.0.2:7777/?t=x', tailscale: null },
+    dependencies: [
+      { id: 'claude', url: 'https://claude.com/claude-code' },
+      { id: 'tmux' },
+      { id: 'ruim', url: 'file:///etc/passwd' },
+    ],
+  } as unknown as Status
+
+  test('link de "como instalar" de uma dependência pode ser aberto', () => {
+    expect(knownLinks(status)).toContain('https://claude.com/claude-code')
+  })
+
+  test('só https entra pela lista de dependências', () => {
+    expect(knownLinks(status)).not.toContain('file:///etc/passwd')
+  })
+
+  test('sem status, sobra só o endereço fixo do app', () => {
+    expect(knownLinks(null)).toHaveLength(1)
   })
 })
